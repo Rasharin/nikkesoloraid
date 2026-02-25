@@ -1060,7 +1060,7 @@ function SettingsTab(props: {
             <button
               key={n.id}
               onClick={() => toggleSelect(n.name)}
-              className={`min-w-0rounded-2xl border p-1 text-left active:scale-[0.99] ${selected ? "border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
+              className={`min-w-0 rounded-2xl border p-1 text-left active:scale-[0.99] ${selected ? "border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
                 }`}
             >
               <div className="aspect-square w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
