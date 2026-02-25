@@ -2,6 +2,18 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
+const btnClass = (selected: boolean) =>
+  `rounded-xl border px-3 py-1 text-sm transition
+   ${selected
+    ? "bg-white text-black border-white"
+    : "bg-transparent text-neutral-200 border-neutral-700 hover:border-neutral-400"
+  }`
+
+function toggleSet<T>(set: Set<T>, value: T) {
+  const next = new Set(set)
+  next.has(value) ? next.delete(value) : next.add(value)
+  return next
+}
 
 // -------------------- Types --------------------
 type Deck = {
@@ -11,11 +23,17 @@ type Deck = {
   createdAt: number;
 };
 
+type NikkeElement = "iron" | "fire" | "wind" | "water" | "electric" | null
+type NikkeRole = "attacker" | "supporter" | "defender" | null
+
 type NikkeRow = {
   id: string;
   name: string;
   image_path: string | null;
   created_at: string;
+  burst: number | null;
+  element: NikkeElement;
+  role: NikkeRole;
 };
 
 type BossRow = {
@@ -27,6 +45,20 @@ type BossRow = {
   ends_at: string | null;
   created_at: string;
 };
+
+  const elements = [
+    { v: "iron", label: "철갑" },
+    { v: "fire", label: "작열" },
+    { v: "wind", label: "풍압" },
+    { v: "water", label: "수냉" },
+    { v: "electric", label: "전격" },
+  ] as const;
+
+  const roles = [
+    { v: "attacker", label: "화력형" },
+    { v: "supporter", label: "지원형" },
+    { v: "defender", label: "방어형" },
+  ] as const;
 
 type TabKey = "home" | "saved" | "settings";
 
@@ -300,6 +332,10 @@ export default function Page() {
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | null>(null);
 
+  const [selectedBursts, setSelectedBursts] = useState<Set<number>>(new Set())
+  const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set())
+  const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set())
+
   function showToast(msg: string) {
     setToast(msg);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
@@ -329,7 +365,7 @@ export default function Page() {
         const parsed = JSON.parse(raw) as Deck[];
         if (Array.isArray(parsed)) setDecks(parsed);
       }
-    } catch {}
+    } catch { }
 
     try {
       const rawSel = localStorage.getItem(SELECTED_KEY);
@@ -337,20 +373,20 @@ export default function Page() {
         const parsed = JSON.parse(rawSel) as string[];
         if (Array.isArray(parsed)) setSelectedNames(parsed.slice(0, MAX_SELECTED));
       }
-    } catch {}
+    } catch { }
   }, []);
 
   // save local
   useEffect(() => {
     try {
       localStorage.setItem(DECKS_KEY, JSON.stringify(decks));
-    } catch {}
+    } catch { }
   }, [decks]);
 
   useEffect(() => {
     try {
       localStorage.setItem(SELECTED_KEY, JSON.stringify(selectedNames));
-    } catch {}
+    } catch { }
   }, [selectedNames]);
 
   async function refreshSupabase() {
@@ -359,7 +395,7 @@ export default function Page() {
     try {
       const { data: nikkeData, error: nikkeErr } = await supabase
         .from("nikkes")
-        .select("id,name,image_path,created_at")
+        .select("id,name,image_path,created_at,burst,element,role")
         .order("name", { ascending: true });
 
       if (nikkeErr) {
@@ -825,6 +861,12 @@ export default function Page() {
             setSelectedNames={setSelectedNames}
             onSync={onSyncBucket}
             syncing={syncing}
+            selectedBursts={selectedBursts}
+            setSelectedBursts={setSelectedBursts}
+            selectedElements={selectedElements}
+            setSelectedElements={setSelectedElements}
+            selectedRoles={selectedRoles}
+            setSelectedRoles={setSelectedRoles}
           />
         )}
       </div>
@@ -866,16 +908,52 @@ function SettingsTab(props: {
   setSelectedNames: React.Dispatch<React.SetStateAction<string[]>>;
   onSync: () => void;
   syncing: boolean;
+
+  selectedBursts: Set<number>;
+  setSelectedBursts: React.Dispatch<React.SetStateAction<Set<number>>>;
+  selectedElements: Set<string>;
+  setSelectedElements: React.Dispatch<React.SetStateAction<Set<string>>>;
+  selectedRoles: Set<string>;
+  setSelectedRoles: React.Dispatch<React.SetStateAction<Set<string>>>;
 }) {
-  const { nikkes, selectedNames, toggleSelect, setSelectedNames, onSync, syncing } = props;
+  const {
+    nikkes, selectedNames, toggleSelect, setSelectedNames, onSync, syncing,
+    selectedBursts, setSelectedBursts,
+    selectedElements, setSelectedElements,
+    selectedRoles, setSelectedRoles,
+  } = props;
+
   const [q, setQ] = useState("");
 
+  // ✅ 검색 + 필터 합친 결과
   const filtered = useMemo(() => {
     const query = q.trim();
-    if (!query) return nikkes;
-    return nikkes.filter((n) => n.name.includes(query));
-  }, [nikkes, q]);
 
+    return nikkes.filter((n) => {
+      // 검색
+      if (query && !n.name.includes(query)) return false;
+
+      // burst: 선택 있으면 (선택 burst OR 0) 통과
+      if (selectedBursts.size > 0) {
+        const b = n.burst ?? -1;
+        if (!(b === 0 || selectedBursts.has(b))) return false;
+      }
+
+      // element
+      if (selectedElements.size > 0) {
+        if (!n.element || !selectedElements.has(n.element)) return false;
+      }
+
+      // role
+      if (selectedRoles.size > 0) {
+        if (!n.role || !selectedRoles.has(n.role)) return false;
+      }
+
+      return true;
+    });
+  }, [nikkes, q, selectedBursts, selectedElements, selectedRoles]);
+
+  // (NikkeName 컴포넌트는 기존 그대로 써도 됨)
   return (
     <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
       <div className="flex items-center justify-between">
@@ -899,7 +977,62 @@ function SettingsTab(props: {
           전체 해제
         </button>
       </div>
+      {/* ✅ 필터 버튼 */}
+      <div className="mt-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-neutral-400">필터</div>
+          <button
+            onClick={() => {
+              setSelectedBursts(new Set());
+              setSelectedElements(new Set());
+              setSelectedRoles(new Set());
+            }}
+            className="rounded-xl border border-neutral-700 px-3 py-1 text-xs text-neutral-200 hover:border-neutral-400"
+          >
+            전체
+          </button>
+        </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-14 text-xs text-neutral-500">버스트</div>
+          {[1, 2, 3].map((b) => (
+            <button
+              key={b}
+              onClick={() => setSelectedBursts((prev) => toggleSet(prev, b))}
+              className={btnClass(selectedBursts.has(b))}
+            >
+              {["Ⅰ", "Ⅱ", "Ⅲ"][b - 1]}
+            </button>
+          ))}
+          <div className="text-[11px] text-neutral-500">(0은 자동 포함)</div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-14 text-xs text-neutral-500">속성</div>
+          {elements.map((e) => (
+            <button
+              key={e.v}
+              onClick={() => setSelectedElements((prev) => toggleSet(prev, e.v))}
+              className={btnClass(selectedElements.has(e.v))}
+            >
+              {e.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-14 text-xs text-neutral-500">역할</div>
+          {roles.map((r) => (
+            <button
+              key={r.v}
+              onClick={() => setSelectedRoles((prev) => toggleSet(prev, r.v))}
+              className={btnClass(selectedRoles.has(r.v))}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="mt-4 grid grid-cols-5 gap-3 justify-items-start">
         {filtered.map((n) => {
           const selected = selectedNames.includes(n.name);
@@ -927,9 +1060,8 @@ function SettingsTab(props: {
             <button
               key={n.id}
               onClick={() => toggleSelect(n.name)}
-              className={`rounded-2xl border p-1 text-left active:scale-[0.99] ${
-                selected ? "border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
-              }`}
+              className={`rounded-2xl border p-1 text-left active:scale-[0.99] ${selected ? "border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
+                }`}
             >
               <div className="aspect-square w-22 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
                 {url ? (
