@@ -46,19 +46,19 @@ type BossRow = {
   created_at: string;
 };
 
-  const elements = [
-    { v: "iron", label: "철갑" },
-    { v: "fire", label: "작열" },
-    { v: "wind", label: "풍압" },
-    { v: "water", label: "수냉" },
-    { v: "electric", label: "전격" },
-  ] as const;
+const elements = [
+  { v: "iron", label: "철갑" },
+  { v: "fire", label: "작열" },
+  { v: "wind", label: "풍압" },
+  { v: "water", label: "수냉" },
+  { v: "electric", label: "전격" },
+] as const;
 
-  const roles = [
-    { v: "attacker", label: "화력형" },
-    { v: "supporter", label: "지원형" },
-    { v: "defender", label: "방어형" },
-  ] as const;
+const roles = [
+  { v: "attacker", label: "화력형" },
+  { v: "supporter", label: "지원형" },
+  { v: "defender", label: "방어형" },
+] as const;
 
 type TabKey = "home" | "saved" | "settings";
 
@@ -1007,17 +1007,20 @@ function SettingsTab(props: {
           <div className="text-[11px] text-neutral-500"></div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-14 text-xs text-neutral-500">속성</div>
-          {elements.map((e) => (
-            <button
-              key={e.v}
-              onClick={() => setSelectedElements((prev) => toggleSet(prev, e.v))}
-              className={btnClass(selectedElements.has(e.v))}
-            >
-              {e.label}
-            </button>
-          ))}
+        <div className="grid grid-cols-[56px_1fr] items-start gap-2">
+          <div className="text-xs text-neutral-500 pt-1">속성</div>
+
+          <div className="flex flex-wrap gap-2">
+            {elements.map((e) => (
+              <button
+                key={e.v}
+                onClick={() => setSelectedElements((prev) => toggleSet(prev, e.v))}
+                className={btnClass(selectedElements.has(e.v))}
+              >
+                {e.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
