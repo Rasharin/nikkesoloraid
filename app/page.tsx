@@ -1004,7 +1004,7 @@ function SettingsTab(props: {
               {["Ⅰ", "Ⅱ", "Ⅲ"][b - 1]}
             </button>
           ))}
-          <div className="text-[11px] text-neutral-500">(0은 자동 포함)</div>
+          <div className="text-[11px] text-neutral-500"></div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
