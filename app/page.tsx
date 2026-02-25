@@ -267,7 +267,6 @@ function GearIcon({ active }: { active: boolean }) {
     </svg>
   );
 }
-
 // -------------------- Page --------------------
 export default function Page() {
   const [tab, setTab] = useState<TabKey>("home");
@@ -306,11 +305,21 @@ export default function Page() {
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 1700);
   }
-  const handleResetSelected = () => {
+
+  // ✅ 선택 리스트 초기화(50개) + 로컬스토리지도 같이
+  const resetSelected = () => {
     setSelectedNames([]);
-    localStorage.removeItem("selectedNames"); // 저장 안 쓰면 이 줄 삭제
+    localStorage.removeItem(SELECTED_KEY);
     showToast("선택 리스트 초기화");
   };
+
+  // ✅ 덱 빌더(draft/score/editing)만 초기화 + 점수 입력칸 포커스
+  function clearDraft() {
+    setDraft([]);
+    setScore("");
+    setEditingId(null);
+    requestAnimationFrame(() => scoreRef.current?.focus());
+  }
 
   // load local
   useEffect(() => {
@@ -320,7 +329,7 @@ export default function Page() {
         const parsed = JSON.parse(raw) as Deck[];
         if (Array.isArray(parsed)) setDecks(parsed);
       }
-    } catch { }
+    } catch {}
 
     try {
       const rawSel = localStorage.getItem(SELECTED_KEY);
@@ -328,20 +337,20 @@ export default function Page() {
         const parsed = JSON.parse(rawSel) as string[];
         if (Array.isArray(parsed)) setSelectedNames(parsed.slice(0, MAX_SELECTED));
       }
-    } catch { }
+    } catch {}
   }, []);
 
   // save local
   useEffect(() => {
     try {
       localStorage.setItem(DECKS_KEY, JSON.stringify(decks));
-    } catch { }
+    } catch {}
   }, [decks]);
 
   useEffect(() => {
     try {
       localStorage.setItem(SELECTED_KEY, JSON.stringify(selectedNames));
-    } catch { }
+    } catch {}
   }, [selectedNames]);
 
   async function refreshSupabase() {
@@ -416,15 +425,10 @@ export default function Page() {
     setDraft((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  function clearDraft() {
-    setDraft([]);
-    setScore("");
-    setEditingId(null);
-  }
-
   function saveDeckFromDraft() {
     if (draft.length !== 5) return showToast("니케 5명을 먼저 골라줘.");
-    const sc = Number(score.replaceAll(",", "").trim());
+
+    const sc = Number(score.replaceAll(",", "").replaceAll(" ", "").trim());
     if (!Number.isFinite(sc) || sc <= 0) return showToast("점수는 숫자로 입력해줘.");
 
     if (editingId) {
@@ -441,7 +445,7 @@ export default function Page() {
       showToast("덱 저장 완료");
     }
 
-    clearDraft();
+    clearDraft(); // ✅ 저장 성공 후 덱 빌더만 초기화
   }
 
   function startEditDeck(d: Deck) {
@@ -548,10 +552,8 @@ export default function Page() {
           <>
             {/* Boss */}
             <section className="mb-5 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-
               {boss && boss.image_path ? (
                 <div className="mt-3 flex gap-4">
-
                   {/* 왼쪽: 제목 + 설명 */}
                   <div className="min-w-0 flex-1">
                     <div className="text-lg font-semibold">{boss.title}</div>
@@ -572,18 +574,14 @@ export default function Page() {
                       />
                     </div>
                   </div>
-
                 </div>
               ) : boss ? (
-                <div className="mt-2 text-sm text-neutral-300">
-                  보스는 있는데 이미지가 없어. bosses.image_path 확인해줘.
-                </div>
+                <div className="mt-2 text-sm text-neutral-300">보스는 있는데 이미지가 없어. bosses.image_path 확인해줘.</div>
               ) : (
-                <div className="mt-2 text-sm text-neutral-300">
-                  보스 데이터가 없어. Supabase bosses에 1개 넣어줘.
-                </div>
+                <div className="mt-2 text-sm text-neutral-300">보스 데이터가 없어. Supabase bosses에 1개 넣어줘.</div>
               )}
             </section>
+
             {/* 추천 조합 */}
             <section className="mb-5 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
               <div className="flex items-center justify-between">
@@ -611,12 +609,11 @@ export default function Page() {
                     </div>
                   </>
                 ) : (
-                  <div className="text-sm text-neutral-300">
-                    추천을 만들 만큼 덱이 부족해
-                  </div>
+                  <div className="text-sm text-neutral-300">추천을 만들 만큼 덱이 부족해</div>
                 )}
               </div>
             </section>
+
             {/* Selected Nikke carousel */}
             <section className="mb-5 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
               <div className="flex items-center justify-between">
@@ -624,7 +621,7 @@ export default function Page() {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={handleResetSelected}
+                    onClick={resetSelected}
                     className="rounded-xl border border-white/30 px-3 py-2 text-sm text-white hover:bg-white/10 active:scale-[0.99]"
                   >
                     리스트 초기화
@@ -679,6 +676,7 @@ export default function Page() {
                 </>
               )}
             </section>
+
             {/* Draft builder */}
             <section className="mb-5 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
               <h2 className="text-base font-semibold">{editingId ? "덱 수정" : "덱 만들기"}</h2>
@@ -716,6 +714,12 @@ export default function Page() {
                     inputMode="numeric"
                     value={score}
                     onChange={(e) => setScore(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        saveDeckFromDraft(); // ✅ Enter = 저장 버튼
+                      }
+                    }}
                     placeholder="점수만 입력하면 1덱 완성 (예: 6510755443)"
                     className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-base outline-none"
                   />
@@ -741,8 +745,7 @@ export default function Page() {
             {/* Optional text bulk add */}
             <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
               <h2 className="text-base font-semibold">덱 일괄입력</h2>
-              <p className="mt-1 text-xs text-neutral-400">
-              </p>
+
               <textarea
                 value={bulkText}
                 onChange={(e) => setBulkText(e.target.value)}
@@ -896,10 +899,12 @@ function SettingsTab(props: {
           전체 해제
         </button>
       </div>
+
       <div className="mt-4 grid grid-cols-5 gap-3 justify-items-start">
         {filtered.map((n) => {
           const selected = selectedNames.includes(n.name);
           const url = n.image_path ? getPublicUrl("nikke-images", n.image_path) : "";
+
           function NikkeName({ name }: { name: string }) {
             const parts = name.split(":");
 
@@ -917,15 +922,18 @@ function SettingsTab(props: {
               </div>
             );
           }
+
           return (
             <button
               key={n.id}
               onClick={() => toggleSelect(n.name)}
-              className={`rounded-2xl border p-1 text-left active:scale-[0.99] ${selected ? "border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
-                }`}
+              className={`rounded-2xl border p-1 text-left active:scale-[0.99] ${
+                selected ? "border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
+              }`}
             >
               <div className="aspect-square w-22 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
                 {url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={url} alt={n.name} className="h-full w-full object-cover" />
                 ) : (
                   <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
