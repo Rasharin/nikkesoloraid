@@ -1033,7 +1033,7 @@ function SettingsTab(props: {
           ))}
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-5 gap-3 justify-items-start">
+      <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
         {filtered.map((n) => {
           const selected = selectedNames.includes(n.name);
           const url = n.image_path ? getPublicUrl("nikke-images", n.image_path) : "";
@@ -1060,10 +1060,10 @@ function SettingsTab(props: {
             <button
               key={n.id}
               onClick={() => toggleSelect(n.name)}
-              className={`rounded-2xl border p-1 text-left active:scale-[0.99] ${selected ? "border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
+              className={`min-w-0rounded-2xl border p-1 text-left active:scale-[0.99] ${selected ? "border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
                 }`}
             >
-              <div className="aspect-square w-22 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
+              <div className="aspect-square w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
                 {url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={url} alt={n.name} className="h-full w-full object-cover" />
