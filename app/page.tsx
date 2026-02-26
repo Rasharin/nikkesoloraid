@@ -452,15 +452,11 @@ export default function Page() {
 
   const best = useMemo(() => pickBest5(decks), [decks]);
   const canRecommend = best.picked.length === 5;
-  const sortedDecks = useMemo(() => decks.slice().sort((a, b) => b.score - a.score), [decks]);
-  const visibleSavedDecks = useMemo(() => {
-    switch (savedDeckTab) {
-      case "altruia":
-      case "onlyone":
-      default:
-        return sortedDecks;
-    }
-  }, [savedDeckTab, sortedDecks]);
+  const sortedDecks = useMemo(
+    () => decks.slice().sort((a, b) => b.score - a.score),
+    [decks]
+  );
+  const visibleSavedDecks = sortedDecks;
 
   function addToDraft(name: string) {
     setDraft((prev) => {
