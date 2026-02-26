@@ -1102,13 +1102,18 @@ function SettingsTab(props: SettingsTabProps) {
           <div className="flex items-center gap-3">
             <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">버스트</div>
             <div className="flex flex-wrap gap-2">
-              {[1, 2, 3].map((b) => (
+              {[
+                { n: 1, label: "I" },
+                { n: 2, label: "II" },
+                { n: 3, label: "III" },
+              ].map((b) => (
                 <button
-                  key={b}
-                  onClick={() => setSelectedBursts(prev => toggleSet(prev, b))}
-                  className={btnClass(selectedBursts.has(b))}
+                  key={b.n}
+                  type="button"
+                  onClick={() => setSelectedBursts((prev) => toggleSet(prev, b.n))}
+                  className={btnClass(selectedBursts.has(b.n))}
                 >
-                  {b}
+                  {b.label}
                 </button>
               ))}
             </div>
