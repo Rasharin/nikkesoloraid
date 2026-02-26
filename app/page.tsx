@@ -457,33 +457,33 @@ export default function Page() {
       return next;
     });
   }
-useEffect(() => {
-  loadDecks();
-}, []);
+  useEffect(() => {
+    loadDecks();
+  }, []);
   function removeFromDraft(idx: number) {
     setDraft((prev) => prev.filter((_, i) => i !== idx));
   }
   async function loadDecks() {
-  const { data, error } = await supabase
-    .from("solo_decks")
-    .select("id, chars, score, created_at")
-    .order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("solo_decks")
+      .select("id, chars, score, created_at")
+      .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error(error);
-    return showToast("덱 불러오기 실패");
+    if (error) {
+      console.error(error);
+      return showToast("덱 불러오기 실패");
+    }
+
+    const mapped =
+      (data ?? []).map((r: any) => ({
+        id: r.id,
+        chars: r.chars,
+        score: Number(r.score),
+        createdAt: new Date(r.created_at).getTime(),
+      })) ?? [];
+
+    setDecks(mapped);
   }
-
-  const mapped =
-    (data ?? []).map((r: any) => ({
-      id: r.id,
-      chars: r.chars,
-      score: Number(r.score),
-      createdAt: new Date(r.created_at).getTime(),
-    })) ?? [];
-
-  setDecks(mapped);
-}
   async function saveDeckFromDraft() {
     if (draft.length !== 5) return showToast("니케 5명을 먼저 골라줘.");
 
@@ -631,7 +631,7 @@ useEffect(() => {
         {/* Header */}
         <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3 backdrop-blur">
           <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold">니케 솔레덱 조합기</h1>
+            <h1 className="text-lg font-semibold">니케 솔로레이드 덱 도우미</h1>
 
             <div className="flex items-center gap-2">
               <button
@@ -733,7 +733,7 @@ useEffect(() => {
                     </div>
                   </>
                 ) : (
-                  <div className="text-sm text-neutral-300">추천을 만들 만큼 덱이 부족해</div>
+                  <div className="text-sm text-neutral-300">5덱 이상 추가 시 추천 조합 생성</div>
                 )}
               </div>
             </section>
@@ -762,7 +762,7 @@ useEffect(() => {
 
               {selectednikkes.length === 0 ? (
                 <div className="mt-3 text-sm text-neutral-300">
-                  아직 선택된 니케가 없어. <span className="text-neutral-200">설정 탭</span>에서 최대 50개 선택 가능.
+                  <span className="text-neutral-200">설정 탭</span>에서 최대 50개 선택 가능.
                 </div>
               ) : (
                 <>
@@ -844,7 +844,7 @@ useEffect(() => {
                         saveDeckFromDraft(); // ✅ Enter = 저장 버튼
                       }
                     }}
-                    placeholder="점수만 입력하면 1덱 완성 (예: 6510755443)"
+                    placeholder="점수입력 (예: 6510755443)"
                     className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-base outline-none"
                   />
                 </div>
@@ -908,7 +908,7 @@ useEffect(() => {
 
             <div className="mt-3 space-y-2">
               {sortedDecks.length === 0 ? (
-                <div className="text-sm text-neutral-300">아직 저장된 덱이 없어. 홈에서 만들어줘.</div>
+                <div className="text-sm text-neutral-300">저장된 덱 없음.</div>
               ) : (
                 sortedDecks.map((d, idx) => (
                   <div key={d.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
@@ -1074,7 +1074,7 @@ function SettingsTab(props: SettingsTabProps) {
   return (
     <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">설정: 사용할 니케 선택</h2>
+        <h2 className="text-base font-semibold">사용할 니케 선택</h2>
         <div className="text-xs text-neutral-400">
           {selectedNames.length} / {MAX_SELECTED}
         </div>
@@ -1095,9 +1095,59 @@ function SettingsTab(props: SettingsTabProps) {
         </button>
       </div>
 
-      {/* 필터 UI는 네 기존 그대로 두면 됨 (btnClass, toggleSet, elements, roles 사용) */}
-      {/* ... 네가 가진 필터 블록 그대로 ... */}
+      <section className="mb-3 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+        <div className="grid gap-3">
 
+          {/* 버스트 */}
+          <div className="flex items-center gap-3">
+            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">버스트</div>
+            <div className="flex flex-wrap gap-2">
+              {[1, 2, 3].map((b) => (
+                <button
+                  key={b}
+                  onClick={() => setSelectedBursts(prev => toggleSet(prev, b))}
+                  className={btnClass(selectedBursts.has(b))}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 속성 */}
+          <div className="flex items-center gap-3">
+            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">속성</div>
+            <div className="flex flex-wrap gap-2">
+              {elements.map((e) => (
+                <button
+                  key={e.v}
+                  onClick={() => setSelectedElements(prev => toggleSet(prev, e.v))}
+                  className={btnClass(selectedElements.has(e.v))}
+                >
+                  {e.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 역할 */}
+          <div className="flex items-center gap-3">
+            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">역할</div>
+            <div className="flex flex-wrap gap-2">
+              {roles.map((r) => (
+                <button
+                  key={r.v}
+                  onClick={() => setSelectedRoles(prev => toggleSet(prev, r.v))}
+                  className={btnClass(selectedRoles.has(r.v))}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </section>
       <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
         {filtered.map((n) => {
           const selected = selectedNames.includes(n.name);
