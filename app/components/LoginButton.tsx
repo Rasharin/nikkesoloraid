@@ -33,14 +33,14 @@ export default function LoginButton() {
     };
   }, []);
 
-  const login = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${location.origin}/auth/callback`,
-      },
-    });
-  };
+async function handleGoogleLogin() {
+  await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: "https://nikkesoloraid.vercel.app/auth/callback",
+    },
+  });
+}
 
   const logout = async () => {
     await supabase.auth.signOut();
@@ -78,7 +78,7 @@ export default function LoginButton() {
 
   return (
     <button
-      onClick={login}
+      onClick={handleGoogleLogin}
       className="rounded-xl border border-neutral-700 px-3 py-2 text-sm hover:border-neutral-400 active:scale-[0.99]"
     >
       Google 로그인
