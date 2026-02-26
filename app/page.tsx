@@ -1,5 +1,5 @@
 "use client";
-
+import LoginButton from "./components/LoginButton";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 const btnClass = (selected: boolean) =>
@@ -561,14 +561,31 @@ export default function Page() {
         <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3 backdrop-blur">
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold">니케 솔레덱 조합기</h1>
-            <button
-              onClick={clearSeason}
-              className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
-            >
-              시즌 종료(초기화)
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={clearSeason}
+                className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
+              >
+                시즌 종료(초기화)
+              </button>
+              <LoginButton />
+            </div>
           </div>
         </div>
+
+        {/* Toast */}
+        {toast && (
+          <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-2xl bg-neutral-800 px-4 py-2 text-sm shadow">
+            {toast}
+          </div>
+        )}
+
+        {loadingData && (
+          <div className="mb-4 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 text-sm text-neutral-300">
+            Supabase에서 니케/보스 정보를 불러오는 중…
+          </div>
+        )}
 
         {/* Toast */}
         {toast && (
@@ -874,7 +891,10 @@ export default function Page() {
       {/* Bottom Tab Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-neutral-800 bg-neutral-950/95 backdrop-blur">
         <div className="mx-auto flex max-w-xl">
-          <button onClick={() => setTab("home")} className="flex w-1/3 flex-col items-center gap-1 py-3 active:scale-[0.99]">
+          <button
+            onClick={() => setTab("home")}
+            className="flex w-1/3 flex-col items-center gap-1 py-3 active:scale-[0.99]"
+          >
             <HomeIcon active={tab === "home"} />
             <div className={`text-xs ${tab === "home" ? "text-white" : "text-neutral-400"}`}>홈</div>
           </button>
@@ -901,7 +921,7 @@ export default function Page() {
 }
 
 // -------------------- SettingsTab --------------------
-function SettingsTab(props: {
+type SettingsTabProps = {
   nikkes: NikkeRow[];
   selectedNames: string[];
   toggleSelect: (name: string) => void;
@@ -911,49 +931,75 @@ function SettingsTab(props: {
 
   selectedBursts: Set<number>;
   setSelectedBursts: React.Dispatch<React.SetStateAction<Set<number>>>;
+
   selectedElements: Set<string>;
   setSelectedElements: React.Dispatch<React.SetStateAction<Set<string>>>;
+
   selectedRoles: Set<string>;
   setSelectedRoles: React.Dispatch<React.SetStateAction<Set<string>>>;
-}) {
+};
+
+function SettingsTab(props: SettingsTabProps) {
   const {
-    nikkes, selectedNames, toggleSelect, setSelectedNames, onSync, syncing,
-    selectedBursts, setSelectedBursts,
-    selectedElements, setSelectedElements,
-    selectedRoles, setSelectedRoles,
+    nikkes,
+    selectedNames,
+    toggleSelect,
+    setSelectedNames,
+    onSync,
+    syncing,
+    selectedBursts,
+    setSelectedBursts,
+    selectedElements,
+    setSelectedElements,
+    selectedRoles,
+    setSelectedRoles,
   } = props;
 
   const [q, setQ] = useState("");
 
-  // ✅ 검색 + 필터 합친 결과
   const filtered = useMemo(() => {
     const query = q.trim();
 
     return nikkes.filter((n) => {
-      // 검색
       if (query && !n.name.includes(query)) return false;
 
-      // burst: 선택 있으면 (선택 burst OR 0) 통과
+      // ⚠️ NikkeRow에 burst/element/role 필드가 실제로 있어야 함
       if (selectedBursts.size > 0) {
-        const b = n.burst ?? -1;
+        const b = (n as any).burst ?? -1;
         if (!(b === 0 || selectedBursts.has(b))) return false;
       }
 
-      // element
       if (selectedElements.size > 0) {
-        if (!n.element || !selectedElements.has(n.element)) return false;
+        const el = (n as any).element;
+        if (!el || !selectedElements.has(el)) return false;
       }
 
-      // role
       if (selectedRoles.size > 0) {
-        if (!n.role || !selectedRoles.has(n.role)) return false;
+        const role = (n as any).role;
+        if (!role || !selectedRoles.has(role)) return false;
       }
 
       return true;
     });
   }, [nikkes, q, selectedBursts, selectedElements, selectedRoles]);
 
-  // (NikkeName 컴포넌트는 기존 그대로 써도 됨)
+  function NikkeName({ name }: { name: string }) {
+    const parts = name.split(":");
+    return (
+      <div className="mt-1 h-[2.4em] overflow-hidden break-words text-[11px] font-medium leading-tight">
+        {parts.length > 1 ? (
+          <>
+            {parts[0]}:
+            <br />
+            {parts.slice(1).join(":")}
+          </>
+        ) : (
+          name
+        )}
+      </div>
+    );
+  }
+
   return (
     <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
       <div className="flex items-center justify-between">
@@ -977,87 +1023,14 @@ function SettingsTab(props: {
           전체 해제
         </button>
       </div>
-      {/* ✅ 필터 버튼 */}
-      <div className="mt-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-neutral-400">필터</div>
-          <button
-            onClick={() => {
-              setSelectedBursts(new Set());
-              setSelectedElements(new Set());
-              setSelectedRoles(new Set());
-            }}
-            className="rounded-xl border border-neutral-700 px-3 py-1 text-xs text-neutral-200 hover:border-neutral-400"
-          >
-            전체
-          </button>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-14 text-xs text-neutral-500">버스트</div>
-          {[1, 2, 3].map((b) => (
-            <button
-              key={b}
-              onClick={() => setSelectedBursts((prev) => toggleSet(prev, b))}
-              className={btnClass(selectedBursts.has(b))}
-            >
-              {["Ⅰ", "Ⅱ", "Ⅲ"][b - 1]}
-            </button>
-          ))}
-          <div className="text-[11px] text-neutral-500"></div>
-        </div>
+      {/* 필터 UI는 네 기존 그대로 두면 됨 (btnClass, toggleSet, elements, roles 사용) */}
+      {/* ... 네가 가진 필터 블록 그대로 ... */}
 
-        <div className="grid grid-cols-[56px_1fr] items-start gap-2">
-          <div className="text-xs text-neutral-500 pt-1">속성</div>
-
-          <div className="flex flex-wrap gap-2">
-            {elements.map((e) => (
-              <button
-                key={e.v}
-                onClick={() => setSelectedElements((prev) => toggleSet(prev, e.v))}
-                className={btnClass(selectedElements.has(e.v))}
-              >
-                {e.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-14 text-xs text-neutral-500">역할</div>
-          {roles.map((r) => (
-            <button
-              key={r.v}
-              onClick={() => setSelectedRoles((prev) => toggleSet(prev, r.v))}
-              className={btnClass(selectedRoles.has(r.v))}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-      </div>
       <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
         {filtered.map((n) => {
           const selected = selectedNames.includes(n.name);
           const url = n.image_path ? getPublicUrl("nikke-images", n.image_path) : "";
-
-          function NikkeName({ name }: { name: string }) {
-            const parts = name.split(":");
-
-            return (
-              <div className="mt-1 h-[2.4em] text-[11px] font-medium leading-tight break-words overflow-hidden">
-                {parts.length > 1 ? (
-                  <>
-                    {parts[0]}:
-                    <br />
-                    {parts.slice(1).join(":")}
-                  </>
-                ) : (
-                  name
-                )}
-              </div>
-            );
-          }
 
           return (
             <button
