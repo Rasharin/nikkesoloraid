@@ -456,32 +456,79 @@ export default function Page() {
       return next;
     });
   }
-
+useEffect(() => {
+  loadDecks();
+}, []);
   function removeFromDraft(idx: number) {
     setDraft((prev) => prev.filter((_, i) => i !== idx));
   }
+  async function loadDecks() {
+  const { data, error } = await supabase
+    .from("solo_decks")
+    .select("id, chars, score, created_at")
+    .order("created_at", { ascending: false });
 
-  function saveDeckFromDraft() {
+  if (error) {
+    console.error(error);
+    return showToast("덱 불러오기 실패");
+  }
+
+  const mapped =
+    (data ?? []).map((r: any) => ({
+      id: r.id,
+      chars: r.chars,
+      score: Number(r.score),
+      createdAt: new Date(r.created_at).getTime(),
+    })) ?? [];
+
+  setDecks(mapped);
+}
+  async function saveDeckFromDraft() {
     if (draft.length !== 5) return showToast("니케 5명을 먼저 골라줘.");
 
     const sc = Number(score.replaceAll(",", "").replaceAll(" ", "").trim());
     if (!Number.isFinite(sc) || sc <= 0) return showToast("점수는 숫자로 입력해줘.");
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return showToast("로그인이 필요해.");
+
     if (editingId) {
-      setDecks((prev) => {
-        const idx = prev.findIndex((d) => d.id === editingId);
-        if (idx < 0) return prev;
-        const copy = [...prev];
-        copy[idx] = { ...copy[idx], chars: [...draft], score: sc, createdAt: Date.now() };
-        return copy;
-      });
+      const { error } = await supabase
+        .from("solo_decks")
+        .update({ chars: [...draft], score: sc })
+        .eq("id", editingId);
+
+      if (error) {
+        console.error(error);
+        return showToast("덱 수정 저장 실패");
+      }
+
       showToast("덱 수정 저장 완료");
     } else {
-      setDecks((prev) => [{ id: uid(), chars: [...draft], score: sc, createdAt: Date.now() }, ...prev]);
+      const { error } = await supabase.from("solo_decks").insert({
+        user_id: user.id,
+        chars: [...draft],
+        score: sc,
+      });
+
+      if (error) {
+        console.error(error);
+        return showToast("덱 저장 실패");
+      }
+
       showToast("덱 저장 완료");
     }
 
-    clearDraft(); // ✅ 저장 성공 후 덱 빌더만 초기화
+    // ✅ 저장 성공 후 빌더만 초기화 (기존 유지)
+    clearDraft();
+    setEditingId(null);
+    setScore("");
+
+    // ✅ DB 기준으로 다시 불러와서 UI 동기화
+    await loadDecks();
   }
 
   function startEditDeck(d: Deck) {
@@ -493,14 +540,37 @@ export default function Page() {
     showToast("수정 모드: 니케 변경 후 점수 저장");
   }
 
-  function deleteDeck(id: string) {
-    setDecks((prev) => prev.filter((d) => d.id !== id));
-    showToast("삭제 완료");
-  }
+  async function deleteDeck(id: string) {
+    const { error } = await supabase.from("solo_decks").delete().eq("id", id);
 
-  function clearSeason() {
-    setDecks([]);
+    if (error) {
+      console.error(error);
+      return showToast("삭제 실패");
+    }
+
+    showToast("삭제 완료");
+    await loadDecks();
+  }
+  async function clearSeason() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return showToast("로그인이 필요해.");
+
+    // 내 덱 전체 삭제
+    const { error } = await supabase.from("solo_decks").delete().eq("user_id", user.id);
+
+    if (error) {
+      console.error(error);
+      return showToast("시즌 초기화 실패");
+    }
+
+    await loadDecks();
     clearDraft();
+    setEditingId(null);
+    setScore("");
+
     showToast("시즌 데이터 초기화 완료");
   }
 
