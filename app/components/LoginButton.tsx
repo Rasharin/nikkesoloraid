@@ -2,6 +2,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
+import InAppBlockerModal, { isInAppBrowser } from "./InAppBlocker"; 
 
 type User = {
   id: string;
@@ -12,6 +13,7 @@ type User = {
 export default function LoginButton() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false); 
 
   // 처음 로드 + 로그인 상태 변화 감지
   useEffect(() => {
@@ -33,33 +35,23 @@ export default function LoginButton() {
     };
   }, []);
 
-function isInAppBrowser() {
-  return /KAKAOTALK|FBAN|FBAV|Instagram|NAVER|Daum|Line|wv/i.test(
-    navigator.userAgent
-  );
-}
+  async function handleGoogleLogin() {
+    // ✅ 인앱이면 모달만 띄우기
+    if (isInAppBrowser()) {
+      setOpen(true);
+      return;
+    }
 
-async function handleGoogleLogin() {
-  // 인앱 브라우저면 → 외부 브라우저로 열기
-  if (isInAppBrowser()) {
-    alert("인앱 브라우저에서는 Google 로그인이 안 됩니다.\n크롬에서 다시 열어주세요.");
-
-    // 현재 페이지를 새 창으로 → 외부 브라우저 유도
-    window.open(window.location.href, "_blank", "noopener,noreferrer");
-    return;
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "https://nikkesoloraid.vercel.app/auth/callback",
+      },
+    });
   }
 
-  // 일반 브라우저면 정상 로그인
-  await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: "https://nikkesoloraid.vercel.app/auth/callback",
-    },
-  });
-}
   const logout = async () => {
     await supabase.auth.signOut();
-    // onAuthStateChange로 null 처리되지만, 즉시 반영용으로 한 번 더
     setUser(null);
   };
 
@@ -92,11 +84,16 @@ async function handleGoogleLogin() {
   }
 
   return (
-    <button
-      onClick={handleGoogleLogin}
-      className="rounded-xl border border-neutral-700 px-3 py-2 text-sm hover:border-neutral-400 active:scale-[0.99]"
-    >
-      Google 로그인
-    </button>
+    <>
+      <button
+        onClick={handleGoogleLogin}
+        className="rounded-xl border border-neutral-700 px-3 py-2 text-sm hover:border-neutral-400 active:scale-[0.99]"
+      >
+        Google 로그인
+      </button>
+
+      {/* ✅ 로그인 눌렀을 때만 뜨는 모달 */}
+      <InAppBlockerModal open={open} onClose={() => setOpen(false)} />
+    </>
   );
 }

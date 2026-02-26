@@ -2,6 +2,7 @@
 import LoginButton from "./components/LoginButton";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
+import InAppBlocker from "./components/InAppBlocker";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
    ${selected
