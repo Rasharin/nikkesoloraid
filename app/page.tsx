@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import LoginButton from "./components/LoginButton";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
@@ -62,10 +62,15 @@ const roles = [
 ] as const;
 
 type TabKey = "home" | "saved" | "settings";
+const ACTIVE_RAID = "altruia" as const; // ✅ 진행되는 솔레 보스명
+const DECK_TABS = [
+  { key: "altruia", label: "앨트루이아" },
+] as const;
+type SavedDeckTab = (typeof DECK_TABS)[number]["key"];
 
 // -------------------- Constants --------------------
-const DECKS_KEY = "soloraid_decks_v5";
 const SELECTED_KEY = "soloraid_selected_nikkes_v2";
+const decksKey = (tab: SavedDeckTab) => `soloraid_decks_${tab}_v1`;
 
 const MAX_SELECTED = 50;
 const MAX_DECK_CHARS = 5;
@@ -303,6 +308,7 @@ function GearIcon({ active }: { active: boolean }) {
 // -------------------- Page --------------------
 export default function Page() {
   const [tab, setTab] = useState<TabKey>("home");
+  const [savedDeckTab, setSavedDeckTab] = useState<SavedDeckTab>(ACTIVE_RAID);
 
   // local decks
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -361,14 +367,6 @@ export default function Page() {
   // load local
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(DECKS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Deck[];
-        if (Array.isArray(parsed)) setDecks(parsed);
-      }
-    } catch { }
-
-    try {
       const rawSel = localStorage.getItem(SELECTED_KEY);
       if (rawSel) {
         const parsed = JSON.parse(rawSel) as string[];
@@ -377,12 +375,22 @@ export default function Page() {
     } catch { }
   }, []);
 
+  // ✅ 조회 탭 바뀔 때: 그 탭 덱을 로드해서 보여줌
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(decksKey(savedDeckTab));
+      setDecks(raw ? (JSON.parse(raw) as Deck[]) : []);
+    } catch {
+      setDecks([]);
+    }
+  }, [savedDeckTab]);
+
   // save local
   useEffect(() => {
     try {
-      localStorage.setItem(DECKS_KEY, JSON.stringify(decks));
+      localStorage.setItem(decksKey(savedDeckTab), JSON.stringify(decks));
     } catch { }
-  }, [decks]);
+  }, [decks, savedDeckTab]);
 
   useEffect(() => {
     try {
@@ -445,6 +453,14 @@ export default function Page() {
   const best = useMemo(() => pickBest5(decks), [decks]);
   const canRecommend = best.picked.length === 5;
   const sortedDecks = useMemo(() => decks.slice().sort((a, b) => b.score - a.score), [decks]);
+  const visibleSavedDecks = useMemo(() => {
+    switch (savedDeckTab) {
+      case "altruia":
+      case "onlyone":
+      default:
+        return sortedDecks;
+    }
+  }, [savedDeckTab, sortedDecks]);
 
   function addToDraft(name: string) {
     setDraft((prev) => {
@@ -457,79 +473,32 @@ export default function Page() {
       return next;
     });
   }
-  useEffect(() => {
-    loadDecks();
-  }, []);
   function removeFromDraft(idx: number) {
     setDraft((prev) => prev.filter((_, i) => i !== idx));
   }
-  async function loadDecks() {
-    const { data, error } = await supabase
-      .from("solo_decks")
-      .select("id, chars, score, created_at")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error(error);
-      return showToast("덱 불러오기 실패");
-    }
-
-    const mapped =
-      (data ?? []).map((r: any) => ({
-        id: r.id,
-        chars: r.chars,
-        score: Number(r.score),
-        createdAt: new Date(r.created_at).getTime(),
-      })) ?? [];
-
-    setDecks(mapped);
-  }
-  async function saveDeckFromDraft() {
+  function saveDeckFromDraft() {
     if (draft.length !== 5) return showToast("니케 5명을 먼저 골라줘.");
 
     const sc = Number(score.replaceAll(",", "").replaceAll(" ", "").trim());
     if (!Number.isFinite(sc) || sc <= 0) return showToast("점수는 숫자로 입력해줘.");
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return showToast("로그인이 필요해.");
-
     if (editingId) {
-      const { error } = await supabase
-        .from("solo_decks")
-        .update({ chars: [...draft], score: sc })
-        .eq("id", editingId);
-
-      if (error) {
-        console.error(error);
-        return showToast("덱 수정 저장 실패");
-      }
-
+      setDecks((prev) =>
+        prev.map((d) => (d.id === editingId ? { ...d, chars: [...draft], score: sc } : d)),
+      );
       showToast("덱 수정 저장 완료");
     } else {
-      const { error } = await supabase.from("solo_decks").insert({
-        user_id: user.id,
-        chars: [...draft],
-        score: sc,
-      });
-
-      if (error) {
-        console.error(error);
-        return showToast("덱 저장 실패");
-      }
-
+      setDecks((prev) => [
+        { id: uid(), chars: [...draft], score: sc, createdAt: Date.now() },
+        ...prev,
+      ]);
       showToast("덱 저장 완료");
     }
 
-    // ✅ 저장 성공 후 빌더만 초기화 (기존 유지)
+    // ✅ 저장 성공 후 빌더만 초기화
     clearDraft();
     setEditingId(null);
     setScore("");
-
-    // ✅ DB 기준으로 다시 불러와서 UI 동기화
-    await loadDecks();
   }
 
   function startEditDeck(d: Deck) {
@@ -541,40 +510,10 @@ export default function Page() {
     showToast("수정 모드: 니케 변경 후 점수 저장");
   }
 
-  async function deleteDeck(id: string) {
-    const { error } = await supabase.from("solo_decks").delete().eq("id", id);
-
-    if (error) {
-      console.error(error);
-      return showToast("삭제 실패");
-    }
-
+  function deleteDeck(id: string) {
+    setDecks((prev) => prev.filter((d) => d.id !== id));
     showToast("삭제 완료");
-    await loadDecks();
   }
-  async function clearSeason() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return showToast("로그인이 필요해.");
-
-    // 내 덱 전체 삭제
-    const { error } = await supabase.from("solo_decks").delete().eq("user_id", user.id);
-
-    if (error) {
-      console.error(error);
-      return showToast("시즌 초기화 실패");
-    }
-
-    await loadDecks();
-    clearDraft();
-    setEditingId(null);
-    setScore("");
-
-    showToast("시즌 데이터 초기화 완료");
-  }
-
   function toggleSelect(name: string) {
     setSelectedNames((prev) => {
       if (prev.includes(name)) return prev.filter((x) => x !== name);
@@ -634,12 +573,6 @@ export default function Page() {
             <h1 className="text-2xl font-semibold">니케 솔로레이드 덱 도우미</h1>
 
             <div className="flex flex-wrap gap-2 justify-end">
-              <button
-                onClick={clearSeason}
-                className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
-              >
-                시즌 종료(초기화)
-              </button>
               <LoginButton />
             </div>
           </div>
@@ -903,21 +836,39 @@ export default function Page() {
           <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold">저장된 덱</h2>
-              <div className="text-xs text-neutral-400">{decks.length}개</div>
+              <div className="text-xs text-neutral-400">{visibleSavedDecks.length}개</div>
+            </div>
+
+            <div className="mt-2 flex gap-2">
+              {DECK_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setSavedDeckTab(tab.key)}
+                  className={`rounded-xl border px-3 py-1 text-sm transition ${savedDeckTab === tab.key
+                    ? "bg-white text-black border-white"
+                    : "bg-transparent text-neutral-200 border-neutral-700 hover:border-neutral-400"
+                    }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
             <div className="mt-3 space-y-2">
-              {sortedDecks.length === 0 ? (
+              {visibleSavedDecks.length === 0 ? (
                 <div className="text-sm text-neutral-300">저장된 덱 없음.</div>
               ) : (
-                sortedDecks.map((d, idx) => (
+                visibleSavedDecks.map((d) => (
                   <div key={d.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm font-semibold">#{idx + 1}</div>
-                      <div className="text-sm tabular-nums text-neutral-200">{fmt(d.score)}</div>
+                    <div className="font-medium text-neutral-100" style={{ fontSize: "1.3rem" }}>
+                      {d.chars.join(" / ")}
                     </div>
 
-                    <div className="mt-2 text-base font-medium text-neutral-100">{d.chars.join(" / ")}</div>
+                    <div className="flex items-center justify-end gap-3">
+                      <div className="font-semibold tabular-nums text-neutral-200" style={{ fontSize: "1.3rem" }}>
+                        {fmt(d.score)}
+                      </div>
+                    </div>
 
                     <div className="mt-3 flex gap-2">
                       <button
