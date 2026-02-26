@@ -630,10 +630,10 @@ export default function Page() {
       <div className="mx-auto max-w-xl px-4 pb-28 pt-6">
         {/* Header */}
         <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3 backdrop-blur">
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold">니케 솔로레이드 덱 도우미</h1>
+          <div className="flex flex-col gap-2">
+            <h1 className="text-2xl font-semibold">니케 솔로레이드 덱 도우미</h1>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-2 justify-end">
               <button
                 onClick={clearSeason}
                 className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
