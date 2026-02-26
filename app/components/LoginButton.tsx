@@ -33,7 +33,23 @@ export default function LoginButton() {
     };
   }, []);
 
+function isInAppBrowser() {
+  return /KAKAOTALK|FBAN|FBAV|Instagram|NAVER|Daum|Line|wv/i.test(
+    navigator.userAgent
+  );
+}
+
 async function handleGoogleLogin() {
+  // 인앱 브라우저면 → 외부 브라우저로 열기
+  if (isInAppBrowser()) {
+    alert("인앱 브라우저에서는 Google 로그인이 안 됩니다.\n크롬에서 다시 열어주세요.");
+
+    // 현재 페이지를 새 창으로 → 외부 브라우저 유도
+    window.open(window.location.href, "_blank", "noopener,noreferrer");
+    return;
+  }
+
+  // 일반 브라우저면 정상 로그인
   await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -41,7 +57,6 @@ async function handleGoogleLogin() {
     },
   });
 }
-
   const logout = async () => {
     await supabase.auth.signOut();
     // onAuthStateChange로 null 처리되지만, 즉시 반영용으로 한 번 더
