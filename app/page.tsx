@@ -409,7 +409,7 @@ export default function Page() {
 
       if (nikkeErr) {
         console.error(nikkeErr);
-        showToast("니케 목록 불러오기 실패(Supabase)");
+        showToast("니케 목록 불러오기 실패");
       } else {
         setnikkes((nikkeData ?? []) as NikkeRow[]);
       }
@@ -422,13 +422,13 @@ export default function Page() {
 
       if (bossErr) {
         console.error(bossErr);
-        showToast("보스 정보 불러오기 실패(Supabase)");
+        showToast("보스 정보 불러오기 실패");
       } else {
         setBoss((bossData && bossData[0]) || null);
       }
     } catch (e) {
       console.error(e);
-      showToast("Supabase 연결 에러(환경변수/키/패키지 확인)");
+      showToast("연결 에러");
     } finally {
       setLoadingData(false);
     }
@@ -583,7 +583,7 @@ export default function Page() {
 
         {loadingData && (
           <div className="mb-4 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 text-sm text-neutral-300">
-            Supabase에서 니케/보스 정보를 불러오는 중…
+            니케/보스 정보를 불러오는 중…
           </div>
         )}
 
@@ -596,7 +596,7 @@ export default function Page() {
 
         {loadingData && (
           <div className="mb-4 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 text-sm text-neutral-300">
-            Supabase에서 니케/보스 정보를 불러오는 중…
+            니케/보스 정보를 불러오는 중…
           </div>
         )}
 
@@ -629,9 +629,9 @@ export default function Page() {
                   </div>
                 </div>
               ) : boss ? (
-                <div className="mt-2 text-sm text-neutral-300">보스는 있는데 이미지가 없어. bosses.image_path 확인해줘.</div>
+                <div className="mt-2 text-sm text-neutral-300">보스는 있는데 이미지가 없어.</div>
               ) : (
-                <div className="mt-2 text-sm text-neutral-300">보스 데이터가 없어. Supabase bosses에 1개 넣어줘.</div>
+                <div className="mt-2 text-sm text-neutral-300">보스 데이터가 없어.</div>
               )}
             </section>
 
