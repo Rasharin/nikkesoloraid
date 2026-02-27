@@ -23,6 +23,13 @@ type Deck = {
   score: number;
   createdAt: number;
 };
+type DeckRow = {
+  id: string;
+  user_id: string;
+  chars: string[] | null;
+  score: number | string | null;
+  created_at: string;
+};
 
 type NikkeElement = "iron" | "fire" | "wind" | "water" | "electric" | null
 type NikkeRole = "attacker" | "supporter" | "defender" | null
@@ -70,7 +77,6 @@ type SavedDeckTab = (typeof DECK_TABS)[number]["key"];
 
 // -------------------- Constants --------------------
 const SELECTED_KEY = "soloraid_selected_nikkes_v2";
-const decksKey = (tab: SavedDeckTab) => `soloraid_decks_${tab}_v1`;
 
 const MAX_SELECTED = 50;
 const MAX_DECK_CHARS = 5;
@@ -78,10 +84,6 @@ const MAX_DECK_CHARS = 5;
 // -------------------- Utils --------------------
 function fmt(n: number) {
   return n.toLocaleString("en-US");
-}
-
-function uid() {
-  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
 function normToken(s: string) {
@@ -259,6 +261,19 @@ function parseBulk(text: string): Array<{ chars: string[]; score: number }> {
   return out;
 }
 
+function mapDeckRow(row: DeckRow): Deck | null {
+  const chars = Array.isArray(row.chars) ? row.chars.filter((v): v is string => typeof v === "string") : [];
+  const score = Number(row.score);
+  if (!Number.isFinite(score)) return null;
+  const createdAt = Date.parse(row.created_at);
+  return {
+    id: row.id,
+    chars,
+    score,
+    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+  };
+}
+
 // -------------------- Icons --------------------
 function HomeIcon({ active }: { active: boolean }) {
   return (
@@ -310,8 +325,10 @@ export default function Page() {
   const [tab, setTab] = useState<TabKey>("home");
   const [savedDeckTab, setSavedDeckTab] = useState<SavedDeckTab>(ACTIVE_RAID);
 
-  // local decks
+  // decks (Supabase)
   const [decks, setDecks] = useState<Deck[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [loadingDecks, setLoadingDecks] = useState(false);
 
   // supabase data
   const [nikkes, setnikkes] = useState<NikkeRow[]>([]);
@@ -343,6 +360,26 @@ export default function Page() {
   const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set())
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set())
 
+  async function refreshDecks(currentUserId: string) {
+    setLoadingDecks(true);
+    try {
+      const { data, error } = await supabase
+        .from("decks")
+        .select("id,user_id,chars,score,created_at")
+        .eq("user_id", currentUserId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setDecks(((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null));
+    } catch (e) {
+      console.error(e);
+      setDecks([]);
+      showToast("덱 불러오기 실패");
+    } finally {
+      setLoadingDecks(false);
+    }
+  }
+
   function showToast(msg: string) {
     setToast(msg);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
@@ -364,7 +401,26 @@ export default function Page() {
     requestAnimationFrame(() => scoreRef.current?.focus());
   }
 
-  // load local
+  // 로그인 유저 추적
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (!mounted) return;
+      setUserId(data.user?.id ?? null);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  // selected 목록만 localStorage 사용
   useEffect(() => {
     try {
       const rawSel = localStorage.getItem(SELECTED_KEY);
@@ -375,22 +431,16 @@ export default function Page() {
     } catch { }
   }, []);
 
-  // ✅ 조회 탭 바뀔 때: 그 탭 덱을 로드해서 보여줌
+  // 로그인 상태 변화 시 덱 로드
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(decksKey(savedDeckTab));
-      setDecks(raw ? (JSON.parse(raw) as Deck[]) : []);
-    } catch {
+    if (!userId) {
       setDecks([]);
+      setEditingId(null);
+      return;
     }
-  }, [savedDeckTab]);
-
-  // save local
-  useEffect(() => {
-    try {
-      localStorage.setItem(decksKey(savedDeckTab), JSON.stringify(decks));
-    } catch { }
-  }, [decks, savedDeckTab]);
+    refreshDecks(userId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, savedDeckTab]);
 
   useEffect(() => {
     try {
@@ -472,23 +522,43 @@ export default function Page() {
   function removeFromDraft(idx: number) {
     setDraft((prev) => prev.filter((_, i) => i !== idx));
   }
-  function saveDeckFromDraft() {
+  async function saveDeckFromDraft() {
     if (draft.length !== 5) return showToast("니케 5명을 먼저 골라줘.");
+    if (!userId) return showToast("로그인 후 덱 저장 가능");
 
     const sc = Number(score.replaceAll(",", "").replaceAll(" ", "").trim());
     if (!Number.isFinite(sc) || sc <= 0) return showToast("점수는 숫자로 입력해줘.");
 
-    if (editingId) {
-      setDecks((prev) =>
-        prev.map((d) => (d.id === editingId ? { ...d, chars: [...draft], score: sc } : d)),
-      );
-      showToast("덱 수정 저장 완료");
-    } else {
-      setDecks((prev) => [
-        { id: uid(), chars: [...draft], score: sc, createdAt: Date.now() },
-        ...prev,
-      ]);
-      showToast("덱 저장 완료");
+    try {
+      if (editingId) {
+        const { data, error } = await supabase
+          .from("decks")
+          .update({ chars: [...draft], score: sc })
+          .eq("id", editingId)
+          .eq("user_id", userId)
+          .select("id,user_id,chars,score,created_at")
+          .single();
+        if (error) throw error;
+        const updated = mapDeckRow(data as DeckRow);
+        if (!updated) throw new Error("Invalid deck row");
+        setDecks((prev) => prev.map((d) => (d.id === editingId ? updated : d)));
+        showToast("덱 수정 저장 완료");
+      } else {
+        const { data, error } = await supabase
+          .from("decks")
+          .insert({ user_id: userId, chars: [...draft], score: sc })
+          .select("id,user_id,chars,score,created_at")
+          .single();
+        if (error) throw error;
+        const inserted = mapDeckRow(data as DeckRow);
+        if (!inserted) throw new Error("Invalid deck row");
+        setDecks((prev) => [inserted, ...prev]);
+        showToast("덱 저장 완료");
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("덱 저장 실패");
+      return;
     }
 
     // ✅ 저장 성공 후 빌더만 초기화
@@ -506,9 +576,22 @@ export default function Page() {
     showToast("수정 모드: 니케 변경 후 점수 저장");
   }
 
-  function deleteDeck(id: string) {
-    setDecks((prev) => prev.filter((d) => d.id !== id));
-    showToast("삭제 완료");
+  async function deleteDeck(id: string) {
+    if (!userId) return showToast("로그인 후 삭제 가능");
+
+    try {
+      const { error } = await supabase
+        .from("decks")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+      if (error) throw error;
+      setDecks((prev) => prev.filter((d) => d.id !== id));
+      showToast("삭제 완료");
+    } catch (e) {
+      console.error(e);
+      showToast("덱 삭제 실패");
+    }
   }
   function toggleSelect(name: string) {
     setSelectedNames((prev) => {
@@ -536,26 +619,37 @@ export default function Page() {
     }
   }
 
-  function addDecksByText() {
+  async function addDecksByText() {
     const parsed = parseBulk(bulkText);
     if (parsed.length === 0) return showToast("맞는 덱이 없음.");
+    if (!userId) return showToast("로그인 후 덱 저장 가능");
 
-    setDecks((prev) => {
-      const exists = new Set(prev.map((d) => `${d.score}|${d.chars.map(normToken).join("|")}`));
-      const add: Deck[] = [];
-      let added = 0;
+    const exists = new Set(decks.map((d) => `${d.score}|${d.chars.map(normToken).join("|")}`));
+    const insertRows: Array<{ user_id: string; chars: string[]; score: number }> = [];
 
-      for (const p of parsed) {
-        const key = `${p.score}|${p.chars.map(normToken).join("|")}`;
-        if (exists.has(key)) continue;
-        add.push({ id: uid(), chars: p.chars, score: p.score, createdAt: Date.now() });
-        exists.add(key);
-        added++;
-      }
+    for (const p of parsed) {
+      const key = `${p.score}|${p.chars.map(normToken).join("|")}`;
+      if (exists.has(key)) continue;
+      insertRows.push({ user_id: userId, chars: p.chars, score: p.score });
+      exists.add(key);
+    }
 
-      showToast(`텍스트로 ${added}개 추가`);
-      return [...add, ...prev];
-    });
+    if (insertRows.length === 0) return showToast("추가할 새 덱이 없어.");
+
+    try {
+      const { data, error } = await supabase
+        .from("decks")
+        .insert(insertRows)
+        .select("id,user_id,chars,score,created_at");
+      if (error) throw error;
+      const added = ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
+      setDecks((prev) => [...added, ...prev]);
+      showToast(`텍스트로 ${added.length}개 추가`);
+    } catch (e) {
+      console.error(e);
+      showToast("텍스트 덱 저장 실패");
+      return;
+    }
 
     setBulkText("");
   }
@@ -584,6 +678,11 @@ export default function Page() {
         {loadingData && (
           <div className="mb-4 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 text-sm text-neutral-300">
             니케/보스 정보를 불러오는 중…
+          </div>
+        )}
+        {loadingDecks && (
+          <div className="mb-4 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 text-sm text-neutral-300">
+            저장된 덱을 불러오는 중…
           </div>
         )}
 
@@ -851,7 +950,9 @@ export default function Page() {
             </div>
 
             <div className="mt-3 space-y-2">
-              {visibleSavedDecks.length === 0 ? (
+              {!userId ? (
+                <div className="text-sm text-neutral-300">로그인하면 내 덱을 불러올 수 있어.</div>
+              ) : visibleSavedDecks.length === 0 ? (
                 <div className="text-sm text-neutral-300">저장된 덱 없음.</div>
               ) : (
                 visibleSavedDecks.map((d) => (
