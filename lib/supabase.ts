@@ -1,22 +1,33 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { parse, serialize } from "cookie";
 
-const sessionStorageAdapter = {
-  getItem: (key: string) => (typeof window === "undefined" ? null : window.sessionStorage.getItem(key)),
-  setItem: (key: string, value: string) => {
-    if (typeof window !== "undefined") window.sessionStorage.setItem(key, value);
-  },
-  removeItem: (key: string) => {
-    if (typeof window !== "undefined") window.sessionStorage.removeItem(key);
-  },
-};
+function normalizeCookieOptions(value: string, options: Record<string, unknown>) {
+  const next = { ...options } as Record<string, unknown>;
+  const isDeleteCookie = value === "" || options.maxAge === 0;
+  if (!isDeleteCookie) {
+    delete next.maxAge;
+    delete next.expires;
+  }
+  return next;
+}
 
 export const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   {
-    auth: {
-      storage: sessionStorageAdapter,
-      persistSession: true,
+    cookies: {
+      getAll() {
+        if (typeof document === "undefined") return [];
+        const parsed = parse(document.cookie ?? "");
+        return Object.entries(parsed).map(([name, value]) => ({ name, value: value ?? "" }));
+      },
+      setAll(cookiesToSet) {
+        if (typeof document === "undefined") return;
+        cookiesToSet.forEach(({ name, value, options }) => {
+          const normalized = normalizeCookieOptions(value, (options ?? {}) as Record<string, unknown>);
+          document.cookie = serialize(name, value, normalized);
+        });
+      },
     },
   }
 );
