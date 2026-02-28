@@ -38,9 +38,10 @@ type SettingsTabProps = {
 };
 
 function NikkeName({ name }: { name: string }) {
-  const parts = name.split(":");
+  const displayName = name.replace(/\s*\[[^\]]*\]/g, "").trim();
+  const parts = displayName.split(":");
   return (
-    <div className="mt-1 h-[2.4em] overflow-hidden break-words text-[11px] font-medium leading-tight">
+    <div className="mt-1 h-[2.4em] overflow-hidden break-words text-xs font-medium leading-tight">
       {parts.length > 1 ? (
         <>
           {parts[0]}:
