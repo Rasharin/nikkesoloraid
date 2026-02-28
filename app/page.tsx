@@ -1072,7 +1072,9 @@ export default function Page() {
           active_raid_key: nextKey,
           solo_raid_active: true,
         })
-        .eq("master_user_id", currentUserId);
+        .eq("master_user_id", currentUserId)
+        .select("master_user_id")
+        .maybeSingle();
 
       if (error) throw error;
 
@@ -1082,7 +1084,8 @@ export default function Page() {
       return true;
     } catch (error) {
       console.error(error);
-      showToast("솔로레이드 추가 실패");
+      const message = error instanceof Error ? error.message : "솔로레이드 추가 실패";
+      showToast(message);
       return false;
     }
   }
@@ -1099,14 +1102,17 @@ export default function Page() {
     }
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("app_config")
         .update({
           solo_raid_active: false,
         })
-        .eq("master_user_id", currentUserId);
+        .eq("master_user_id", currentUserId)
+        .select("master_user_id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error("app_config 업데이트 대상이 없어");
 
       await refreshAppConfig();
       await refreshSupabase(false);
@@ -1114,7 +1120,8 @@ export default function Page() {
       return true;
     } catch (error) {
       console.error(error);
-      showToast("솔로레이드 종료 실패");
+      const message = error instanceof Error ? error.message : "솔로레이드 종료 실패";
+      showToast(message);
       return false;
     }
   }
