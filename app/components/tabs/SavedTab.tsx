@@ -1,5 +1,7 @@
 "use client";
 
+import { formatNikkeDisplayNames } from "../../../lib/nikke-display";
+
 type Deck = {
   id: string;
   raidKey: string;
@@ -66,7 +68,7 @@ export default function SavedTab({
           visibleSavedDecks.map((deck) => (
             <div key={deck.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
               <div className="font-medium text-neutral-100" style={{ fontSize: "1.3rem" }}>
-                {deck.chars.join(" / ")}
+                {formatNikkeDisplayNames(deck.chars)}
               </div>
 
               <div className="flex items-center justify-end gap-3">

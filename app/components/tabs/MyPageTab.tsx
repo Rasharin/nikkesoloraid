@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatNikkeDisplayNames } from "../../../lib/nikke-display";
 
 type RecommendationDeck = {
   chars: string[];
@@ -376,7 +377,7 @@ export default function MyPageTab({
                         <div className="space-y-2">
                           {tabRecommendation.decks.map((deck, index) => (
                             <div key={`${tabRecommendation.raidKey}-${index}`} className="rounded-xl border border-neutral-800 px-3 py-2">
-                              <div className="text-sm text-neutral-100">{deck.chars.join(" / ")}</div>
+                              <div className="text-sm text-neutral-100">{formatNikkeDisplayNames(deck.chars)}</div>
                               <div className="mt-1 text-xs tabular-nums text-neutral-400">{fmt(deck.score)}</div>
                             </div>
                           ))}

@@ -140,6 +140,14 @@ function slugifyRaidLabel(label: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+function slugifyStorageKey(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function normToken(s: string) {
   return s.replace(/\s+/g, "").trim().toLowerCase();
 }
@@ -1057,7 +1065,7 @@ export default function Page() {
     const extension = imageFile.name.includes(".")
       ? imageFile.name.split(".").pop()?.toLowerCase() ?? "png"
       : "png";
-    const imagePath = `${nextKey}-${Date.now()}.${extension}`;
+    const imagePath = `${slugifyStorageKey(trimmed) || "boss"}-${Date.now()}.${extension}`;
 
     try {
       const { error: uploadError } = await supabase.storage
@@ -1134,22 +1142,17 @@ export default function Page() {
       return false;
     }
 
-    const safeName = trimmedName
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9가-힣]+/g, "-")
-      .replace(/^-+|-+$/g, "");
     const extension = imageFile.name.includes(".")
       ? imageFile.name.split(".").pop()?.toLowerCase() ?? "png"
       : "png";
-    const imagePath = `${safeName || "nikke"}-${Date.now()}.${extension}`;
+    const imagePath = imageFile.name.trim() || `nikke-${Date.now()}.${extension}`;
 
     try {
       const { error: uploadError } = await supabase.storage
         .from("nikke-images")
         .upload(imagePath, imageFile, {
           cacheControl: "3600",
-          upsert: false,
+          upsert: true,
         });
 
       if (uploadError) throw uploadError;
