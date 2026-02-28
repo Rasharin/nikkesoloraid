@@ -132,7 +132,7 @@ export default function SettingsTab({
         </button>
       </div>
 
-      <section className="mb-3 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+      <section className="mt-3 mb-3 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
         <div className="grid gap-3">
           <div className="flex items-center gap-3">
             <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">버스트</div>
@@ -186,7 +186,7 @@ export default function SettingsTab({
         </div>
       </section>
 
-      <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+      <div className="mt-4 grid grid-cols-5 gap-2">
         {filtered.map((nikke) => {
           const selected = selectedNames.includes(nikke.name);
           const url = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
