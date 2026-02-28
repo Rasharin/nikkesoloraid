@@ -469,6 +469,7 @@ export default function Page() {
   const [isMasterUser, setIsMasterUser] = useState(false);
   const [activeRaidKey, setActiveRaidKey] = useState<string | null>(DEFAULT_ACTIVE_RAID_KEY);
   const [soloRaidActive, setSoloRaidActive] = useState(true);
+  const [appConfigLoaded, setAppConfigLoaded] = useState(false);
   const [recommendationHistory, setRecommendationHistory] = useState<Record<string, RecommendationRecord>>({});
   const [recommendationLoaded, setRecommendationLoaded] = useState(false);
 
@@ -552,6 +553,7 @@ export default function Page() {
     let cancelled = false;
 
     async function loadAppConfig() {
+      setAppConfigLoaded(false);
       try {
         await refreshAppConfig();
       } catch (error) {
@@ -560,6 +562,10 @@ export default function Page() {
           setDeckTabs(DEFAULT_DECK_TABS);
           setActiveRaidKey(DEFAULT_ACTIVE_RAID_KEY);
           setSoloRaidActive(true);
+        }
+      } finally {
+        if (!cancelled) {
+          setAppConfigLoaded(true);
         }
       }
     }
@@ -732,9 +738,10 @@ export default function Page() {
 
   // initial fetch
   useEffect(() => {
+    if (!appConfigLoaded) return;
     refreshSupabase();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [soloRaidActive]);
+  }, [appConfigLoaded, soloRaidActive]);
 
   const nikkeMap = useMemo(() => {
     const m = new Map<string, NikkeRow>();
