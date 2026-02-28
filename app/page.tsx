@@ -46,7 +46,6 @@ type RecommendationRow = {
   updated_at: string | null;
 };
 type AppConfigRow = {
-  id: string;
   master_user_id: string | null;
   active_raid_key: string | null;
   solo_raid_active: boolean | null;
@@ -463,7 +462,6 @@ export default function Page() {
   const [selectedBursts, setSelectedBursts] = useState<Set<number>>(new Set())
   const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set())
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set())
-  const [appConfigId, setAppConfigId] = useState<string | null>(null);
   const [isMasterUser, setIsMasterUser] = useState(false);
   const [activeRaidKey, setActiveRaidKey] = useState<string | null>(DEFAULT_ACTIVE_RAID_KEY);
   const [soloRaidActive, setSoloRaidActive] = useState(true);
@@ -529,7 +527,7 @@ export default function Page() {
       try {
         const { data, error } = await supabase
           .from("app_config")
-          .select("id,master_user_id,active_raid_key,solo_raid_active,solo_raid_tabs")
+          .select("master_user_id,active_raid_key,solo_raid_active,solo_raid_tabs")
           .limit(1)
           .maybeSingle();
 
@@ -540,7 +538,6 @@ export default function Page() {
         const nextTabs = mapDeckTabs(config?.solo_raid_tabs);
         const resolvedTabs = nextTabs.length > 0 ? nextTabs : DEFAULT_DECK_TABS;
         const nextActiveKey = config?.active_raid_key ?? DEFAULT_ACTIVE_RAID_KEY;
-        setAppConfigId(config?.id ?? null);
         setDeckTabs(resolvedTabs);
         setActiveRaidKey(nextActiveKey);
         setSoloRaidActive(config?.solo_raid_active ?? true);
@@ -552,7 +549,6 @@ export default function Page() {
       } catch (error) {
         console.error(error);
         if (!cancelled) {
-          setAppConfigId(null);
           setDeckTabs(DEFAULT_DECK_TABS);
           setActiveRaidKey(DEFAULT_ACTIVE_RAID_KEY);
           setSoloRaidActive(true);
@@ -972,7 +968,7 @@ export default function Page() {
       showToast("마스터 계정만 가능");
       return false;
     }
-    if (!appConfigId) {
+    if (!userId) {
       showToast("앱 설정을 찾을 수 없어");
       return false;
     }
@@ -1035,7 +1031,7 @@ export default function Page() {
           active_raid_key: nextKey,
           solo_raid_active: true,
         })
-        .eq("id", appConfigId);
+        .eq("master_user_id", userId.trim());
 
       if (error) throw error;
 
@@ -1058,7 +1054,7 @@ export default function Page() {
       showToast("마스터 계정만 가능");
       return false;
     }
-    if (!appConfigId) {
+    if (!userId) {
       showToast("앱 설정을 찾을 수 없어");
       return false;
     }
@@ -1070,7 +1066,7 @@ export default function Page() {
           solo_raid_active: false,
           active_raid_key: null,
         })
-        .eq("id", appConfigId);
+        .eq("master_user_id", userId.trim());
 
       if (error) throw error;
 
