@@ -69,6 +69,13 @@ type AddSoloRaidPayload = {
   description: string;
   imageFile: File | null;
 };
+type AddNikkePayload = {
+  name: string;
+  burst: number | null;
+  element: NikkeElement;
+  role: NikkeRole;
+  imageFile: File | null;
+};
 
 type NikkeElement = "iron" | "fire" | "wind" | "water" | "electric" | null
 type NikkeRole = "attacker" | "supporter" | "defender" | null
@@ -244,7 +251,7 @@ async function syncnikkesFromBucket(): Promise<number> {
 
   if (rows.length === 0) return 0;
 
-  const { error: upErr } = await supabase.from("nikkesolo").upsert(rows, { onConflict: "name" });
+  const { error: upErr } = await supabase.from("nikkes").upsert(rows, { onConflict: "name" });
   if (upErr) throw upErr;
 
   return rows.length;
@@ -1097,6 +1104,80 @@ export default function Page() {
     }
   }
 
+  async function addNikke(payload: AddNikkePayload) {
+    const trimmedName = payload.name.trim();
+    const imageFile = payload.imageFile;
+
+    if (!isMaster) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 가능");
+      return false;
+    }
+
+    if (!trimmedName) {
+      showToast("니케 이름을 입력해줘");
+      return false;
+    }
+
+    if (!payload.burst || !payload.element || !payload.role) {
+      showToast("버스트/속성/역할을 모두 선택해줘");
+      return false;
+    }
+
+    if (!imageFile) {
+      showToast("니케 이미지를 선택해줘");
+      return false;
+    }
+
+    const safeName = trimmedName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9가-힣]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    const extension = imageFile.name.includes(".")
+      ? imageFile.name.split(".").pop()?.toLowerCase() ?? "png"
+      : "png";
+    const imagePath = `${safeName || "nikke"}-${Date.now()}.${extension}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("nikke-images")
+        .upload(imagePath, imageFile, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { error: upsertError } = await supabase.from("nikkes").upsert(
+        {
+          name: trimmedName,
+          image_path: imagePath,
+          burst: payload.burst,
+          element: payload.element,
+          role: payload.role,
+        },
+        { onConflict: "name" }
+      );
+
+      if (upsertError) throw upsertError;
+
+      await refreshSupabase();
+      showToast("니케 등록 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "니케 등록 실패";
+      showToast(message);
+      return false;
+    }
+  }
+
   async function endSoloRaid() {
     if (!canManageBosses) {
       showToast("마스터 계정만 가능");
@@ -1227,8 +1308,6 @@ export default function Page() {
             selectedNames={selectedNames}
             toggleSelect={toggleSelect}
             setSelectedNames={setSelectedNames}
-            onSync={onSyncBucket}
-            syncing={syncing}
             selectedBursts={selectedBursts}
             setSelectedBursts={setSelectedBursts}
             selectedElements={selectedElements}
@@ -1251,6 +1330,11 @@ export default function Page() {
             showBossManagement={canManageBosses}
             recommendationHistory={recommendationHistory}
             soloRaidActive={soloRaidActive}
+            onSyncNikkes={onSyncBucket}
+            syncingNikkes={syncing}
+            onAddNikke={addNikke}
+            elements={elements}
+            roles={roles}
             onAddSoloRaid={addSoloRaid}
             onEndSoloRaid={endSoloRaid}
             fmt={fmt}

@@ -23,8 +23,6 @@ type SettingsTabProps = {
   selectedNames: string[];
   toggleSelect: (name: string) => void;
   setSelectedNames: React.Dispatch<React.SetStateAction<string[]>>;
-  onSync: () => void;
-  syncing: boolean;
   selectedBursts: Set<number>;
   setSelectedBursts: React.Dispatch<React.SetStateAction<Set<number>>>;
   selectedElements: Set<string>;
@@ -39,13 +37,28 @@ type SettingsTabProps = {
   maxSelected: number;
 };
 
+function NikkeName({ name }: { name: string }) {
+  const parts = name.split(":");
+  return (
+    <div className="mt-1 h-[2.4em] overflow-hidden break-words text-[11px] font-medium leading-tight">
+      {parts.length > 1 ? (
+        <>
+          {parts[0]}:
+          <br />
+          {parts.slice(1).join(":")}
+        </>
+      ) : (
+        name
+      )}
+    </div>
+  );
+}
+
 export default function SettingsTab({
   nikkes,
   selectedNames,
   toggleSelect,
   setSelectedNames,
-  onSync,
-  syncing,
   selectedBursts,
   setSelectedBursts,
   selectedElements,
@@ -84,27 +97,10 @@ export default function SettingsTab({
     });
   }, [nikkes, q, selectedBursts, selectedElements, selectedRoles]);
 
-  function NikkeName({ name }: { name: string }) {
-    const parts = name.split(":");
-    return (
-      <div className="mt-1 h-[2.4em] overflow-hidden break-words text-[11px] font-medium leading-tight">
-        {parts.length > 1 ? (
-          <>
-            {parts[0]}:
-            <br />
-            {parts.slice(1).join(":")}
-          </>
-        ) : (
-          name
-        )}
-      </div>
-    );
-  }
-
   return (
     <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">사용할 니케 선택</h2>
+        <h2 className="text-base font-semibold">Select Nikkes</h2>
         <div className="text-xs text-neutral-400">
           {selectedNames.length} / {maxSelected}
         </div>
@@ -114,28 +110,21 @@ export default function SettingsTab({
         <input
           value={q}
           onChange={(event) => setQ(event.target.value)}
-          placeholder="니케 이름 검색"
+          placeholder="Search nikke name"
           className="flex-1 rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
         />
         <button
           onClick={() => setSelectedNames([])}
           className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99]"
         >
-          전체 해제
-        </button>
-        <button
-          onClick={onSync}
-          disabled={syncing}
-          className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
-        >
-          {syncing ? "동기화 중" : "이미지 동기화"}
+          Clear
         </button>
       </div>
 
-      <section className="mt-3 mb-3 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+      <section className="mt-5 mb-3 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
         <div className="grid gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">버스트</div>
+            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">Burst</div>
             <div className="flex flex-wrap gap-2">
               {[
                 { n: 1, label: "I" },
@@ -155,7 +144,7 @@ export default function SettingsTab({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">속성</div>
+            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">Element</div>
             <div className="flex flex-wrap gap-2">
               {elements.map((element) => (
                 <button
@@ -170,7 +159,7 @@ export default function SettingsTab({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">역할</div>
+            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">Role</div>
             <div className="flex flex-wrap gap-2">
               {roles.map((role) => (
                 <button
