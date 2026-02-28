@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 
 type NikkeRow = {
   id: string;
@@ -38,13 +39,7 @@ type SettingsTabProps = {
 };
 
 function NikkeName({ name }: { name: string }) {
-  const bracketChars = ["[", "［", "【", "〔", "〖", "〘", "〚", "⟦"];
-  const firstBracketIndex = bracketChars.reduce((currentMin, bracket) => {
-    const index = name.indexOf(bracket);
-    if (index === -1) return currentMin;
-    return currentMin === -1 ? index : Math.min(currentMin, index);
-  }, -1);
-  const displayName = (firstBracketIndex === -1 ? name : name.slice(0, firstBracketIndex)).trim();
+  const displayName = formatNikkeDisplayName(name);
   const parts = displayName.split(":");
   return (
     <div className="mt-1 h-[2.4em] overflow-hidden break-words text-xs font-medium leading-tight">

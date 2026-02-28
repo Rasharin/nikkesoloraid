@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
 
 type Deck = {
   id: string;
@@ -167,7 +168,7 @@ export default function HomeTab({
                 {best.picked.map((deck) => (
                   <div key={deck.id} className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 text-sm text-neutral-200">{deck.chars.join(" / ")}</div>
+                      <div className="min-w-0 text-sm text-neutral-200">{formatNikkeDisplayNames(deck.chars)}</div>
                       <div className="flex-none text-sm tabular-nums text-neutral-200">{fmt(deck.score)}</div>
                     </div>
                   </div>
@@ -232,7 +233,7 @@ export default function HomeTab({
                         )}
                       </div>
                       <div className="mt-1 text-xs text-neutral-200 leading-tight break-words line-clamp-2 text-center">
-                        {nikke.name}
+                        {formatNikkeDisplayName(nikke.name)}
                       </div>
                     </button>
                   );
