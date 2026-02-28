@@ -1,8 +1,11 @@
 ﻿"use client";
 import LoginButton from "./components/LoginButton";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import HomeTab from "./components/tabs/HomeTab";
+import MyPageTab from "./components/tabs/MyPageTab";
+import SavedTab from "./components/tabs/SavedTab";
+import SettingsTab from "./components/tabs/SettingsTab";
 import { supabase } from "../lib/supabase";
-import InAppBlocker from "./components/InAppBlocker";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
    ${selected
@@ -23,12 +26,47 @@ type Deck = {
   score: number;
   createdAt: number;
 };
+type RecommendationDeck = {
+  chars: string[];
+  score: number;
+};
+type RecommendationRecord = {
+  raidKey: string;
+  raidLabel: string;
+  total: number;
+  decks: RecommendationDeck[];
+  updatedAt: number;
+};
+type RecommendationRow = {
+  user_id: string;
+  raid_key: string;
+  raid_label: string;
+  total: number | string | null;
+  decks: unknown;
+  updated_at: string | null;
+};
+type AppConfigRow = {
+  id: string;
+  master_user_id: string | null;
+  active_raid_key: string | null;
+  solo_raid_active: boolean | null;
+  solo_raid_tabs: unknown;
+};
+type DeckTabItem = {
+  key: string;
+  label: string;
+};
 type DeckRow = {
   id: string;
   user_id: string;
   chars: string[] | null;
   score: number | string | null;
   created_at: string;
+};
+type AddSoloRaidPayload = {
+  title: string;
+  description: string;
+  imageFile: File | null;
 };
 
 type NikkeElement = "iron" | "fire" | "wind" | "water" | "electric" | null
@@ -68,15 +106,15 @@ const roles = [
   { v: "defender", label: "방어형" },
 ] as const;
 
-type TabKey = "home" | "saved" | "settings";
-const ACTIVE_RAID = "altruia" as const; // ✅ 진행되는 솔레 보스명
-const DECK_TABS = [
+type TabKey = "home" | "saved" | "settings" | "mypage";
+const DEFAULT_DECK_TABS: DeckTabItem[] = [
   { key: "altruia", label: "앨트루이아" },
-] as const;
-type SavedDeckTab = (typeof DECK_TABS)[number]["key"];
+];
+const DEFAULT_ACTIVE_RAID_KEY = DEFAULT_DECK_TABS[0]?.key ?? null;
 
 // -------------------- Constants --------------------
 const SELECTED_KEY = "soloraid_selected_nikkes_v2";
+const RECOMMENDATION_TABLE = "solo_raid_recommendations";
 
 const MAX_SELECTED = 50;
 const MAX_DECK_CHARS = 5;
@@ -84,6 +122,14 @@ const MAX_DECK_CHARS = 5;
 // -------------------- Utils --------------------
 function fmt(n: number) {
   return n.toLocaleString("en-US");
+}
+
+function slugifyRaidLabel(label: string) {
+  return label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function normToken(s: string) {
@@ -274,6 +320,71 @@ function mapDeckRow(row: DeckRow): Deck | null {
   };
 }
 
+function mapRecommendationRow(row: RecommendationRow): RecommendationRecord | null {
+  const total = Number(row.total);
+  if (!Number.isFinite(total)) return null;
+
+  const rawDecks = Array.isArray(row.decks) ? row.decks : [];
+  const decks: RecommendationDeck[] = [];
+
+  for (const item of rawDecks) {
+    if (!item || typeof item !== "object") continue;
+    const candidate = item as { chars?: unknown; score?: unknown };
+    const chars = Array.isArray(candidate.chars)
+      ? candidate.chars.filter((value): value is string => typeof value === "string")
+      : [];
+    const score = Number(candidate.score);
+
+    if (chars.length === 0 || !Number.isFinite(score)) continue;
+    decks.push({ chars, score });
+  }
+
+  const updatedAt = row.updated_at ? Date.parse(row.updated_at) : NaN;
+
+  return {
+    raidKey: row.raid_key,
+    raidLabel: row.raid_label,
+    total,
+    decks,
+    updatedAt: Number.isFinite(updatedAt) ? updatedAt : Date.now(),
+  };
+}
+
+function mapDeckTabs(value: unknown): DeckTabItem[] {
+  if (!Array.isArray(value)) return [];
+
+  const tabs: DeckTabItem[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const candidate = item as { key?: unknown; label?: unknown };
+    if (typeof candidate.key !== "string" || typeof candidate.label !== "string") continue;
+    const key = candidate.key.trim();
+    const label = candidate.label.trim();
+    if (!key || !label) continue;
+    tabs.push({ key, label });
+  }
+
+  return tabs;
+}
+
+function sameRecommendationRecord(a: RecommendationRecord | undefined, b: RecommendationRecord) {
+  if (!a) return false;
+  if (a.raidKey !== b.raidKey || a.raidLabel !== b.raidLabel || a.total !== b.total) return false;
+  if (a.decks.length !== b.decks.length) return false;
+
+  for (let i = 0; i < a.decks.length; i++) {
+    const left = a.decks[i];
+    const right = b.decks[i];
+    if (left.score !== right.score) return false;
+    if (left.chars.length !== right.chars.length) return false;
+    for (let j = 0; j < left.chars.length; j++) {
+      if (left.chars[j] !== right.chars[j]) return false;
+    }
+  }
+
+  return true;
+}
+
 // -------------------- Icons --------------------
 function HomeIcon({ active }: { active: boolean }) {
   return (
@@ -320,10 +431,12 @@ function GearIcon({ active }: { active: boolean }) {
     </svg>
   );
 }
+
 // -------------------- Page --------------------
 export default function Page() {
   const [tab, setTab] = useState<TabKey>("home");
-  const [savedDeckTab, setSavedDeckTab] = useState<SavedDeckTab>(ACTIVE_RAID);
+  const [deckTabs, setDeckTabs] = useState<DeckTabItem[]>(DEFAULT_DECK_TABS);
+  const [savedDeckTab, setSavedDeckTab] = useState<string>(DEFAULT_DECK_TABS[0]?.key ?? "");
 
   // decks (Supabase)
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -338,16 +451,7 @@ export default function Page() {
   // selected nikkes (max 50) - localStorage
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
 
-  // draft deck builder
-  const [draft, setDraft] = useState<string[]>([]);
-  const [score, setScore] = useState("");
-  const scoreRef = useRef<HTMLInputElement | null>(null);
-
-  // saved edit mode
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  // optional: text bulk add
-  const [bulkText, setBulkText] = useState("");
+  const [homeEditRequest, setHomeEditRequest] = useState<Deck | null>(null);
 
   // sync state
   const [syncing, setSyncing] = useState(false);
@@ -359,6 +463,12 @@ export default function Page() {
   const [selectedBursts, setSelectedBursts] = useState<Set<number>>(new Set())
   const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set())
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set())
+  const [appConfigId, setAppConfigId] = useState<string | null>(null);
+  const [masterUserId, setMasterUserId] = useState<string | null>(null);
+  const [activeRaidKey, setActiveRaidKey] = useState<string | null>(DEFAULT_ACTIVE_RAID_KEY);
+  const [soloRaidActive, setSoloRaidActive] = useState(true);
+  const [recommendationHistory, setRecommendationHistory] = useState<Record<string, RecommendationRecord>>({});
+  const [recommendationLoaded, setRecommendationLoaded] = useState(false);
 
   async function refreshDecks(currentUserId: string) {
     setLoadingDecks(true);
@@ -393,14 +503,6 @@ export default function Page() {
     showToast("선택 리스트 초기화");
   };
 
-  // ✅ 덱 빌더(draft/score/editing)만 초기화 + 점수 입력칸 포커스
-  function clearDraft() {
-    setDraft([]);
-    setScore("");
-    setEditingId(null);
-    requestAnimationFrame(() => scoreRef.current?.focus());
-  }
-
   // 로그인 유저 추적
   useEffect(() => {
     let mounted = true;
@@ -420,6 +522,54 @@ export default function Page() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAppConfig() {
+      try {
+        const { data, error } = await supabase
+          .from("app_config")
+          .select("id,master_user_id,active_raid_key,solo_raid_active,solo_raid_tabs")
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        const config = data as AppConfigRow | null;
+        const nextTabs = mapDeckTabs(config?.solo_raid_tabs);
+        const resolvedTabs = nextTabs.length > 0 ? nextTabs : DEFAULT_DECK_TABS;
+        const nextActiveKey = config?.active_raid_key ?? DEFAULT_ACTIVE_RAID_KEY;
+
+        setAppConfigId(config?.id ?? null);
+        setMasterUserId(config?.master_user_id ?? null);
+        setDeckTabs(resolvedTabs);
+        setActiveRaidKey(nextActiveKey);
+        setSoloRaidActive(config?.solo_raid_active ?? true);
+        setSavedDeckTab((prev) => {
+          if (resolvedTabs.some((tab) => tab.key === prev)) return prev;
+          if (nextActiveKey && resolvedTabs.some((tab) => tab.key === nextActiveKey)) return nextActiveKey;
+          return resolvedTabs[0]?.key ?? "";
+        });
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setAppConfigId(null);
+          setMasterUserId(null);
+          setDeckTabs(DEFAULT_DECK_TABS);
+          setActiveRaidKey(DEFAULT_ACTIVE_RAID_KEY);
+          setSoloRaidActive(true);
+        }
+      }
+    }
+
+    void loadAppConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // selected 목록만 localStorage 사용
   useEffect(() => {
     try {
@@ -431,11 +581,59 @@ export default function Page() {
     } catch { }
   }, []);
 
+  useEffect(() => {
+    setRecommendationLoaded(false);
+
+    if (!userId) {
+      setRecommendationHistory({});
+      setRecommendationLoaded(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadRecommendationHistory() {
+      try {
+        const { data, error } = await supabase
+          .from(RECOMMENDATION_TABLE)
+          .select("user_id,raid_key,raid_label,total,decks,updated_at")
+          .eq("user_id", userId);
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        const nextHistory: Record<string, RecommendationRecord> = {};
+        for (const row of (data ?? []) as RecommendationRow[]) {
+          const mapped = mapRecommendationRow(row);
+          if (!mapped) continue;
+          nextHistory[mapped.raidKey] = mapped;
+        }
+
+        setRecommendationHistory(nextHistory);
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setRecommendationHistory({});
+        }
+      } finally {
+        if (!cancelled) {
+          setRecommendationLoaded(true);
+        }
+      }
+    }
+
+    void loadRecommendationHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
   // 로그인 상태 변화 시 덱 로드
   useEffect(() => {
     if (!userId) {
       setDecks([]);
-      setEditingId(null);
+      setHomeEditRequest(null);
       return;
     }
     refreshDecks(userId);
@@ -447,6 +645,13 @@ export default function Page() {
       localStorage.setItem(SELECTED_KEY, JSON.stringify(selectedNames));
     } catch { }
   }, [selectedNames]);
+
+  useEffect(() => {
+    if (deckTabs.some((deckTab) => deckTab.key === savedDeckTab)) return;
+    setSavedDeckTab(activeRaidKey && deckTabs.some((deckTab) => deckTab.key === activeRaidKey)
+      ? activeRaidKey
+      : deckTabs[0]?.key ?? "");
+  }, [activeRaidKey, deckTabs, savedDeckTab]);
 
   async function refreshSupabase() {
     setLoadingData(true);
@@ -464,8 +669,9 @@ export default function Page() {
         setnikkes((nikkeData ?? []) as NikkeRow[]);
       }
 
+      const bossSource = soloRaidActive ? "bosses" : "boss_default";
       const { data: bossData, error: bossErr } = await supabase
-        .from("bosses")
+        .from(bossSource)
         .select("id,title,description,image_path,starts_at,ends_at,created_at")
         .order("created_at", { ascending: false })
         .limit(1);
@@ -488,7 +694,7 @@ export default function Page() {
   useEffect(() => {
     refreshSupabase();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [soloRaidActive]);
 
   const nikkeMap = useMemo(() => {
     const m = new Map<string, NikkeRow>();
@@ -502,78 +708,81 @@ export default function Page() {
 
   const best = useMemo(() => pickBest5(decks), [decks]);
   const canRecommend = best.picked.length === 5;
+  const activeRaidLabel = useMemo(
+    () => deckTabs.find((deckTab) => deckTab.key === activeRaidKey)?.label ?? activeRaidKey ?? "",
+    [activeRaidKey, deckTabs]
+  );
   const sortedDecks = useMemo(
     () => decks.slice().sort((a, b) => b.score - a.score),
     [decks]
   );
   const visibleSavedDecks = sortedDecks;
+  const isMaster = Boolean(userId && masterUserId && userId === masterUserId);
+  const canManageBosses = isMaster || process.env.NODE_ENV !== "production";
 
-  function addToDraft(name: string) {
-    setDraft((prev) => {
-      if (prev.includes(name)) return prev;
-      if (prev.length >= MAX_DECK_CHARS) return prev;
-      const next = [...prev, name];
-      if (next.length === MAX_DECK_CHARS) {
-        requestAnimationFrame(() => scoreRef.current?.focus());
-      }
-      return next;
-    });
-  }
-  function removeFromDraft(idx: number) {
-    setDraft((prev) => prev.filter((_, i) => i !== idx));
-  }
-  async function saveDeckFromDraft() {
-    if (draft.length !== 5) return showToast("니케 5명을 먼저 골라줘.");
-    if (!userId) return showToast("로그인 후 덱 저장 가능");
+  useEffect(() => {
+    if (!recommendationLoaded) return;
+    if (!userId) return;
+    if (!soloRaidActive) return;
+    if (!activeRaidKey) return;
+    if (!canRecommend) return;
 
-    const sc = Number(score.replaceAll(",", "").replaceAll(" ", "").trim());
-    if (!Number.isFinite(sc) || sc <= 0) return showToast("점수는 숫자로 입력해줘.");
+    const nextRecord: RecommendationRecord = {
+      raidKey: activeRaidKey,
+      raidLabel: activeRaidLabel,
+      total: best.total,
+      decks: best.picked.map((deck) => ({
+        chars: [...deck.chars],
+        score: deck.score,
+      })),
+      updatedAt: Date.now(),
+    };
 
-    try {
-      if (editingId) {
-        const { data, error } = await supabase
-          .from("decks")
-          .update({ chars: [...draft], score: sc })
-          .eq("id", editingId)
-          .eq("user_id", userId)
-          .select("id,user_id,chars,score,created_at")
-          .single();
+    if (sameRecommendationRecord(recommendationHistory[activeRaidKey], nextRecord)) return;
+
+    let cancelled = false;
+
+    async function saveRecommendation() {
+      try {
+        const { error } = await supabase
+          .from(RECOMMENDATION_TABLE)
+          .upsert(
+            {
+              user_id: userId,
+              raid_key: nextRecord.raidKey,
+              raid_label: nextRecord.raidLabel,
+              total: nextRecord.total,
+              decks: nextRecord.decks,
+              updated_at: new Date(nextRecord.updatedAt).toISOString(),
+            },
+            { onConflict: "user_id,raid_key" }
+          );
+
         if (error) throw error;
-        const updated = mapDeckRow(data as DeckRow);
-        if (!updated) throw new Error("Invalid deck row");
-        setDecks((prev) => prev.map((d) => (d.id === editingId ? updated : d)));
-        showToast("덱 수정 저장 완료");
-      } else {
-        const { data, error } = await supabase
-          .from("decks")
-          .insert({ user_id: userId, chars: [...draft], score: sc })
-          .select("id,user_id,chars,score,created_at")
-          .single();
-        if (error) throw error;
-        const inserted = mapDeckRow(data as DeckRow);
-        if (!inserted) throw new Error("Invalid deck row");
-        setDecks((prev) => [inserted, ...prev]);
-        showToast("덱 저장 완료");
+        if (cancelled) return;
+
+        setRecommendationHistory((prev) => {
+          if (sameRecommendationRecord(prev[activeRaidKey], nextRecord)) return prev;
+          return {
+            ...prev,
+            [activeRaidKey]: nextRecord,
+          };
+        });
+      } catch (error) {
+        console.error(error);
       }
-    } catch (e) {
-      console.error(e);
-      showToast("덱 저장 실패");
-      return;
     }
 
-    // ✅ 저장 성공 후 빌더만 초기화
-    clearDraft();
-    setEditingId(null);
-    setScore("");
-  }
+    void saveRecommendation();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeRaidKey, activeRaidLabel, best, canRecommend, recommendationHistory, recommendationLoaded, soloRaidActive, userId]);
 
   function startEditDeck(d: Deck) {
     setTab("home");
-    setEditingId(d.id);
-    setDraft([...d.chars]);
-    setScore(String(d.score));
-    requestAnimationFrame(() => scoreRef.current?.focus());
-    showToast("수정 모드: 니케 변경 후 점수 저장");
+    setHomeEditRequest(d);
   }
 
   async function deleteDeck(id: string) {
@@ -619,10 +828,69 @@ export default function Page() {
     }
   }
 
-  async function addDecksByText() {
-    const parsed = parseBulk(bulkText);
-    if (parsed.length === 0) return showToast("맞는 덱이 없음.");
-    if (!userId) return showToast("로그인 후 덱 저장 가능");
+  async function submitDeckFromHome(payload: { draft: string[]; scoreText: string; editingId: string | null }) {
+    const { draft, scoreText, editingId } = payload;
+
+    if (draft.length !== MAX_DECK_CHARS) {
+      showToast("니케 5명을 먼저 골라줘.");
+      return false;
+    }
+    if (!userId) {
+      showToast("로그인 후 덱 저장 가능");
+      return false;
+    }
+
+    const sc = Number(scoreText.replaceAll(",", "").replaceAll(" ", "").trim());
+    if (!Number.isFinite(sc) || sc <= 0) {
+      showToast("점수는 숫자로 입력해줘.");
+      return false;
+    }
+
+    try {
+      if (editingId) {
+        const { data, error } = await supabase
+          .from("decks")
+          .update({ chars: [...draft], score: sc })
+          .eq("id", editingId)
+          .eq("user_id", userId)
+          .select("id,user_id,chars,score,created_at")
+          .single();
+        if (error) throw error;
+        const updated = mapDeckRow(data as DeckRow);
+        if (!updated) throw new Error("Invalid deck row");
+        setDecks((prev) => prev.map((deck) => (deck.id === editingId ? updated : deck)));
+        showToast("덱 수정 저장 완료");
+      } else {
+        const { data, error } = await supabase
+          .from("decks")
+          .insert({ user_id: userId, chars: [...draft], score: sc })
+          .select("id,user_id,chars,score,created_at")
+          .single();
+        if (error) throw error;
+        const inserted = mapDeckRow(data as DeckRow);
+        if (!inserted) throw new Error("Invalid deck row");
+        setDecks((prev) => [inserted, ...prev]);
+        showToast("덱 저장 완료");
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("덱 저장 실패");
+      return false;
+    }
+
+    return true;
+  }
+
+  async function submitBulkFromHome(text: string) {
+    const parsed = parseBulk(text);
+    if (parsed.length === 0) {
+      showToast("맞는 덱이 없음.");
+      return false;
+    }
+    if (!userId) {
+      showToast("로그인 후 덱 저장 가능");
+      return false;
+    }
 
     const exists = new Set(decks.map((d) => `${d.score}|${d.chars.map(normToken).join("|")}`));
     const insertRows: Array<{ user_id: string; chars: string[]; score: number }> = [];
@@ -634,7 +902,10 @@ export default function Page() {
       exists.add(key);
     }
 
-    if (insertRows.length === 0) return showToast("추가할 새 덱이 없어.");
+    if (insertRows.length === 0) {
+      showToast("추가할 새 덱이 없어.");
+      return false;
+    }
 
     try {
       const { data, error } = await supabase
@@ -648,10 +919,133 @@ export default function Page() {
     } catch (e) {
       console.error(e);
       showToast("텍스트 덱 저장 실패");
-      return;
+      return false;
     }
 
-    setBulkText("");
+    return true;
+  }
+
+  async function addSoloRaid(payload: AddSoloRaidPayload) {
+    const trimmed = payload.title.trim();
+    const trimmedDescription = payload.description.trim();
+    const imageFile = payload.imageFile;
+
+    if (!canManageBosses) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+    if (!appConfigId) {
+      showToast("앱 설정을 찾을 수 없어");
+      return false;
+    }
+    if (!trimmed) {
+      showToast("보스명을 입력해줘");
+      return false;
+    }
+    if (!trimmedDescription) {
+      showToast("보스 설명을 입력해줘");
+      return false;
+    }
+    if (!imageFile) {
+      showToast("보스 이미지를 선택해줘");
+      return false;
+    }
+
+    const baseKey = slugifyRaidLabel(trimmed);
+    if (!baseKey) {
+      showToast("보스명 형식이 맞지 않아");
+      return false;
+    }
+
+    let nextKey = baseKey;
+    let suffix = 2;
+    while (deckTabs.some((deckTab) => deckTab.key === nextKey)) {
+      nextKey = `${baseKey}-${suffix}`;
+      suffix += 1;
+    }
+
+    const nextTabs = [...deckTabs, { key: nextKey, label: trimmed }];
+    const extension = imageFile.name.includes(".")
+      ? imageFile.name.split(".").pop()?.toLowerCase() ?? "png"
+      : "png";
+    const imagePath = `${nextKey}-${Date.now()}.${extension}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("boss-images")
+        .upload(imagePath, imageFile, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { error: bossInsertError } = await supabase
+        .from("bosses")
+        .insert({
+          title: trimmed,
+          description: trimmedDescription,
+          image_path: imagePath,
+        });
+
+      if (bossInsertError) throw bossInsertError;
+
+      const { error } = await supabase
+        .from("app_config")
+        .update({
+          solo_raid_tabs: nextTabs,
+          active_raid_key: nextKey,
+          solo_raid_active: true,
+        })
+        .eq("id", appConfigId);
+
+      if (error) throw error;
+
+      setDeckTabs(nextTabs);
+      setActiveRaidKey(nextKey);
+      setSoloRaidActive(true);
+      setSavedDeckTab(nextKey);
+      await refreshSupabase();
+      showToast("새 솔로레이드 추가 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("솔로레이드 추가 실패");
+      return false;
+    }
+  }
+
+  async function endSoloRaid() {
+    if (!canManageBosses) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+    if (!appConfigId) {
+      showToast("앱 설정을 찾을 수 없어");
+      return false;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("app_config")
+        .update({
+          solo_raid_active: false,
+          active_raid_key: null,
+        })
+        .eq("id", appConfigId);
+
+      if (error) throw error;
+
+      setSoloRaidActive(false);
+      setActiveRaidKey(null);
+      await refreshSupabase();
+      showToast("솔로레이드 종료 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("솔로레이드 종료 실패");
+      return false;
+    }
   }
 
   return (
@@ -662,8 +1056,17 @@ export default function Page() {
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl font-semibold">니케 솔로레이드 덱 도우미</h1>
 
-            <div className="flex flex-wrap gap-2 justify-end">
-              <LoginButton />
+            <div className="flex flex-col items-end gap-2">
+              <LoginButton onProfileClick={() => setTab("mypage")} />
+              {process.env.NODE_ENV !== "production" ? (
+                <button
+                  type="button"
+                  onClick={() => setTab("mypage")}
+                  className="rounded-xl border border-neutral-700 px-3 py-2 text-sm hover:border-neutral-400 active:scale-[0.99]"
+                >
+                  마이페이지 테스트
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -699,296 +1102,40 @@ export default function Page() {
           </div>
         )}
 
-        {/* HOME */}
         {tab === "home" && (
-          <>
-            {/* Boss */}
-            <section className="mb-5 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-              {boss && boss.image_path ? (
-                <div className="mt-3 flex gap-4">
-                  {/* 왼쪽: 제목 + 설명 */}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-lg font-semibold">{boss.title}</div>
-
-                    <div className="mt-2 whitespace-pre-wrap text-sm text-neutral-400">
-                      {boss.description || "설명 없음"}
-                    </div>
-                  </div>
-
-                  {/* 오른쪽: 큰 이미지 */}
-                  <div className="w-[55%] max-w-[520px]">
-                    <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/40">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={getPublicUrl("boss-images", boss.image_path)}
-                        alt={boss.title}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ) : boss ? (
-                <div className="mt-2 text-sm text-neutral-300">보스는 있는데 이미지가 없어.</div>
-              ) : (
-                <div className="mt-2 text-sm text-neutral-300">보스 데이터가 없어.</div>
-              )}
-            </section>
-
-            {/* 추천 조합 */}
-            <section className="mb-5 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold">추천 조합</h2>
-                <div className="text-xs text-neutral-400">{decks.length}개 덱</div>
-              </div>
-
-              <div className="mt-3 rounded-2xl bg-neutral-950/40 p-3">
-                {canRecommend ? (
-                  <>
-                    <div className="mb-2 flex items-end justify-between">
-                      <div className="text-sm text-neutral-300">총합</div>
-                      <div className="text-2xl font-bold tabular-nums">{fmt(best.total)}</div>
-                    </div>
-
-                    <div className="space-y-2">
-                      {best.picked.map((d) => (
-                        <div key={d.id} className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0 text-sm text-neutral-200">{d.chars.join(" / ")}</div>
-                            <div className="flex-none text-sm tabular-nums text-neutral-200">{fmt(d.score)}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-sm text-neutral-300">5덱 이상 추가 시 추천 조합 생성</div>
-                )}
-              </div>
-            </section>
-
-            {/* Selected Nikke carousel */}
-            <section className="mb-5 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold">니케 선택 (클릭해서 덱 구성)</h2>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={resetSelected}
-                    className="rounded-xl border border-white/30 px-3 py-2 text-sm text-white hover:bg-white/10 active:scale-[0.99]"
-                  >
-                    리스트 초기화
-                  </button>
-
-                  <button
-                    onClick={() => setTab("settings")}
-                    className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
-                  >
-                    설정으로
-                  </button>
-                </div>
-              </div>
-
-              {selectednikkes.length === 0 ? (
-                <div className="mt-3 text-sm text-neutral-300">
-                  <span className="text-neutral-200">설정 탭</span>에서 최대 50개 선택 가능.
-                </div>
-              ) : (
-                <>
-                  <div className="mt-2 text-xs text-neutral-400">
-                    선택됨: <span className="text-neutral-200">{selectednikkes.length}</span> / {MAX_SELECTED}
-                  </div>
-
-                  <div className="mt-3 max-h-[30vh] overflow-y-auto pr-1 no-scrollbar overscroll-contain">
-                    <div className="grid grid-cols-5 gap-2">
-                      {selectednikkes.map((n) => {
-                        const url = n.image_path ? getPublicUrl("nikke-images", n.image_path) : "";
-                        return (
-                          <button
-                            key={n.id}
-                            onClick={() => addToDraft(n.name)}
-                            className="flex flex-col items-center active:scale-[0.99]"
-                            title={n.name}
-                          >
-                            <div className="aspect-square w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              {url ? (
-                                <img src={url} alt={n.name} className="h-full w-full object-cover" />
-                              ) : (
-                                <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
-                              )}
-                            </div>
-                            <div className="mt-1 text-xs text-neutral-200 leading-tight break-words line-clamp-2 text-center">
-                              {n.name}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
-            </section>
-
-            {/* Draft builder */}
-            <section className="mb-5 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-              <h2 className="text-base font-semibold">{editingId ? "덱 수정" : "덱 만들기"}</h2>
-
-              <div className="mt-3">
-                <div className="grid grid-cols-5 gap-2">
-                  {Array.from({ length: 5 }).map((_, i) => {
-                    const name = draft[i];
-                    const row = name ? nikkeMap.get(name) : undefined;
-                    const url = row?.image_path ? getPublicUrl("nikke-images", row.image_path) : "";
-
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => (name ? removeFromDraft(i) : undefined)}
-                        className="aspect-square overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/40 active:scale-[0.99]"
-                        title={name ? "클릭하면 제거" : "비어있음"}
-                      >
-                        {name && url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={url} alt={name} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="grid h-full w-full place-items-center text-lg text-neutral-600">+</div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-2 text-sm text-neutral-300">{draft.length ? draft.join(" / ") : "아직 선택 없음"}</div>
-
-                <div className="mt-4">
-                  <input
-                    ref={scoreRef}
-                    inputMode="numeric"
-                    value={score}
-                    onChange={(e) => setScore(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        saveDeckFromDraft(); // ✅ Enter = 저장 버튼
-                      }
-                    }}
-                    placeholder="점수입력 (예: 6510755443)"
-                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-base outline-none"
-                  />
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={saveDeckFromDraft}
-                    className="flex-1 rounded-2xl bg-white px-4 py-3 text-base font-semibold text-neutral-900 active:scale-[0.99]"
-                  >
-                    {editingId ? "수정 저장" : "덱 저장"}
-                  </button>
-                  <button
-                    onClick={clearDraft}
-                    className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
-                  >
-                    비우기
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            {/* Optional text bulk add */}
-            <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-              <h2 className="text-base font-semibold">덱 일괄입력</h2>
-
-              <textarea
-                value={bulkText}
-                onChange={(e) => setBulkText(e.target.value)}
-                placeholder={`예) 세이렌 이브 라피 크라운 프리바티 6510755443
-리타 / 앵커 / 리버렐리오 / 마스트 / 레이븐
-3896714666
-리타, 앵커, 리버렐리오, 마스트, 레이븐
-383838883`}
-                className="mt-3 h-32 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 p-3 text-sm outline-none"
-              />
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={addDecksByText}
-                  className="flex-1 rounded-2xl bg-neutral-100 px-4 py-3 text-base font-semibold text-neutral-900 active:scale-[0.99]"
-                >
-                  텍스트 추가
-                </button>
-                <button
-                  onClick={() => setBulkText("")}
-                  className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
-                >
-                  비우기
-                </button>
-              </div>
-            </section>
-          </>
+          <HomeTab
+            boss={boss}
+            decksCount={decks.length}
+            canRecommend={canRecommend}
+            best={best}
+            fmt={fmt}
+            getPublicUrl={getPublicUrl}
+            selectedNikkes={selectednikkes}
+            maxSelected={MAX_SELECTED}
+            nikkeMap={nikkeMap}
+            editRequest={homeEditRequest}
+            onEditRequestConsumed={() => setHomeEditRequest(null)}
+            onResetSelected={resetSelected}
+            onGoToSettings={() => setTab("settings")}
+            onShowToast={showToast}
+            onSubmitDeck={submitDeckFromHome}
+            onSubmitBulk={submitBulkFromHome}
+          />
         )}
 
-        {/* SAVED */}
         {tab === "saved" && (
-          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold">저장된 덱</h2>
-              <div className="text-xs text-neutral-400">{visibleSavedDecks.length}개</div>
-            </div>
-
-            <div className="mt-2 flex gap-2">
-              {DECK_TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setSavedDeckTab(tab.key)}
-                  className={`rounded-xl border px-3 py-1 text-sm transition ${savedDeckTab === tab.key
-                    ? "bg-white text-black border-white"
-                    : "bg-transparent text-neutral-200 border-neutral-700 hover:border-neutral-400"
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-3 space-y-2">
-              {!userId ? (
-                <div className="text-sm text-neutral-300">로그인하면 내 덱을 불러올 수 있어.</div>
-              ) : visibleSavedDecks.length === 0 ? (
-                <div className="text-sm text-neutral-300">저장된 덱 없음.</div>
-              ) : (
-                visibleSavedDecks.map((d) => (
-                  <div key={d.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
-                    <div className="font-medium text-neutral-100" style={{ fontSize: "1.3rem" }}>
-                      {d.chars.join(" / ")}
-                    </div>
-
-                    <div className="flex items-center justify-end gap-3">
-                      <div className="font-semibold tabular-nums text-neutral-200" style={{ fontSize: "1.3rem" }}>
-                        {fmt(d.score)}
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex gap-2">
-                      <button
-                        onClick={() => startEditDeck(d)}
-                        className="flex-1 rounded-2xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
-                      >
-                        홈에서 수정
-                      </button>
-                      <button
-                        onClick={() => deleteDeck(d.id)}
-                        className="rounded-2xl border border-red-800/60 px-3 py-2 text-sm text-red-300 active:scale-[0.99]"
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+          <SavedTab
+            userId={userId}
+            visibleSavedDecks={visibleSavedDecks}
+            deckTabs={deckTabs}
+            savedDeckTab={savedDeckTab}
+            onSavedDeckTabChange={setSavedDeckTab}
+            onStartEditDeck={startEditDeck}
+            onDeleteDeck={deleteDeck}
+            fmt={fmt}
+          />
         )}
 
-        {/* SETTINGS */}
         {tab === "settings" && (
           <SettingsTab
             nikkes={nikkes}
@@ -1003,6 +1150,25 @@ export default function Page() {
             setSelectedElements={setSelectedElements}
             selectedRoles={selectedRoles}
             setSelectedRoles={setSelectedRoles}
+            toggleSet={toggleSet}
+            btnClass={btnClass}
+            elements={elements}
+            roles={roles}
+            getPublicUrl={getPublicUrl}
+            maxSelected={MAX_SELECTED}
+          />
+        )}
+
+        {tab === "mypage" && (
+          <MyPageTab
+            deckTabs={deckTabs}
+            isMaster={isMaster}
+            showBossManagement={canManageBosses}
+            recommendationHistory={recommendationHistory}
+            soloRaidActive={soloRaidActive}
+            onAddSoloRaid={addSoloRaid}
+            onEndSoloRaid={endSoloRaid}
+            fmt={fmt}
           />
         )}
       </div>
@@ -1036,196 +1202,5 @@ export default function Page() {
         </div>
       </div>
     </div>
-  );
-}
-
-// -------------------- SettingsTab --------------------
-type SettingsTabProps = {
-  nikkes: NikkeRow[];
-  selectedNames: string[];
-  toggleSelect: (name: string) => void;
-  setSelectedNames: React.Dispatch<React.SetStateAction<string[]>>;
-  onSync: () => void;
-  syncing: boolean;
-
-  selectedBursts: Set<number>;
-  setSelectedBursts: React.Dispatch<React.SetStateAction<Set<number>>>;
-
-  selectedElements: Set<string>;
-  setSelectedElements: React.Dispatch<React.SetStateAction<Set<string>>>;
-
-  selectedRoles: Set<string>;
-  setSelectedRoles: React.Dispatch<React.SetStateAction<Set<string>>>;
-};
-
-function SettingsTab(props: SettingsTabProps) {
-  const {
-    nikkes,
-    selectedNames,
-    toggleSelect,
-    setSelectedNames,
-    onSync,
-    syncing,
-    selectedBursts,
-    setSelectedBursts,
-    selectedElements,
-    setSelectedElements,
-    selectedRoles,
-    setSelectedRoles,
-  } = props;
-
-  const [q, setQ] = useState("");
-
-  const filtered = useMemo(() => {
-    const query = q.trim();
-
-    return nikkes.filter((n) => {
-      if (query && !n.name.includes(query)) return false;
-
-      // ⚠️ NikkeRow에 burst/element/role 필드가 실제로 있어야 함
-      if (selectedBursts.size > 0) {
-        const b = (n as any).burst ?? -1;
-        if (!(b === 0 || selectedBursts.has(b))) return false;
-      }
-
-      if (selectedElements.size > 0) {
-        const el = (n as any).element;
-        if (!el || !selectedElements.has(el)) return false;
-      }
-
-      if (selectedRoles.size > 0) {
-        const role = (n as any).role;
-        if (!role || !selectedRoles.has(role)) return false;
-      }
-
-      return true;
-    });
-  }, [nikkes, q, selectedBursts, selectedElements, selectedRoles]);
-
-  function NikkeName({ name }: { name: string }) {
-    const parts = name.split(":");
-    return (
-      <div className="mt-1 h-[2.4em] overflow-hidden break-words text-[11px] font-medium leading-tight">
-        {parts.length > 1 ? (
-          <>
-            {parts[0]}:
-            <br />
-            {parts.slice(1).join(":")}
-          </>
-        ) : (
-          name
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">사용할 니케 선택</h2>
-        <div className="text-xs text-neutral-400">
-          {selectedNames.length} / {MAX_SELECTED}
-        </div>
-      </div>
-
-      <div className="mt-3 flex gap-2">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="니케 이름 검색"
-          className="flex-1 rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
-        />
-        <button
-          onClick={() => setSelectedNames([])}
-          className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99]"
-        >
-          전체 해제
-        </button>
-      </div>
-
-      <section className="mb-3 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-        <div className="grid gap-3">
-
-          {/* 버스트 */}
-          <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">버스트</div>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { n: 1, label: "I" },
-                { n: 2, label: "II" },
-                { n: 3, label: "III" },
-              ].map((b) => (
-                <button
-                  key={b.n}
-                  type="button"
-                  onClick={() => setSelectedBursts((prev) => toggleSet(prev, b.n))}
-                  className={btnClass(selectedBursts.has(b.n))}
-                >
-                  {b.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 속성 */}
-          <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">속성</div>
-            <div className="flex flex-wrap gap-2">
-              {elements.map((e) => (
-                <button
-                  key={e.v}
-                  onClick={() => setSelectedElements(prev => toggleSet(prev, e.v))}
-                  className={btnClass(selectedElements.has(e.v))}
-                >
-                  {e.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 역할 */}
-          <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">역할</div>
-            <div className="flex flex-wrap gap-2">
-              {roles.map((r) => (
-                <button
-                  key={r.v}
-                  onClick={() => setSelectedRoles(prev => toggleSet(prev, r.v))}
-                  className={btnClass(selectedRoles.has(r.v))}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-        </div>
-      </section>
-      <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-        {filtered.map((n) => {
-          const selected = selectedNames.includes(n.name);
-          const url = n.image_path ? getPublicUrl("nikke-images", n.image_path) : "";
-
-          return (
-            <button
-              key={n.id}
-              onClick={() => toggleSelect(n.name)}
-              className={`min-w-0 rounded-2xl border p-1 text-left active:scale-[0.99] ${selected ? "border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
-                }`}
-            >
-              <div className="aspect-square w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
-                {url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={url} alt={n.name} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
-                )}
-              </div>
-              <NikkeName name={n.name} />
-            </button>
-          );
-        })}
-      </div>
-    </section>
   );
 }

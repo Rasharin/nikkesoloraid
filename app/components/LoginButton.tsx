@@ -2,31 +2,39 @@
 
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
-import InAppBlockerModal, { isInAppBrowser } from "./InAppBlocker"; 
+import InAppBlockerModal, { isInAppBrowser } from "./InAppBlocker";
 
 type User = {
   id: string;
   email?: string;
-  user_metadata?: { name?: string; full_name?: string };
+  user_metadata?: {
+    name?: string;
+    full_name?: string;
+    avatar_url?: string;
+    picture?: string;
+  };
 };
 
-export default function LoginButton() {
+type LoginButtonProps = {
+  onProfileClick?: () => void;
+};
+
+export default function LoginButton({ onProfileClick }: LoginButtonProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false); 
+  const [open, setOpen] = useState(false);
 
-  // 처음 로드 + 로그인 상태 변화 감지
   useEffect(() => {
     let mounted = true;
 
     supabase.auth.getUser().then(({ data }) => {
       if (!mounted) return;
-      setUser((data.user as any) ?? null);
+      setUser((data.user as User) ?? null);
       setLoading(false);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser((session?.user as any) ?? null);
+      setUser((session?.user as User) ?? null);
     });
 
     return () => {
@@ -36,7 +44,6 @@ export default function LoginButton() {
   }, []);
 
   async function handleGoogleLogin() {
-    // ✅ 인앱이면 모달만 띄우기
     if (isInAppBrowser()) {
       setOpen(true);
       return;
@@ -64,15 +71,28 @@ export default function LoginButton() {
   }
 
   if (user) {
-    const name =
-      user.user_metadata?.name ||
-      user.user_metadata?.full_name ||
-      user.email ||
-      "로그인됨";
+    const profileImage =
+      user.user_metadata?.avatar_url ||
+      user.user_metadata?.picture ||
+      null;
 
     return (
       <div className="flex items-center gap-2">
-        <span className="hidden sm:inline text-xs text-neutral-300">{name}</span>
+        {profileImage ? (
+          <button
+            type="button"
+            onClick={onProfileClick}
+            className="overflow-hidden rounded-full active:scale-[0.99]"
+            aria-label="Open my page"
+          >
+            <img
+              src={profileImage}
+              alt="Google profile"
+              className="h-9 w-9 rounded-full border border-neutral-700 object-cover"
+              referrerPolicy="no-referrer"
+            />
+          </button>
+        ) : null}
         <button
           onClick={logout}
           className="rounded-xl border border-neutral-700 px-3 py-2 text-sm hover:border-neutral-400 active:scale-[0.99]"
@@ -92,7 +112,6 @@ export default function LoginButton() {
         Google 로그인
       </button>
 
-      {/* ✅ 로그인 눌렀을 때만 뜨는 모달 */}
       <InAppBlockerModal open={open} onClose={() => setOpen(false)} />
     </>
   );
