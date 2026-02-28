@@ -959,6 +959,18 @@ export default function Page() {
     return true;
   }
 
+  async function getCurrentUserId() {
+    if (userId) return userId.trim();
+
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      console.error(error);
+      return null;
+    }
+
+    return data.user?.id?.trim() ?? null;
+  }
+
   async function addSoloRaid(payload: AddSoloRaidPayload) {
     const trimmed = payload.title.trim();
     const trimmedDescription = payload.description.trim();
@@ -968,8 +980,9 @@ export default function Page() {
       showToast("마스터 계정만 가능");
       return false;
     }
-    if (!userId) {
-      showToast("앱 설정을 찾을 수 없어");
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 가능");
       return false;
     }
     if (!trimmed) {
@@ -1031,7 +1044,7 @@ export default function Page() {
           active_raid_key: nextKey,
           solo_raid_active: true,
         })
-        .eq("master_user_id", userId.trim());
+        .eq("master_user_id", currentUserId);
 
       if (error) throw error;
 
@@ -1054,8 +1067,9 @@ export default function Page() {
       showToast("마스터 계정만 가능");
       return false;
     }
-    if (!userId) {
-      showToast("앱 설정을 찾을 수 없어");
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 가능");
       return false;
     }
 
@@ -1066,7 +1080,7 @@ export default function Page() {
           solo_raid_active: false,
           active_raid_key: null,
         })
-        .eq("master_user_id", userId.trim());
+        .eq("master_user_id", currentUserId);
 
       if (error) throw error;
 
