@@ -149,22 +149,28 @@ export default function MyPageTab({
 
   return (
     <div className="space-y-4">
-      {isMaster ? (
+      {showBossManagement ? (
         <section className="rounded-2xl border border-sky-500/30 bg-sky-500/5 p-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Nikke Management</h2>
-            <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-300">
-              Master only
-            </span>
+            <h2 className="text-lg font-semibold">니케 관리</h2>
+            {isMaster ? (
+              <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-300">
+                마스터 계정
+              </span>
+            ) : (
+              <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-300">
+                로컬 테스트
+              </span>
+            )}
           </div>
 
           <div className="mt-4 space-y-4">
             <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-neutral-100">1. Sync from nikke-images bucket</div>
+                  <div className="text-sm font-medium text-neutral-100">1. 이미지 버킷 동기화</div>
                   <div className="mt-1 text-xs text-neutral-400">
-                    Register files already uploaded to storage into the nikke table.
+                    `nikke-images` 버킷에 있는 파일을 니케 테이블에 자동 등록합니다.
                   </div>
                 </div>
                 <button
@@ -173,18 +179,18 @@ export default function MyPageTab({
                   disabled={syncingNikkes}
                   className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
                 >
-                  {syncingNikkes ? "Syncing..." : "Sync images"}
+                  {syncingNikkes ? "동기화 중..." : "이미지 동기화"}
                 </button>
               </div>
             </div>
 
             <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
-              <div className="text-sm font-medium text-neutral-100">2. Add or update a nikke</div>
+              <div className="text-sm font-medium text-neutral-100">2. 니케 등록/수정</div>
               <div className="mt-2 space-y-2">
                 <input
                   value={nikkeName}
                   onChange={(event) => setNikkeName(event.target.value)}
-                  placeholder="Nikke name"
+                  placeholder="니케 이름"
                   className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                 />
 
@@ -197,7 +203,7 @@ export default function MyPageTab({
                     }}
                     className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                   >
-                    <option value="">Burst</option>
+                    <option value="">버스트</option>
                     <option value="1">I</option>
                     <option value="2">II</option>
                     <option value="3">III</option>
@@ -208,7 +214,7 @@ export default function MyPageTab({
                     onChange={(event) => setNikkeElement((event.target.value || null) as NikkeElementValue)}
                     className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                   >
-                    <option value="">Element</option>
+                    <option value="">속성</option>
                     {elements.map((element) => (
                       <option key={element.v} value={element.v}>
                         {element.label}
@@ -221,7 +227,7 @@ export default function MyPageTab({
                     onChange={(event) => setNikkeRole((event.target.value || null) as NikkeRoleValue)}
                     className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                   >
-                    <option value="">Role</option>
+                    <option value="">역할</option>
                     {roles.map((role) => (
                       <option key={role.v} value={role.v}>
                         {role.label}
@@ -240,7 +246,7 @@ export default function MyPageTab({
 
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xs text-neutral-400">
-                    {nikkeImageFile ? `Selected image: ${nikkeImageFile.name}` : "Choose a nikke image file"}
+                    {nikkeImageFile ? `선택된 이미지: ${nikkeImageFile.name}` : "니케 이미지 파일을 선택해줘"}
                   </div>
                   <button
                     type="button"
@@ -248,7 +254,7 @@ export default function MyPageTab({
                     disabled={savingNikke}
                     className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
                   >
-                    {savingNikke ? "Saving..." : "Save nikke"}
+                    {savingNikke ? "저장 중..." : "니케 저장"}
                   </button>
                 </div>
               </div>
@@ -260,32 +266,32 @@ export default function MyPageTab({
       {showBossManagement ? (
         <section className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Solo Raid Boss Management</h2>
+            <h2 className="text-lg font-semibold">솔로레이드 보스 관리</h2>
             {isMaster ? (
               <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-300">
-                Master
+                마스터 계정
               </span>
             ) : (
               <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-300">
-                Local test
+                로컬 테스트
               </span>
             )}
           </div>
 
           <div className="mt-4 space-y-4">
             <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
-              <div className="text-sm font-medium text-neutral-100">1. Add solo raid boss</div>
+              <div className="text-sm font-medium text-neutral-100">1. 솔로레이드 보스 추가</div>
               <div className="mt-2 space-y-2">
                 <input
                   value={newRaidName}
                   onChange={(event) => setNewRaidName(event.target.value)}
-                  placeholder="Boss name"
+                  placeholder="보스 이름"
                   className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                 />
                 <textarea
                   value={newRaidDescription}
                   onChange={(event) => setNewRaidDescription(event.target.value)}
-                  placeholder="Boss description"
+                  placeholder="보스 설명"
                   className="h-24 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                 />
                 <input
@@ -297,7 +303,7 @@ export default function MyPageTab({
                 />
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xs text-neutral-400">
-                    {newRaidImageFile ? `Selected image: ${newRaidImageFile.name}` : "Choose a boss image file"}
+                    {newRaidImageFile ? `선택된 이미지: ${newRaidImageFile.name}` : "보스 이미지 파일을 선택해줘"}
                   </div>
                   <button
                     type="button"
@@ -305,7 +311,7 @@ export default function MyPageTab({
                     disabled={savingRaid}
                     className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
                   >
-                    {savingRaid ? "Saving..." : "Add boss"}
+                    {savingRaid ? "저장 중..." : "보스 추가"}
                   </button>
                 </div>
               </div>
@@ -314,9 +320,9 @@ export default function MyPageTab({
             <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-medium text-neutral-100">2. End solo raid</div>
+                  <div className="text-sm font-medium text-neutral-100">2. 솔로레이드 종료</div>
                   <div className="mt-1 text-xs text-neutral-400">
-                    Ending the raid switches the home boss card back to the default boss.
+                    종료하면 홈 상단 보스 정보가 기본 보스로 다시 바뀝니다.
                   </div>
                 </div>
                 <button
@@ -325,7 +331,7 @@ export default function MyPageTab({
                   disabled={endingRaid || !soloRaidActive}
                   className="rounded-2xl border border-red-800/60 px-4 py-3 text-sm text-red-300 active:scale-[0.99] disabled:opacity-50"
                 >
-                  {endingRaid ? "Ending..." : "End raid"}
+                  {endingRaid ? "종료 중..." : "레이드 종료"}
                 </button>
               </div>
             </div>
@@ -334,7 +340,7 @@ export default function MyPageTab({
       ) : null}
 
       <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-        <h2 className="text-lg font-semibold">Solo Raid History</h2>
+        <h2 className="text-lg font-semibold">솔로레이드 기록</h2>
 
         <div className="mt-3 space-y-2">
           {deckTabs.map((tab) => {
@@ -352,7 +358,7 @@ export default function MyPageTab({
                 >
                   <span>{tab.label}</span>
                   <span className={`text-xl ${isOpen ? "text-black/70" : "text-neutral-500"}`}>
-                    {isOpen ? "Hide" : "Open"}
+                    {isOpen ? "닫기" : "보기"}
                   </span>
                 </button>
 
@@ -361,7 +367,7 @@ export default function MyPageTab({
                     {tabRecommendation ? (
                       <div className="space-y-3">
                         <div className="flex items-center justify-between gap-3">
-                          <div className="text-sm text-neutral-300">{tabRecommendation.raidLabel} recommendation</div>
+                          <div className="text-sm text-neutral-300">{tabRecommendation.raidLabel} 추천 기록</div>
                           <div className="text-lg font-semibold tabular-nums text-neutral-100">
                             {fmt(tabRecommendation.total)}
                           </div>
@@ -377,7 +383,7 @@ export default function MyPageTab({
                         </div>
                       </div>
                     ) : (
-                      <div className="text-sm text-neutral-400">No saved recommendation for this raid yet.</div>
+                      <div className="text-sm text-neutral-400">해당 레이드에 저장된 추천 기록이 없습니다.</div>
                     )}
                   </div>
                 ) : null}

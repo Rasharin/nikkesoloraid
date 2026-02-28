@@ -100,7 +100,7 @@ export default function SettingsTab({
   return (
     <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold">Select Nikkes</h2>
+        <h2 className="text-base font-semibold">사용할 니케 선택</h2>
         <div className="text-xs text-neutral-400">
           {selectedNames.length} / {maxSelected}
         </div>
@@ -110,21 +110,22 @@ export default function SettingsTab({
         <input
           value={q}
           onChange={(event) => setQ(event.target.value)}
-          placeholder="Search nikke name"
+          placeholder="니케 이름 검색"
           className="flex-1 rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
         />
         <button
+          type="button"
           onClick={() => setSelectedNames([])}
           className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99]"
         >
-          Clear
+          전체 해제
         </button>
       </div>
 
-      <section className="mt-5 mb-3 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-        <div className="grid gap-3">
+      <section className="mt-2 mb-3 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+        <div className="grid gap-2">
           <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">Burst</div>
+            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">버스트</div>
             <div className="flex flex-wrap gap-2">
               {[
                 { n: 1, label: "I" },
@@ -144,7 +145,7 @@ export default function SettingsTab({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">Element</div>
+            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">속성</div>
             <div className="flex flex-wrap gap-2">
               {elements.map((element) => (
                 <button
@@ -159,7 +160,7 @@ export default function SettingsTab({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">Role</div>
+            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">역할</div>
             <div className="flex flex-wrap gap-2">
               {roles.map((role) => (
                 <button
