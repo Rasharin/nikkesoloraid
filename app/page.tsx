@@ -464,7 +464,7 @@ export default function Page() {
   const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set())
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set())
   const [appConfigId, setAppConfigId] = useState<string | null>(null);
-  const [masterUserId, setMasterUserId] = useState<string | null>(null);
+  const [isMasterUser, setIsMasterUser] = useState(false);
   const [activeRaidKey, setActiveRaidKey] = useState<string | null>(DEFAULT_ACTIVE_RAID_KEY);
   const [soloRaidActive, setSoloRaidActive] = useState(true);
   const [recommendationHistory, setRecommendationHistory] = useState<Record<string, RecommendationRecord>>({});
@@ -540,10 +540,7 @@ export default function Page() {
         const nextTabs = mapDeckTabs(config?.solo_raid_tabs);
         const resolvedTabs = nextTabs.length > 0 ? nextTabs : DEFAULT_DECK_TABS;
         const nextActiveKey = config?.active_raid_key ?? DEFAULT_ACTIVE_RAID_KEY;
-        const nextMasterUserId = config?.master_user_id?.trim() ?? null;
-
         setAppConfigId(config?.id ?? null);
-        setMasterUserId(nextMasterUserId);
         setDeckTabs(resolvedTabs);
         setActiveRaidKey(nextActiveKey);
         setSoloRaidActive(config?.solo_raid_active ?? true);
@@ -556,7 +553,6 @@ export default function Page() {
         console.error(error);
         if (!cancelled) {
           setAppConfigId(null);
-          setMasterUserId(null);
           setDeckTabs(DEFAULT_DECK_TABS);
           setActiveRaidKey(DEFAULT_ACTIVE_RAID_KEY);
           setSoloRaidActive(true);
@@ -565,6 +561,45 @@ export default function Page() {
     }
 
     void loadAppConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      setIsMasterUser(false);
+      return;
+    }
+
+    const currentUserId = userId;
+
+    let cancelled = false;
+
+    async function checkMasterUser() {
+      try {
+        const normalizedUserId = currentUserId.trim();
+        const { data, error } = await supabase
+          .from("app_config")
+          .select("id")
+          .eq("master_user_id", normalizedUserId)
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        setIsMasterUser(Boolean(data));
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setIsMasterUser(false);
+        }
+      }
+    }
+
+    void checkMasterUser();
 
     return () => {
       cancelled = true;
@@ -718,7 +753,7 @@ export default function Page() {
     [decks]
   );
   const visibleSavedDecks = sortedDecks;
-  const isMaster = Boolean(userId?.trim() && masterUserId?.trim() && userId.trim() === masterUserId.trim());
+  const isMaster = isMasterUser;
   const canManageBosses = isMaster || process.env.NODE_ENV !== "production";
 
   useEffect(() => {
