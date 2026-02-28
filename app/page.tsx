@@ -22,6 +22,7 @@ function toggleSet<T>(set: Set<T>, value: T) {
 // -------------------- Types --------------------
 type Deck = {
   id: string;
+  raidKey: string;
   chars: string[]; // length 5
   score: number;
   createdAt: number;
@@ -58,6 +59,7 @@ type DeckTabItem = {
 type DeckRow = {
   id: string;
   user_id: string;
+  raid_key: string | null;
   chars: string[] | null;
   score: number | string | null;
   created_at: string;
@@ -307,12 +309,14 @@ function parseBulk(text: string): Array<{ chars: string[]; score: number }> {
 }
 
 function mapDeckRow(row: DeckRow): Deck | null {
+  if (!row.raid_key || typeof row.raid_key !== "string") return null;
   const chars = Array.isArray(row.chars) ? row.chars.filter((v): v is string => typeof v === "string") : [];
   const score = Number(row.score);
   if (!Number.isFinite(score)) return null;
   const createdAt = Date.parse(row.created_at);
   return {
     id: row.id,
+    raidKey: row.raid_key,
     chars,
     score,
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
@@ -473,7 +477,7 @@ export default function Page() {
     try {
       const { data, error } = await supabase
         .from("decks")
-        .select("id,user_id,chars,score,created_at")
+        .select("id,user_id,raid_key,chars,score,created_at")
         .eq("user_id", currentUserId)
         .order("created_at", { ascending: false });
 
@@ -520,32 +524,36 @@ export default function Page() {
     };
   }, []);
 
+  async function refreshAppConfig() {
+    const { data, error } = await supabase
+      .from("app_config")
+      .select("master_user_id,active_raid_key,solo_raid_active,solo_raid_tabs")
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    const config = data as AppConfigRow | null;
+    const nextTabs = mapDeckTabs(config?.solo_raid_tabs);
+    const resolvedTabs = nextTabs.length > 0 ? nextTabs : DEFAULT_DECK_TABS;
+    const nextActiveKey = config?.active_raid_key ?? DEFAULT_ACTIVE_RAID_KEY;
+
+    setDeckTabs(resolvedTabs);
+    setActiveRaidKey(nextActiveKey);
+    setSoloRaidActive(config?.solo_raid_active ?? true);
+    setSavedDeckTab((prev) => {
+      if (resolvedTabs.some((tab) => tab.key === prev)) return prev;
+      if (nextActiveKey && resolvedTabs.some((tab) => tab.key === nextActiveKey)) return nextActiveKey;
+      return resolvedTabs[0]?.key ?? "";
+    });
+  }
+
   useEffect(() => {
     let cancelled = false;
 
     async function loadAppConfig() {
       try {
-        const { data, error } = await supabase
-          .from("app_config")
-          .select("master_user_id,active_raid_key,solo_raid_active,solo_raid_tabs")
-          .limit(1)
-          .maybeSingle();
-
-        if (error) throw error;
-        if (cancelled) return;
-
-        const config = data as AppConfigRow | null;
-        const nextTabs = mapDeckTabs(config?.solo_raid_tabs);
-        const resolvedTabs = nextTabs.length > 0 ? nextTabs : DEFAULT_DECK_TABS;
-        const nextActiveKey = config?.active_raid_key ?? DEFAULT_ACTIVE_RAID_KEY;
-        setDeckTabs(resolvedTabs);
-        setActiveRaidKey(nextActiveKey);
-        setSoloRaidActive(config?.solo_raid_active ?? true);
-        setSavedDeckTab((prev) => {
-          if (resolvedTabs.some((tab) => tab.key === prev)) return prev;
-          if (nextActiveKey && resolvedTabs.some((tab) => tab.key === nextActiveKey)) return nextActiveKey;
-          return resolvedTabs[0]?.key ?? "";
-        });
+        await refreshAppConfig();
       } catch (error) {
         console.error(error);
         if (!cancelled) {
@@ -670,7 +678,7 @@ export default function Page() {
     }
     refreshDecks(userId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, savedDeckTab]);
+  }, [userId]);
 
   useEffect(() => {
     try {
@@ -685,7 +693,7 @@ export default function Page() {
       : deckTabs[0]?.key ?? "");
   }, [activeRaidKey, deckTabs, savedDeckTab]);
 
-  async function refreshSupabase() {
+  async function refreshSupabase(forceSoloRaidActive?: boolean) {
     setLoadingData(true);
 
     try {
@@ -701,7 +709,7 @@ export default function Page() {
         setnikkes((nikkeData ?? []) as NikkeRow[]);
       }
 
-      const bossSource = soloRaidActive ? "bosses" : "boss_default";
+      const bossSource = (forceSoloRaidActive ?? soloRaidActive) ? "bosses" : "boss_default";
       const { data: bossData, error: bossErr } = await supabase
         .from(bossSource)
         .select("id,title,description,image_path,starts_at,ends_at,created_at")
@@ -738,15 +746,23 @@ export default function Page() {
     return selectedNames.map((name) => nikkeMap.get(name)).filter(Boolean) as NikkeRow[];
   }, [selectedNames, nikkeMap]);
 
-  const best = useMemo(() => pickBest5(decks), [decks]);
+  const activeRaidDecks = useMemo(
+    () => (activeRaidKey ? decks.filter((deck) => deck.raidKey === activeRaidKey) : []),
+    [activeRaidKey, decks]
+  );
+  const best = useMemo(() => pickBest5(activeRaidDecks), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
   const activeRaidLabel = useMemo(
     () => deckTabs.find((deckTab) => deckTab.key === activeRaidKey)?.label ?? activeRaidKey ?? "",
     [activeRaidKey, deckTabs]
   );
   const sortedDecks = useMemo(
-    () => decks.slice().sort((a, b) => b.score - a.score),
-    [decks]
+    () =>
+      decks
+        .filter((deck) => deck.raidKey === savedDeckTab)
+        .slice()
+        .sort((a, b) => b.score - a.score),
+    [decks, savedDeckTab]
   );
   const visibleSavedDecks = sortedDecks;
   const isMaster = isMasterUser;
@@ -873,6 +889,10 @@ export default function Page() {
       showToast("로그인 후 덱 저장 가능");
       return false;
     }
+    if (!activeRaidKey) {
+      showToast("현재 진행 중인 솔로레이드가 없어");
+      return false;
+    }
 
     const sc = Number(scoreText.replaceAll(",", "").replaceAll(" ", "").trim());
     if (!Number.isFinite(sc) || sc <= 0) {
@@ -887,7 +907,7 @@ export default function Page() {
           .update({ chars: [...draft], score: sc })
           .eq("id", editingId)
           .eq("user_id", userId)
-          .select("id,user_id,chars,score,created_at")
+          .select("id,user_id,raid_key,chars,score,created_at")
           .single();
         if (error) throw error;
         const updated = mapDeckRow(data as DeckRow);
@@ -897,8 +917,8 @@ export default function Page() {
       } else {
         const { data, error } = await supabase
           .from("decks")
-          .insert({ user_id: userId, chars: [...draft], score: sc })
-          .select("id,user_id,chars,score,created_at")
+          .insert({ user_id: userId, raid_key: activeRaidKey, chars: [...draft], score: sc })
+          .select("id,user_id,raid_key,chars,score,created_at")
           .single();
         if (error) throw error;
         const inserted = mapDeckRow(data as DeckRow);
@@ -925,14 +945,22 @@ export default function Page() {
       showToast("로그인 후 덱 저장 가능");
       return false;
     }
+    if (!activeRaidKey) {
+      showToast("현재 진행 중인 솔로레이드가 없어");
+      return false;
+    }
 
-    const exists = new Set(decks.map((d) => `${d.score}|${d.chars.map(normToken).join("|")}`));
-    const insertRows: Array<{ user_id: string; chars: string[]; score: number }> = [];
+    const exists = new Set(
+      decks
+        .filter((deck) => deck.raidKey === activeRaidKey)
+        .map((d) => `${d.score}|${d.chars.map(normToken).join("|")}`)
+    );
+    const insertRows: Array<{ user_id: string; raid_key: string; chars: string[]; score: number }> = [];
 
     for (const p of parsed) {
       const key = `${p.score}|${p.chars.map(normToken).join("|")}`;
       if (exists.has(key)) continue;
-      insertRows.push({ user_id: userId, chars: p.chars, score: p.score });
+      insertRows.push({ user_id: userId, raid_key: activeRaidKey, chars: p.chars, score: p.score });
       exists.add(key);
     }
 
@@ -945,7 +973,7 @@ export default function Page() {
       const { data, error } = await supabase
         .from("decks")
         .insert(insertRows)
-        .select("id,user_id,chars,score,created_at");
+        .select("id,user_id,raid_key,chars,score,created_at");
       if (error) throw error;
       const added = ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
       setDecks((prev) => [...added, ...prev]);
@@ -1048,11 +1076,8 @@ export default function Page() {
 
       if (error) throw error;
 
-      setDeckTabs(nextTabs);
-      setActiveRaidKey(nextKey);
-      setSoloRaidActive(true);
-      setSavedDeckTab(nextKey);
-      await refreshSupabase();
+      await refreshAppConfig();
+      await refreshSupabase(true);
       showToast("새 솔로레이드 추가 완료");
       return true;
     } catch (error) {
@@ -1078,15 +1103,13 @@ export default function Page() {
         .from("app_config")
         .update({
           solo_raid_active: false,
-          active_raid_key: null,
         })
         .eq("master_user_id", currentUserId);
 
       if (error) throw error;
 
-      setSoloRaidActive(false);
-      setActiveRaidKey(null);
-      await refreshSupabase();
+      await refreshAppConfig();
+      await refreshSupabase(false);
       showToast("솔로레이드 종료 완료");
       return true;
     } catch (error) {
@@ -1153,7 +1176,7 @@ export default function Page() {
         {tab === "home" && (
           <HomeTab
             boss={boss}
-            decksCount={decks.length}
+            decksCount={activeRaidDecks.length}
             canRecommend={canRecommend}
             best={best}
             fmt={fmt}

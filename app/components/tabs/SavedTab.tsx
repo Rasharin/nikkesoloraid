@@ -2,6 +2,7 @@
 
 type Deck = {
   id: string;
+  raidKey: string;
   chars: string[];
   score: number;
   createdAt: number;
