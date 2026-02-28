@@ -727,8 +727,10 @@ export default function Page() {
     if (!activeRaidKey) return;
     if (!canRecommend) return;
 
+    const currentRaidKey = activeRaidKey;
+
     const nextRecord: RecommendationRecord = {
-      raidKey: activeRaidKey,
+      raidKey: currentRaidKey,
       raidLabel: activeRaidLabel,
       total: best.total,
       decks: best.picked.map((deck) => ({
@@ -738,7 +740,7 @@ export default function Page() {
       updatedAt: Date.now(),
     };
 
-    if (sameRecommendationRecord(recommendationHistory[activeRaidKey], nextRecord)) return;
+    if (sameRecommendationRecord(recommendationHistory[currentRaidKey], nextRecord)) return;
 
     let cancelled = false;
 
@@ -762,10 +764,10 @@ export default function Page() {
         if (cancelled) return;
 
         setRecommendationHistory((prev) => {
-          if (sameRecommendationRecord(prev[activeRaidKey], nextRecord)) return prev;
+          if (sameRecommendationRecord(prev[currentRaidKey], nextRecord)) return prev;
           return {
             ...prev,
-            [activeRaidKey]: nextRecord,
+            [currentRaidKey]: nextRecord,
           };
         });
       } catch (error) {
