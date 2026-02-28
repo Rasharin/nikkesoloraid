@@ -13,6 +13,12 @@ type User = {
     avatar_url?: string;
     picture?: string;
   };
+  identities?: Array<{
+    identity_data?: {
+      avatar_url?: string;
+      picture?: string;
+    };
+  }>;
 };
 
 type LoginButtonProps = {
@@ -74,6 +80,8 @@ export default function LoginButton({ onProfileClick }: LoginButtonProps) {
     const profileImage =
       user.user_metadata?.avatar_url ||
       user.user_metadata?.picture ||
+      user.identities?.[0]?.identity_data?.avatar_url ||
+      user.identities?.[0]?.identity_data?.picture ||
       null;
 
     return (
