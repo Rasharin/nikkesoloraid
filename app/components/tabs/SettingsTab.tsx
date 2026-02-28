@@ -38,7 +38,13 @@ type SettingsTabProps = {
 };
 
 function NikkeName({ name }: { name: string }) {
-  const displayName = name.replace(/\s*\[[^\]]*\]/g, "").trim();
+  const bracketChars = ["[", "［", "【", "〔", "〖", "〘", "〚", "⟦"];
+  const firstBracketIndex = bracketChars.reduce((currentMin, bracket) => {
+    const index = name.indexOf(bracket);
+    if (index === -1) return currentMin;
+    return currentMin === -1 ? index : Math.min(currentMin, index);
+  }, -1);
+  const displayName = (firstBracketIndex === -1 ? name : name.slice(0, firstBracketIndex)).trim();
   const parts = displayName.split(":");
   return (
     <div className="mt-1 h-[2.4em] overflow-hidden break-words text-xs font-medium leading-tight">
@@ -49,7 +55,7 @@ function NikkeName({ name }: { name: string }) {
           {parts.slice(1).join(":")}
         </>
       ) : (
-        name
+        displayName
       )}
     </div>
   );
