@@ -540,9 +540,10 @@ export default function Page() {
         const nextTabs = mapDeckTabs(config?.solo_raid_tabs);
         const resolvedTabs = nextTabs.length > 0 ? nextTabs : DEFAULT_DECK_TABS;
         const nextActiveKey = config?.active_raid_key ?? DEFAULT_ACTIVE_RAID_KEY;
+        const nextMasterUserId = config?.master_user_id?.trim() ?? null;
 
         setAppConfigId(config?.id ?? null);
-        setMasterUserId(config?.master_user_id ?? null);
+        setMasterUserId(nextMasterUserId);
         setDeckTabs(resolvedTabs);
         setActiveRaidKey(nextActiveKey);
         setSoloRaidActive(config?.solo_raid_active ?? true);
@@ -568,7 +569,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [userId]);
 
   // selected 목록만 localStorage 사용
   useEffect(() => {
@@ -717,7 +718,7 @@ export default function Page() {
     [decks]
   );
   const visibleSavedDecks = sortedDecks;
-  const isMaster = Boolean(userId && masterUserId && userId === masterUserId);
+  const isMaster = Boolean(userId?.trim() && masterUserId?.trim() && userId.trim() === masterUserId.trim());
   const canManageBosses = isMaster || process.env.NODE_ENV !== "production";
 
   useEffect(() => {
