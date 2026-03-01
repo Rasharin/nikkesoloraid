@@ -16,7 +16,6 @@ type SavedTabItem = {
 };
 
 type SavedTabProps = {
-  userId: string | null;
   visibleSavedDecks: Deck[];
   deckTabs: readonly SavedTabItem[];
   savedDeckTab: string;
@@ -27,7 +26,6 @@ type SavedTabProps = {
 };
 
 export default function SavedTab({
-  userId,
   visibleSavedDecks,
   deckTabs,
   savedDeckTab,
@@ -60,10 +58,8 @@ export default function SavedTab({
       </div>
 
       <div className="mt-3 space-y-2">
-        {!userId ? (
-          <div className="text-sm text-neutral-300">로그인 후 덱 저장 가능.</div>
-        ) : visibleSavedDecks.length === 0 ? (
-          <div className="text-sm text-neutral-300">저장된 덱 없음.</div>
+        {visibleSavedDecks.length === 0 ? (
+          <div className="text-sm text-neutral-300">저장된 덱이 없습니다.</div>
         ) : (
           visibleSavedDecks.map((deck) => (
             <div key={deck.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">

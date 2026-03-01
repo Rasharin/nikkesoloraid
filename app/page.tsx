@@ -122,6 +122,7 @@ const DEFAULT_ACTIVE_RAID_KEY = DEFAULT_DECK_TABS[0]?.key ?? null;
 
 // -------------------- Constants --------------------
 const SELECTED_KEY = "soloraid_selected_nikkes_v2";
+const LOCAL_DECKS_KEY = "soloraid_saved_decks_v1";
 const RECOMMENDATION_TABLE = "solo_raid_recommendations";
 
 const MAX_SELECTED = 50;
@@ -338,6 +339,64 @@ function mapDeckRow(row: DeckRow): Deck | null {
   };
 }
 
+function mapLocalDeck(value: unknown): Deck | null {
+  if (!value || typeof value !== "object") return null;
+
+  const candidate = value as {
+    id?: unknown;
+    raidKey?: unknown;
+    chars?: unknown;
+    score?: unknown;
+    createdAt?: unknown;
+  };
+  const chars = Array.isArray(candidate.chars)
+    ? candidate.chars.filter((item): item is string => typeof item === "string")
+    : [];
+  const score = Number(candidate.score);
+  const createdAt = Number(candidate.createdAt);
+
+  if (typeof candidate.id !== "string" || typeof candidate.raidKey !== "string") return null;
+  if (chars.length !== MAX_DECK_CHARS) return null;
+  if (!Number.isFinite(score) || score <= 0) return null;
+
+  return {
+    id: candidate.id,
+    raidKey: candidate.raidKey,
+    chars,
+    score,
+    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+  };
+}
+
+function loadLocalDecks(): Deck[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_DECKS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(mapLocalDeck).filter((deck): deck is Deck => deck !== null);
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalDecks(nextDecks: Deck[]) {
+  try {
+    localStorage.setItem(LOCAL_DECKS_KEY, JSON.stringify(nextDecks));
+  } catch { }
+}
+
+function createLocalDeckId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getDeckSignature(deck: Pick<Deck, "raidKey" | "chars" | "score">) {
+  return `${deck.raidKey}|${deck.score}|${deck.chars.map(normToken).join("|")}`;
+}
+
 function mapRecommendationRow(row: RecommendationRow): RecommendationRecord | null {
   const total = Number(row.total);
   if (!Number.isFinite(total)) return null;
@@ -488,24 +547,44 @@ export default function Page() {
   const [recommendationHistory, setRecommendationHistory] = useState<Record<string, RecommendationRecord>>({});
   const [recommendationLoaded, setRecommendationLoaded] = useState(false);
 
-  async function refreshDecks(currentUserId: string) {
-    setLoadingDecks(true);
-    try {
-      const { data, error } = await supabase
-        .from("decks")
-        .select("id,user_id,raid_key,chars,score,created_at")
-        .eq("user_id", currentUserId)
-        .order("created_at", { ascending: false });
+  async function fetchUserDecks(currentUserId: string) {
+    const { data, error } = await supabase
+      .from("decks")
+      .select("id,user_id,raid_key,chars,score,created_at")
+      .eq("user_id", currentUserId)
+      .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      setDecks(((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null));
-    } catch (e) {
-      console.error(e);
-      setDecks([]);
-      showToast("덱 불러오기 실패");
-    } finally {
-      setLoadingDecks(false);
+    if (error) throw error;
+    return ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
+  }
+
+  async function syncLocalDecksToAccount(currentUserId: string) {
+    const localDecks = loadLocalDecks();
+    if (localDecks.length === 0) return 0;
+
+    const existingDecks = await fetchUserDecks(currentUserId);
+    const existingKeys = new Set(existingDecks.map(getDeckSignature));
+    const insertRows: Array<{ user_id: string; raid_key: string; chars: string[]; score: number }> = [];
+
+    for (const deck of localDecks) {
+      const key = getDeckSignature(deck);
+      if (existingKeys.has(key)) continue;
+      insertRows.push({
+        user_id: currentUserId,
+        raid_key: deck.raidKey,
+        chars: [...deck.chars],
+        score: deck.score,
+      });
+      existingKeys.add(key);
     }
+
+    if (insertRows.length > 0) {
+      const { error } = await supabase.from("decks").insert(insertRows);
+      if (error) throw error;
+    }
+
+    localStorage.removeItem(LOCAL_DECKS_KEY);
+    return insertRows.length;
   }
 
   function showToast(msg: string) {
@@ -693,12 +772,42 @@ export default function Page() {
   // 로그인 상태 변화 시 덱 로드
   useEffect(() => {
     if (!userId) {
-      setDecks([]);
+      setDecks(loadLocalDecks());
       setHomeEditRequest(null);
       return;
     }
-    refreshDecks(userId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    const currentUserId = userId;
+    let cancelled = false;
+
+    async function syncAndRefreshDecks() {
+      setLoadingDecks(true);
+      try {
+        const syncedCount = await syncLocalDecksToAccount(currentUserId);
+        const nextDecks = await fetchUserDecks(currentUserId);
+        if (cancelled) return;
+        setDecks(nextDecks);
+        if (syncedCount > 0) {
+          showToast(`로컬 덱 ${syncedCount}개 동기화 완료`);
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setDecks([]);
+          showToast("덱 불러오기 실패");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingDecks(false);
+        }
+      }
+    }
+
+    void syncAndRefreshDecks();
+
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
   useEffect(() => {
@@ -858,7 +967,15 @@ export default function Page() {
   }
 
   async function deleteDeck(id: string) {
-    if (!userId) return showToast("로그인 후 삭제 가능");
+    if (!userId) {
+      setDecks((prev) => {
+        const next = prev.filter((d) => d.id !== id);
+        saveLocalDecks(next);
+        return next;
+      });
+      showToast("삭제 완료");
+      return;
+    }
 
     try {
       const { error } = await supabase
@@ -907,10 +1024,6 @@ export default function Page() {
       showToast("니케 5명을 먼저 골라줘.");
       return false;
     }
-    if (!userId) {
-      showToast("로그인 후 덱 저장 가능");
-      return false;
-    }
     if (!activeRaidKey) {
       showToast("현재 진행 중인 솔로레이드가 없어");
       return false;
@@ -923,7 +1036,7 @@ export default function Page() {
     }
 
     try {
-      if (editingId) {
+      if (editingId && userId) {
         const { data, error } = await supabase
           .from("decks")
           .update({ chars: [...draft], score: sc })
@@ -936,7 +1049,7 @@ export default function Page() {
         if (!updated) throw new Error("Invalid deck row");
         setDecks((prev) => prev.map((deck) => (deck.id === editingId ? updated : deck)));
         showToast("덱 수정 저장 완료");
-      } else {
+      } else if (!editingId && userId) {
         const { data, error } = await supabase
           .from("decks")
           .insert({ user_id: userId, raid_key: activeRaidKey, chars: [...draft], score: sc })
@@ -946,6 +1059,31 @@ export default function Page() {
         const inserted = mapDeckRow(data as DeckRow);
         if (!inserted) throw new Error("Invalid deck row");
         setDecks((prev) => [inserted, ...prev]);
+        showToast("덱 저장 완료");
+      } else if (editingId) {
+        setDecks((prev) => {
+          const next = prev.map((deck) => (
+            deck.id === editingId
+              ? { ...deck, raidKey: activeRaidKey, chars: [...draft], score: sc }
+              : deck
+          ));
+          saveLocalDecks(next);
+          return next;
+        });
+        showToast("덱 수정 저장 완료");
+      } else {
+        const inserted: Deck = {
+          id: createLocalDeckId(),
+          raidKey: activeRaidKey,
+          chars: [...draft],
+          score: sc,
+          createdAt: Date.now(),
+        };
+        setDecks((prev) => {
+          const next = [inserted, ...prev];
+          saveLocalDecks(next);
+          return next;
+        });
         showToast("덱 저장 완료");
       }
     } catch (e) {
@@ -963,10 +1101,6 @@ export default function Page() {
       showToast("맞는 덱이 없음.");
       return false;
     }
-    if (!userId) {
-      showToast("로그인 후 덱 저장 가능");
-      return false;
-    }
     if (!activeRaidKey) {
       showToast("현재 진행 중인 솔로레이드가 없어");
       return false;
@@ -977,28 +1111,52 @@ export default function Page() {
         .filter((deck) => deck.raidKey === activeRaidKey)
         .map((d) => `${d.score}|${d.chars.map(normToken).join("|")}`)
     );
-    const insertRows: Array<{ user_id: string; raid_key: string; chars: string[]; score: number }> = [];
+    const insertCandidates: Array<{ raidKey: string; chars: string[]; score: number }> = [];
 
     for (const p of parsed) {
       const key = `${p.score}|${p.chars.map(normToken).join("|")}`;
       if (exists.has(key)) continue;
-      insertRows.push({ user_id: userId, raid_key: activeRaidKey, chars: p.chars, score: p.score });
+      insertCandidates.push({ raidKey: activeRaidKey, chars: p.chars, score: p.score });
       exists.add(key);
     }
 
-    if (insertRows.length === 0) {
+    if (insertCandidates.length === 0) {
       showToast("추가할 새 덱이 없어.");
       return false;
     }
 
     try {
-      const { data, error } = await supabase
-        .from("decks")
-        .insert(insertRows)
-        .select("id,user_id,raid_key,chars,score,created_at");
-      if (error) throw error;
-      const added = ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
-      setDecks((prev) => [...added, ...prev]);
+      let added: Deck[] = [];
+
+      if (userId) {
+        const insertRows = insertCandidates.map((candidate) => ({
+          user_id: userId,
+          raid_key: candidate.raidKey,
+          chars: candidate.chars,
+          score: candidate.score,
+        }));
+        const { data, error } = await supabase
+          .from("decks")
+          .insert(insertRows)
+          .select("id,user_id,raid_key,chars,score,created_at");
+        if (error) throw error;
+        added = ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
+      } else {
+        const now = Date.now();
+        added = insertCandidates.map((candidate, index) => ({
+          id: createLocalDeckId(),
+          raidKey: candidate.raidKey,
+          chars: [...candidate.chars],
+          score: candidate.score,
+          createdAt: now + index,
+        }));
+      }
+
+      setDecks((prev) => {
+        const next = [...added, ...prev];
+        if (!userId) saveLocalDecks(next);
+        return next;
+      });
       showToast(`텍스트로 ${added.length}개 추가`);
     } catch (e) {
       console.error(e);
@@ -1294,7 +1452,6 @@ export default function Page() {
 
         {tab === "saved" && (
           <SavedTab
-            userId={userId}
             visibleSavedDecks={visibleSavedDecks}
             deckTabs={deckTabs}
             savedDeckTab={savedDeckTab}
