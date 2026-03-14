@@ -50,7 +50,6 @@ export default function RecommendTab({
     <div className="space-y-3">
       {videoEmbedUrl ? (
         <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
-          <div className="mb-2 text-sm font-medium text-neutral-200">추천 영상</div>
           <div className="aspect-video overflow-hidden rounded-2xl border border-neutral-800 bg-black">
             <iframe
               src={videoEmbedUrl}
