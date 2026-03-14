@@ -449,6 +449,15 @@ function getLatestSavedDeckTabKey(_decks: readonly Deck[], deckTabs: readonly De
   return orderedTabs[0]?.key ?? "";
 }
 
+function getNewestDeckTabKey(deckTabs: readonly DeckTabItem[]) {
+  return (
+    deckTabs
+      .filter((tab) => tab.key.toLowerCase() !== "test" && tab.label.toLowerCase() !== "test")
+      .slice()
+      .reverse()[0]?.key ?? null
+  );
+}
+
 function mapRecommendationRow(row: RecommendationRow): RecommendationRecord | null {
   const total = Number(row.total);
   if (!Number.isFinite(total)) return null;
@@ -718,7 +727,7 @@ export default function Page() {
     const config = data as AppConfigRow | null;
     const nextTabs = mapDeckTabs(config?.solo_raid_tabs);
     const resolvedTabs = nextTabs.length > 0 ? nextTabs : DEFAULT_DECK_TABS;
-    const nextActiveKey = config?.active_raid_key ?? DEFAULT_ACTIVE_RAID_KEY;
+    const nextActiveKey = config?.solo_raid_active === false ? null : (getNewestDeckTabKey(resolvedTabs) ?? DEFAULT_ACTIVE_RAID_KEY);
 
     setDeckTabs(resolvedTabs);
     setActiveRaidKey(nextActiveKey);
@@ -941,9 +950,15 @@ export default function Page() {
   }, [selectedNames]);
 
   useEffect(() => {
-    if (activeRaidKey && deckTabs.some((deckTab) => deckTab.key === activeRaidKey)) return;
-    setActiveRaidKey(getLatestSavedDeckTabKey(decks, deckTabs, activeRaidKey ?? "") || null);
-  }, [activeRaidKey, deckTabs, decks]);
+    if (!soloRaidActive) {
+      if (activeRaidKey !== null) setActiveRaidKey(null);
+      return;
+    }
+
+    const newestDeckTabKey = getNewestDeckTabKey(deckTabs) ?? DEFAULT_ACTIVE_RAID_KEY;
+    if (activeRaidKey === newestDeckTabKey) return;
+    setActiveRaidKey(newestDeckTabKey);
+  }, [activeRaidKey, deckTabs, soloRaidActive]);
 
   async function refreshSupabase(forceSoloRaidActive?: boolean) {
     setLoadingData(true);
@@ -1569,6 +1584,7 @@ export default function Page() {
         .from("app_config")
         .update({
           solo_raid_active: false,
+          active_raid_key: null,
         })
         .eq("master_user_id", currentUserId)
         .select("master_user_id")
