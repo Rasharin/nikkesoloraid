@@ -38,6 +38,7 @@ type HomeTabProps = {
   editRequest: Deck | null;
   onEditRequestConsumed: () => void;
   onResetSelected: () => void;
+  onRemoveSelectedNikke: (name: string) => void;
   onGoToSettings: () => void;
   onShowToast: (message: string) => void;
   onSubmitDeck: (payload: { draft: string[]; scoreText: string; editingId: string | null }) => Promise<boolean>;
@@ -59,6 +60,7 @@ export default function HomeTab({
   editRequest,
   onEditRequestConsumed,
   onResetSelected,
+  onRemoveSelectedNikke,
   onGoToSettings,
   onShowToast,
   onSubmitDeck,
@@ -218,12 +220,42 @@ export default function HomeTab({
                   const url = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
 
                   return (
-                    <button
+                    <div
                       key={nikke.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => addToDraft(nikke.name)}
-                      className="flex flex-col items-center active:scale-[0.99]"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          addToDraft(nikke.name);
+                        }
+                      }}
+                      className="relative flex flex-col items-center active:scale-[0.99]"
                       title={nikke.name}
                     >
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRemoveSelectedNikke(nikke.name);
+                        }}
+                        aria-label={`${nikke.name} 제거`}
+                        className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white shadow-sm transition hover:bg-red-500 active:scale-[0.95]"
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.4"
+                          strokeLinecap="round"
+                        >
+                          <path d="M6 6L18 18" />
+                          <path d="M18 6L6 18" />
+                        </svg>
+                      </button>
                       <div className="aspect-square w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         {url ? (
@@ -235,7 +267,7 @@ export default function HomeTab({
                       <div className="mt-1 text-xs text-neutral-200 leading-tight break-words line-clamp-2 text-center">
                         {formatNikkeDisplayName(nikke.name)}
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>

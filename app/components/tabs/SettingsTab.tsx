@@ -64,7 +64,7 @@ function ChevronIcon({ open }: { open: boolean }) {
 
 function StarIcon({ active }: { active: boolean }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} aria-hidden="true">
       <path
         d="M12 3.5L14.8 9.2L21 10.1L16.5 14.5L17.6 20.7L12 17.8L6.4 20.7L7.5 14.5L3 10.1L9.2 9.2L12 3.5Z"
         stroke="currentColor"
@@ -127,7 +127,7 @@ function NikkeCard({ nikke, selected, favorite, onSelect, onToggleFavorite, getP
           event.stopPropagation();
           void onToggleFavorite(nikke.name);
         }}
-        className={`absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-full border transition ${
+        className={`absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full border transition ${
           favorite
             ? "border-yellow-500/70 bg-yellow-500/20 text-yellow-300"
             : "border-neutral-700 bg-neutral-950/80 text-neutral-500 hover:border-neutral-500 hover:text-neutral-300"
@@ -279,13 +279,13 @@ export default function SettingsTab({
             aria-label="검색어 지우기"
             disabled={!q}
             style={{ borderRadius: "9999px" }}
-            className={`ml-2 flex h-10 min-w-[40px] shrink-0 items-center justify-center appearance-none overflow-hidden border-0 p-0 transition active:scale-[0.98] ${
+            className={`ml-2 flex h-9 min-w-[36px] shrink-0 items-center justify-center appearance-none overflow-hidden border-0 p-0 transition active:scale-[0.98] ${
               q ? "bg-neutral-800 text-neutral-100 hover:bg-neutral-700" : "bg-neutral-900/70 text-neutral-600"
             }`}
           >
             <svg
-              width="20"
-              height="20"
+              width="18"
+              height="18"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"

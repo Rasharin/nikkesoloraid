@@ -1216,6 +1216,10 @@ export default function Page() {
     });
   }
 
+  function removeSelectedNikke(name: string) {
+    setSelectedNames((prev) => prev.filter((currentName) => currentName !== name));
+  }
+
   async function toggleFavorite(name: string) {
     const wasFavorite = favoriteNames.has(name);
     const nextFavorites = new Set(favoriteNames);
@@ -1706,6 +1710,7 @@ export default function Page() {
             editRequest={homeEditRequest}
             onEditRequestConsumed={() => setHomeEditRequest(null)}
             onResetSelected={resetSelected}
+            onRemoveSelectedNikke={removeSelectedNikke}
             onGoToSettings={() => setTab("settings")}
             onShowToast={showToast}
             onSubmitDeck={submitDeckFromHome}
