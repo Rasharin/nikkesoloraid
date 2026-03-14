@@ -28,6 +28,7 @@ type FilterOption = {
 
 type NikkeElementValue = "iron" | "fire" | "wind" | "water" | "electric" | null;
 type NikkeRoleValue = "attacker" | "supporter" | "defender" | null;
+type AdminSectionKey = "nikkes" | "bosses" | "video";
 
 type MyPageTabProps = {
   deckTabs: readonly DeckTabItem[];
@@ -52,8 +53,16 @@ type MyPageTabProps = {
     imageFile: File | null;
   }) => Promise<boolean>;
   onEndSoloRaid: () => Promise<boolean>;
+  recommendedVideoUrl: string;
+  onSaveRecommendedVideo: (url: string) => Promise<boolean>;
   fmt: (value: number) => string;
 };
+
+function adminTabClass(active: boolean) {
+  return active
+    ? "rounded-2xl border border-white bg-white px-3 py-2 text-sm font-medium text-black"
+    : "rounded-2xl border border-neutral-700 px-3 py-2 text-sm text-neutral-200";
+}
 
 export default function MyPageTab({
   deckTabs,
@@ -68,15 +77,20 @@ export default function MyPageTab({
   roles,
   onAddSoloRaid,
   onEndSoloRaid,
+  recommendedVideoUrl,
+  onSaveRecommendedVideo,
   fmt,
 }: MyPageTabProps) {
   const [openRaidKey, setOpenRaidKey] = useState<string>("");
+  const [adminSection, setAdminSection] = useState<AdminSectionKey>("nikkes");
   const [newRaidName, setNewRaidName] = useState("");
   const [newRaidDescription, setNewRaidDescription] = useState("");
   const [newRaidImageFile, setNewRaidImageFile] = useState<File | null>(null);
   const [raidImageInputKey, setRaidImageInputKey] = useState(0);
   const [savingRaid, setSavingRaid] = useState(false);
   const [endingRaid, setEndingRaid] = useState(false);
+  const [videoUrlInput, setVideoUrlInput] = useState(recommendedVideoUrl);
+  const [savingVideo, setSavingVideo] = useState(false);
 
   const [nikkeName, setNikkeName] = useState("");
   const [nikkeBurst, setNikkeBurst] = useState<number | null>(null);
@@ -91,6 +105,10 @@ export default function MyPageTab({
       setOpenRaidKey("");
     }
   }, [deckTabs, openRaidKey]);
+
+  useEffect(() => {
+    setVideoUrlInput(recommendedVideoUrl);
+  }, [recommendedVideoUrl]);
 
   function toggleRaid(key: string) {
     setOpenRaidKey((prev) => (prev === key ? "" : key));
@@ -148,195 +166,237 @@ export default function MyPageTab({
     }
   }
 
+  async function handleSaveRecommendedVideo() {
+    if (savingVideo) return;
+    setSavingVideo(true);
+    try {
+      const saved = await onSaveRecommendedVideo(videoUrlInput);
+      if (!saved) return;
+      setVideoUrlInput((prev) => prev.trim());
+    } finally {
+      setSavingVideo(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {showBossManagement ? (
         <section className="rounded-2xl border border-sky-500/30 bg-sky-500/5 p-4">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">니케 관리</h2>
+            <h2 className="text-lg font-semibold">마스터 관리</h2>
             {isMaster ? (
               <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-300">
                 마스터 계정
               </span>
             ) : (
               <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-300">
-                로컬 테스트
+                로그인 테스트
               </span>
             )}
           </div>
 
-          <div className="mt-4 space-y-4">
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-medium text-neutral-100">1. 이미지 버킷 동기화</div>
-                  <div className="mt-1 text-xs text-neutral-400">
-                    `nikke-images` 버킷에 있는 파일을 니케 테이블에 자동 등록합니다.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void onSyncNikkes()}
-                  disabled={syncingNikkes}
-                  className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
-                >
-                  {syncingNikkes ? "동기화 중..." : "이미지 동기화"}
-                </button>
-              </div>
-            </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" onClick={() => setAdminSection("nikkes")} className={adminTabClass(adminSection === "nikkes")}>
+              니케 관리
+            </button>
+            <button type="button" onClick={() => setAdminSection("bosses")} className={adminTabClass(adminSection === "bosses")}>
+              보스 관리
+            </button>
+            <button type="button" onClick={() => setAdminSection("video")} className={adminTabClass(adminSection === "video")}>
+              추천 영상
+            </button>
+          </div>
 
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
-              <div className="text-sm font-medium text-neutral-100">2. 니케 등록/수정</div>
-              <div className="mt-2 space-y-2">
-                <input
-                  value={nikkeName}
-                  onChange={(event) => setNikkeName(event.target.value)}
-                  placeholder="니케 이름"
-                  className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
-                />
-
-                <div className="grid grid-cols-3 gap-2">
-                  <select
-                    value={nikkeBurst ?? ""}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      setNikkeBurst(Number.isFinite(value) && value > 0 ? value : null);
-                    }}
-                    className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
-                  >
-                    <option value="">버스트</option>
-                    <option value="1">I</option>
-                    <option value="2">II</option>
-                    <option value="3">III</option>
-                  </select>
-
-                  <select
-                    value={nikkeElement ?? ""}
-                    onChange={(event) => setNikkeElement((event.target.value || null) as NikkeElementValue)}
-                    className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
-                  >
-                    <option value="">속성</option>
-                    {elements.map((element) => (
-                      <option key={element.v} value={element.v}>
-                        {element.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={nikkeRole ?? ""}
-                    onChange={(event) => setNikkeRole((event.target.value || null) as NikkeRoleValue)}
-                    className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
-                  >
-                    <option value="">역할</option>
-                    {roles.map((role) => (
-                      <option key={role.v} value={role.v}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <input
-                  key={nikkeImageInputKey}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => setNikkeImageFile(event.target.files?.[0] ?? null)}
-                  className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none file:mr-3 file:rounded-xl file:border-0 file:bg-neutral-800 file:px-3 file:py-2 file:text-sm file:text-neutral-100"
-                />
-
+          {adminSection === "nikkes" ? (
+            <div className="mt-4 space-y-4">
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs text-neutral-400">
-                    {nikkeImageFile ? `선택된 이미지: ${nikkeImageFile.name}` : "니케 이미지 파일을 선택해줘"}
+                  <div>
+                    <div className="text-sm font-medium text-neutral-100">1. 이미지 버킷 동기화</div>
+                    <div className="mt-1 text-xs text-neutral-400">
+                      `nikke-images` 버킷에 있는 파일들을 니케 테이블에 자동 등록합니다.
+                    </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => void handleAddNikke()}
-                    disabled={savingNikke}
+                    onClick={() => void onSyncNikkes()}
+                    disabled={syncingNikkes}
                     className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
                   >
-                    {savingNikke ? "저장 중..." : "니케 저장"}
+                    {syncingNikkes ? "동기화 중..." : "이미지 동기화"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+                <div className="text-sm font-medium text-neutral-100">2. 니케 등록/수정</div>
+                <div className="mt-2 space-y-2">
+                  <input
+                    value={nikkeName}
+                    onChange={(event) => setNikkeName(event.target.value)}
+                    placeholder="니케 이름"
+                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                  />
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <select
+                      value={nikkeBurst ?? ""}
+                      onChange={(event) => {
+                        const value = Number(event.target.value);
+                        setNikkeBurst(Number.isFinite(value) && value > 0 ? value : null);
+                      }}
+                      className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                    >
+                      <option value="">버스트</option>
+                      <option value="1">I</option>
+                      <option value="2">II</option>
+                      <option value="3">III</option>
+                    </select>
+
+                    <select
+                      value={nikkeElement ?? ""}
+                      onChange={(event) => setNikkeElement((event.target.value || null) as NikkeElementValue)}
+                      className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                    >
+                      <option value="">속성</option>
+                      {elements.map((element) => (
+                        <option key={element.v} value={element.v}>
+                          {element.label}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={nikkeRole ?? ""}
+                      onChange={(event) => setNikkeRole((event.target.value || null) as NikkeRoleValue)}
+                      className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                    >
+                      <option value="">역할</option>
+                      {roles.map((role) => (
+                        <option key={role.v} value={role.v}>
+                          {role.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <input
+                    key={nikkeImageInputKey}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => setNikkeImageFile(event.target.files?.[0] ?? null)}
+                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none file:mr-3 file:rounded-xl file:border-0 file:bg-neutral-800 file:px-3 file:py-2 file:text-sm file:text-neutral-100"
+                  />
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs text-neutral-400">
+                      {nikkeImageFile ? `선택된 이미지: ${nikkeImageFile.name}` : "니케 이미지 파일을 선택해주세요"}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleAddNikke()}
+                      disabled={savingNikke}
+                      className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
+                    >
+                      {savingNikke ? "저장 중..." : "니케 저장"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {adminSection === "bosses" ? (
+            <div className="mt-4 space-y-4">
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+                <div className="text-sm font-medium text-neutral-100">1. 솔로레이드 보스 추가</div>
+                <div className="mt-2 space-y-2">
+                  <input
+                    value={newRaidName}
+                    onChange={(event) => setNewRaidName(event.target.value)}
+                    placeholder="보스 이름"
+                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                  />
+                  <textarea
+                    value={newRaidDescription}
+                    onChange={(event) => setNewRaidDescription(event.target.value)}
+                    placeholder="보스 설명"
+                    className="h-24 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                  />
+                  <input
+                    key={raidImageInputKey}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => setNewRaidImageFile(event.target.files?.[0] ?? null)}
+                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none file:mr-3 file:rounded-xl file:border-0 file:bg-neutral-800 file:px-3 file:py-2 file:text-sm file:text-neutral-100"
+                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs text-neutral-400">
+                      {newRaidImageFile ? `선택된 이미지: ${newRaidImageFile.name}` : "보스 이미지 파일을 선택해주세요"}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleAddSoloRaid()}
+                      disabled={savingRaid}
+                      className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
+                    >
+                      {savingRaid ? "저장 중..." : "보스 추가"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-neutral-100">2. 솔로레이드 종료</div>
+                    <div className="mt-1 text-xs text-neutral-400">
+                      종료하면 현재 활성 레이드가 비활성화되고 기본 화면으로 돌아갑니다.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleEndSoloRaid()}
+                    disabled={endingRaid || !soloRaidActive}
+                    className="rounded-2xl border border-red-800/60 px-4 py-3 text-sm text-red-300 active:scale-[0.99] disabled:opacity-50"
+                  >
+                    {endingRaid ? "종료 중..." : "레이드 종료"}
                   </button>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
-      ) : null}
+          ) : null}
 
-      {showBossManagement ? (
-        <section className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">솔로레이드 보스 관리</h2>
-            {isMaster ? (
-              <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-300">
-                마스터 계정
-              </span>
-            ) : (
-              <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-300">
-                로컬 테스트
-              </span>
-            )}
-          </div>
+          {adminSection === "video" ? (
+            <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+              <div className="text-sm font-medium text-neutral-100">추천 영상</div>
+              <div className="mt-1 text-xs text-neutral-400">
+                유튜브 링크 1개만 저장되며, 저장하면 기존 추천 영상이 바로 교체됩니다.
+              </div>
 
-          <div className="mt-4 space-y-4">
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
-              <div className="text-sm font-medium text-neutral-100">1. 솔로레이드 보스 추가</div>
-              <div className="mt-2 space-y-2">
+              <div className="mt-3 space-y-2">
                 <input
-                  value={newRaidName}
-                  onChange={(event) => setNewRaidName(event.target.value)}
-                  placeholder="보스 이름"
+                  value={videoUrlInput}
+                  onChange={(event) => setVideoUrlInput(event.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
                   className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                 />
-                <textarea
-                  value={newRaidDescription}
-                  onChange={(event) => setNewRaidDescription(event.target.value)}
-                  placeholder="보스 설명"
-                  className="h-24 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
-                />
-                <input
-                  key={raidImageInputKey}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => setNewRaidImageFile(event.target.files?.[0] ?? null)}
-                  className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none file:mr-3 file:rounded-xl file:border-0 file:bg-neutral-800 file:px-3 file:py-2 file:text-sm file:text-neutral-100"
-                />
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs text-neutral-400">
-                    {newRaidImageFile ? `선택된 이미지: ${newRaidImageFile.name}` : "보스 이미지 파일을 선택해줘"}
+                  <div className="min-w-0 text-xs text-neutral-400">
+                    {recommendedVideoUrl ? `현재 저장된 링크: ${recommendedVideoUrl}` : "현재 저장된 추천 영상이 없습니다."}
                   </div>
                   <button
                     type="button"
-                    onClick={() => void handleAddSoloRaid()}
-                    disabled={savingRaid}
+                    onClick={() => void handleSaveRecommendedVideo()}
+                    disabled={savingVideo}
                     className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
                   >
-                    {savingRaid ? "저장 중..." : "보스 추가"}
+                    {savingVideo ? "저장 중..." : "영상 저장"}
                   </button>
                 </div>
               </div>
             </div>
-
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-medium text-neutral-100">2. 솔로레이드 종료</div>
-                  <div className="mt-1 text-xs text-neutral-400">
-                    종료하면 홈 상단 보스 정보가 기본 보스로 다시 바뀝니다.
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void handleEndSoloRaid()}
-                  disabled={endingRaid || !soloRaidActive}
-                  className="rounded-2xl border border-red-800/60 px-4 py-3 text-sm text-red-300 active:scale-[0.99] disabled:opacity-50"
-                >
-                  {endingRaid ? "종료 중..." : "레이드 종료"}
-                </button>
-              </div>
-            </div>
-          </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -354,13 +414,11 @@ export default function MyPageTab({
                   type="button"
                   onClick={() => toggleRaid(tab.key)}
                   className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left text-lg transition ${
-                    isOpen ? "border-white bg-white text-black" : "text-neutral-200"
+                    isOpen ? "bg-white text-black" : "text-neutral-200"
                   }`}
                 >
                   <span>{tab.label}</span>
-                  <span className={`text-xl ${isOpen ? "text-black/70" : "text-neutral-500"}`}>
-                    {isOpen ? "닫기" : "보기"}
-                  </span>
+                  <span className={`text-xl ${isOpen ? "text-black/70" : "text-neutral-500"}`}>{isOpen ? "닫기" : "보기"}</span>
                 </button>
 
                 {isOpen ? (
@@ -369,9 +427,7 @@ export default function MyPageTab({
                       <div className="space-y-3">
                         <div className="flex items-center justify-between gap-3">
                           <div className="text-sm text-neutral-300">{tabRecommendation.raidLabel} 추천 기록</div>
-                          <div className="text-lg font-semibold tabular-nums text-neutral-100">
-                            {fmt(tabRecommendation.total)}
-                          </div>
+                          <div className="text-lg font-semibold tabular-nums text-neutral-100">{fmt(tabRecommendation.total)}</div>
                         </div>
 
                         <div className="space-y-2">

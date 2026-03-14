@@ -59,6 +59,12 @@ type FavoriteRow = {
   nikke_name: string;
   created_at: string | null;
 };
+type SiteSettingRow = {
+  key: string;
+  value: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+};
 type AppConfigRow = {
   master_user_id: string | null;
   active_raid_key: string | null;
@@ -138,6 +144,8 @@ const LOCAL_DECKS_KEY = "soloraid_saved_decks_v1";
 const RECOMMENDATION_TABLE = "solo_raid_recommendations";
 const LOCAL_FAVORITES_KEY = "soloraid_favorite_nikkes_v1";
 const FAVORITES_TABLE = "favorite_nikkes";
+const SITE_SETTINGS_TABLE = "site_settings";
+const RECOMMENDED_VIDEO_KEY = "recommended_video_url";
 
 const MAX_SELECTED = 50;
 const MAX_DECK_CHARS = 5;
@@ -169,6 +177,42 @@ function normToken(s: string) {
 
 function buildDeckKey(chars: readonly string[]) {
   return [...chars].map((char) => char.trim()).sort((a, b) => a.localeCompare(b)).join("|");
+}
+
+function extractYouTubeVideoId(input: string) {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  try {
+    const url = new URL(trimmed);
+    const hostname = url.hostname.replace(/^www\./, "");
+
+    if (hostname === "youtu.be") {
+      const id = url.pathname.split("/").filter(Boolean)[0] ?? "";
+      return id || null;
+    }
+
+    if (hostname === "youtube.com" || hostname === "m.youtube.com") {
+      if (url.pathname === "/watch") {
+        return url.searchParams.get("v");
+      }
+
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (parts[0] === "shorts" || parts[0] === "embed") {
+        return parts[1] ?? null;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function toYouTubeEmbedUrl(input: string | null) {
+  if (!input) return null;
+  const videoId = extractYouTubeVideoId(input);
+  return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
 }
 
 function splitCharsFlexible(input: string): string[] {
@@ -619,6 +663,7 @@ export default function Page() {
   const [appConfigLoaded, setAppConfigLoaded] = useState(false);
   const [recommendationHistory, setRecommendationHistory] = useState<Record<string, RecommendationRecord>>({});
   const [recommendationLoaded, setRecommendationLoaded] = useState(false);
+  const [recommendedVideoUrl, setRecommendedVideoUrl] = useState<string>("");
 
   async function fetchUserDecks(currentUserId: string) {
     const { data, error } = await supabase
@@ -643,6 +688,18 @@ export default function Page() {
         .map((row) => row.nikke_name)
         .filter((name): name is string => typeof name === "string" && name.trim().length > 0)
     );
+  }
+
+  async function fetchRecommendedVideoUrl() {
+    const { data, error } = await supabase
+      .from(SITE_SETTINGS_TABLE)
+      .select("key,value,updated_at,updated_by")
+      .eq("key", RECOMMENDED_VIDEO_KEY)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return ((data as SiteSettingRow | null)?.value ?? "").trim();
   }
 
   async function syncLocalDecksToAccount(currentUserId: string) {
@@ -759,6 +816,30 @@ export default function Page() {
       cancelled = true;
     };
   }, [userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRecommendedVideo() {
+      try {
+        const nextUrl = await fetchRecommendedVideoUrl();
+        if (!cancelled) {
+          setRecommendedVideoUrl(nextUrl);
+        }
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setRecommendedVideoUrl("");
+        }
+      }
+    }
+
+    void loadRecommendedVideo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!userId) {
@@ -1603,6 +1684,53 @@ export default function Page() {
     }
   }
 
+  async function saveRecommendedVideo(nextUrl: string) {
+    if (!isMaster) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 가능");
+      return false;
+    }
+
+    const trimmed = nextUrl.trim();
+    if (!trimmed) {
+      showToast("유튜브 링크를 입력해줘");
+      return false;
+    }
+
+    if (!extractYouTubeVideoId(trimmed)) {
+      showToast("유효한 유튜브 링크가 아니야");
+      return false;
+    }
+
+    try {
+      const { error } = await supabase
+        .from(SITE_SETTINGS_TABLE)
+        .upsert(
+          {
+            key: RECOMMENDED_VIDEO_KEY,
+            value: trimmed,
+            updated_by: currentUserId,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "key" }
+        );
+
+      if (error) throw error;
+      setRecommendedVideoUrl(trimmed);
+      showToast("추천 영상 저장 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("추천 영상 저장 실패");
+      return false;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-50">
       <div className="mx-auto max-w-xl px-4 pb-28 pt-6">
@@ -1722,6 +1850,7 @@ export default function Page() {
             recommendDeckTab={activeRaidKey ?? ""}
             onRecommendDeckTabChange={(key) => setActiveRaidKey(key)}
             recommendedDecks={recommendedDecks}
+            videoEmbedUrl={toYouTubeEmbedUrl(recommendedVideoUrl)}
             nikkeMap={nikkeMap}
             getPublicUrl={getPublicUrl}
             fmt={fmt}
@@ -1742,6 +1871,8 @@ export default function Page() {
             roles={roles}
             onAddSoloRaid={addSoloRaid}
             onEndSoloRaid={endSoloRaid}
+            recommendedVideoUrl={recommendedVideoUrl}
+            onSaveRecommendedVideo={saveRecommendedVideo}
             fmt={fmt}
           />
         )}
