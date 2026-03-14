@@ -241,15 +241,15 @@ export default function HomeTab({
                           onRemoveSelectedNikke(nikke.name);
                         }}
                         aria-label={`${nikke.name} 제거`}
-                        className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-red-600/70 text-white transition hover:bg-red-600 hover:text-white active:scale-[0.95]"
+                        className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-red-400 transition hover:bg-black/90 hover:text-red-300 active:scale-[0.95]"
                       >
                         <svg
-                          width="12"
-                          height="12"
+                          width="11"
+                          height="11"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
-                          strokeWidth="2.4"
+                          strokeWidth="3"
                           strokeLinecap="round"
                         >
                           <path d="M6 6L18 18" />
