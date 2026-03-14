@@ -3,6 +3,7 @@ create extension if not exists "pgcrypto";
 create table if not exists public.decks (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
+  deck_key text,
   chars jsonb not null,
   score bigint not null,
   created_at timestamptz not null default now()
@@ -10,6 +11,9 @@ create table if not exists public.decks (
 
 create index if not exists decks_user_id_created_at_idx
   on public.decks (user_id, created_at desc);
+
+create index if not exists decks_deck_key_idx
+  on public.decks (deck_key);
 
 alter table public.decks enable row level security;
 

@@ -3,6 +3,7 @@ import LoginButton from "./components/LoginButton";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import HomeTab from "./components/tabs/HomeTab";
 import MyPageTab from "./components/tabs/MyPageTab";
+import RecommendTab from "./components/tabs/RecommendTab";
 import SavedTab from "./components/tabs/SavedTab";
 import SettingsTab from "./components/tabs/SettingsTab";
 import { supabase } from "../lib/supabase";
@@ -23,9 +24,16 @@ function toggleSet<T>(set: Set<T>, value: T) {
 type Deck = {
   id: string;
   raidKey: string;
+  deckKey: string;
   chars: string[]; // length 5
   score: number;
   createdAt: number;
+};
+type RecommendedDeck = {
+  deckKey: string;
+  chars: string[];
+  usedCount: number;
+  avgScore: number;
 };
 type RecommendationDeck = {
   chars: string[];
@@ -46,6 +54,11 @@ type RecommendationRow = {
   decks: unknown;
   updated_at: string | null;
 };
+type FavoriteRow = {
+  user_id: string;
+  nikke_name: string;
+  created_at: string | null;
+};
 type AppConfigRow = {
   master_user_id: string | null;
   active_raid_key: string | null;
@@ -60,6 +73,7 @@ type DeckRow = {
   id: string;
   user_id: string;
   raid_key: string | null;
+  deck_key: string | null;
   chars: string[] | null;
   score: number | string | null;
   created_at: string;
@@ -114,7 +128,7 @@ const roles = [
   { v: "defender", label: "방어형" },
 ] as const;
 
-type TabKey = "home" | "saved" | "settings" | "mypage";
+type TabKey = "home" | "saved" | "recommend" | "settings" | "mypage";
 const DEFAULT_DECK_TABS: DeckTabItem[] = [
   { key: "altruia", label: "앨트루이아" },
 ];
@@ -124,6 +138,10 @@ const DEFAULT_ACTIVE_RAID_KEY = DEFAULT_DECK_TABS[0]?.key ?? null;
 const SELECTED_KEY = "soloraid_selected_nikkes_v2";
 const LOCAL_DECKS_KEY = "soloraid_saved_decks_v1";
 const RECOMMENDATION_TABLE = "solo_raid_recommendations";
+const LOCAL_FAVORITES_KEY = "soloraid_favorite_nikkes_v1";
+const FAVORITES_TABLE = "favorite_nikkes";
+const SAVED_BOSS_TAB_KEY = "nikke-saved-active-boss-tab";
+const RECOMMEND_BOSS_TAB_KEY = "nikke-recommend-active-boss-tab";
 
 const MAX_SELECTED = 50;
 const MAX_DECK_CHARS = 5;
@@ -151,6 +169,10 @@ function slugifyStorageKey(value: string) {
 
 function normToken(s: string) {
   return s.replace(/\s+/g, "").trim().toLowerCase();
+}
+
+function buildDeckKey(chars: readonly string[]) {
+  return [...chars].map((char) => char.trim()).sort((a, b) => a.localeCompare(b)).join("|");
 }
 
 function splitCharsFlexible(input: string): string[] {
@@ -333,6 +355,7 @@ function mapDeckRow(row: DeckRow): Deck | null {
   return {
     id: row.id,
     raidKey: row.raid_key,
+    deckKey: row.deck_key?.trim() || buildDeckKey(chars),
     chars,
     score,
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
@@ -345,6 +368,7 @@ function mapLocalDeck(value: unknown): Deck | null {
   const candidate = value as {
     id?: unknown;
     raidKey?: unknown;
+    deckKey?: unknown;
     chars?: unknown;
     score?: unknown;
     createdAt?: unknown;
@@ -362,6 +386,7 @@ function mapLocalDeck(value: unknown): Deck | null {
   return {
     id: candidate.id,
     raidKey: candidate.raidKey,
+    deckKey: typeof candidate.deckKey === "string" && candidate.deckKey.trim() ? candidate.deckKey : buildDeckKey(chars),
     chars,
     score,
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
@@ -393,8 +418,51 @@ function createLocalDeckId() {
   return `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function loadLocalFavorites(): string[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_FAVORITES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalFavorites(nextFavorites: Iterable<string>) {
+  try {
+    localStorage.setItem(LOCAL_FAVORITES_KEY, JSON.stringify(Array.from(nextFavorites)));
+  } catch { }
+}
+
+function loadStoredTabKey(storageKey: string) {
+  if (typeof window === "undefined") return "";
+
+  try {
+    return localStorage.getItem(storageKey) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 function getDeckSignature(deck: Pick<Deck, "raidKey" | "chars" | "score">) {
   return `${deck.raidKey}|${deck.score}|${deck.chars.map(normToken).join("|")}`;
+}
+
+function getLatestSavedDeckTabKey(
+  _decks: readonly Deck[],
+  deckTabs: readonly DeckTabItem[],
+  fallbackKey = ""
+) {
+  const orderedTabs = deckTabs
+    .filter((tab) => tab.key.toLowerCase() !== "test" && tab.label.toLowerCase() !== "test")
+    .slice()
+    .reverse();
+  const availableKeys = new Set(orderedTabs.map((tab) => tab.key));
+
+  if (fallbackKey && availableKeys.has(fallbackKey)) return fallbackKey;
+  return orderedTabs[0]?.key ?? "";
 }
 
 function mapRecommendationRow(row: RecommendationRow): RecommendationRecord | null {
@@ -438,6 +506,7 @@ function mapDeckTabs(value: unknown): DeckTabItem[] {
     const key = candidate.key.trim();
     const label = candidate.label.trim();
     if (!key || !label) continue;
+    if (key.toLowerCase() === "test" || label.toLowerCase() === "test") continue;
     tabs.push({ key, label });
   }
 
@@ -495,6 +564,19 @@ function SaveIcon({ active }: { active: boolean }) {
   );
 }
 
+function RecommendIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"
+        stroke={active ? "white" : "#a3a3a3"}
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function GearIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -513,7 +595,8 @@ function GearIcon({ active }: { active: boolean }) {
 export default function Page() {
   const [tab, setTab] = useState<TabKey>("home");
   const [deckTabs, setDeckTabs] = useState<DeckTabItem[]>(DEFAULT_DECK_TABS);
-  const [savedDeckTab, setSavedDeckTab] = useState<string>(DEFAULT_DECK_TABS[0]?.key ?? "");
+  const [savedDeckTab, setSavedDeckTab] = useState<string>(() => loadStoredTabKey(SAVED_BOSS_TAB_KEY) || (DEFAULT_DECK_TABS[0]?.key ?? ""));
+  const [recommendDeckTab, setRecommendDeckTab] = useState<string>(() => loadStoredTabKey(RECOMMEND_BOSS_TAB_KEY) || (DEFAULT_DECK_TABS[0]?.key ?? ""));
 
   // decks (Supabase)
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -527,6 +610,7 @@ export default function Page() {
 
   // selected nikkes (max 50) - localStorage
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
+  const [favoriteNames, setFavoriteNames] = useState<Set<string>>(new Set());
 
   const [homeEditRequest, setHomeEditRequest] = useState<Deck | null>(null);
 
@@ -550,12 +634,26 @@ export default function Page() {
   async function fetchUserDecks(currentUserId: string) {
     const { data, error } = await supabase
       .from("decks")
-      .select("id,user_id,raid_key,chars,score,created_at")
+      .select("id,user_id,raid_key,deck_key,chars,score,created_at")
       .eq("user_id", currentUserId)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
     return ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
+  }
+
+  async function fetchFavoriteNames(currentUserId: string) {
+    const { data, error } = await supabase
+      .from(FAVORITES_TABLE)
+      .select("user_id,nikke_name,created_at")
+      .eq("user_id", currentUserId);
+
+    if (error) throw error;
+    return new Set(
+      ((data ?? []) as FavoriteRow[])
+        .map((row) => row.nikke_name)
+        .filter((name): name is string => typeof name === "string" && name.trim().length > 0)
+    );
   }
 
   async function syncLocalDecksToAccount(currentUserId: string) {
@@ -564,7 +662,7 @@ export default function Page() {
 
     const existingDecks = await fetchUserDecks(currentUserId);
     const existingKeys = new Set(existingDecks.map(getDeckSignature));
-    const insertRows: Array<{ user_id: string; raid_key: string; chars: string[]; score: number }> = [];
+    const insertRows: Array<{ user_id: string; raid_key: string; deck_key: string; chars: string[]; score: number }> = [];
 
     for (const deck of localDecks) {
       const key = getDeckSignature(deck);
@@ -572,6 +670,7 @@ export default function Page() {
       insertRows.push({
         user_id: currentUserId,
         raid_key: deck.raidKey,
+        deck_key: deck.deckKey,
         chars: [...deck.chars],
         score: deck.score,
       });
@@ -598,6 +697,12 @@ export default function Page() {
     setSelectedNames([]);
     localStorage.removeItem(SELECTED_KEY);
     showToast("선택 리스트 초기화");
+  };
+
+  const resetFilters = () => {
+    setSelectedBursts(new Set());
+    setSelectedElements(new Set());
+    setSelectedRoles(new Set());
   };
 
   // 로그인 유저 추적
@@ -637,6 +742,11 @@ export default function Page() {
     setActiveRaidKey(nextActiveKey);
     setSoloRaidActive(config?.solo_raid_active ?? true);
     setSavedDeckTab((prev) => {
+      if (resolvedTabs.some((tab) => tab.key === prev)) return prev;
+      if (nextActiveKey && resolvedTabs.some((tab) => tab.key === nextActiveKey)) return nextActiveKey;
+      return resolvedTabs[0]?.key ?? "";
+    });
+    setRecommendDeckTab((prev) => {
       if (resolvedTabs.some((tab) => tab.key === prev)) return prev;
       if (nextActiveKey && resolvedTabs.some((tab) => tab.key === nextActiveKey)) return nextActiveKey;
       return resolvedTabs[0]?.key ?? "";
@@ -720,6 +830,48 @@ export default function Page() {
       }
     } catch { }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFavorites() {
+      if (!userId) {
+        setFavoriteNames(new Set(loadLocalFavorites()));
+        return;
+      }
+
+      try {
+        const remoteFavorites = await fetchFavoriteNames(userId);
+        const localFavorites = loadLocalFavorites();
+        const missingLocalFavorites = localFavorites.filter((name) => !remoteFavorites.has(name));
+
+        if (missingLocalFavorites.length > 0) {
+          const { error } = await supabase
+            .from(FAVORITES_TABLE)
+            .insert(missingLocalFavorites.map((name) => ({ user_id: userId, nikke_name: name })));
+          if (error) throw error;
+          for (const name of missingLocalFavorites) remoteFavorites.add(name);
+          localStorage.removeItem(LOCAL_FAVORITES_KEY);
+        }
+
+        if (!cancelled) {
+          setFavoriteNames(new Set(remoteFavorites));
+        }
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setFavoriteNames(new Set());
+          showToast("즐겨찾기 불러오기 실패");
+        }
+      }
+    }
+
+    void loadFavorites();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     setRecommendationLoaded(false);
@@ -817,11 +969,26 @@ export default function Page() {
   }, [selectedNames]);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(SAVED_BOSS_TAB_KEY, savedDeckTab);
+    } catch { }
+  }, [savedDeckTab]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RECOMMEND_BOSS_TAB_KEY, recommendDeckTab);
+    } catch { }
+  }, [recommendDeckTab]);
+
+  useEffect(() => {
     if (deckTabs.some((deckTab) => deckTab.key === savedDeckTab)) return;
-    setSavedDeckTab(activeRaidKey && deckTabs.some((deckTab) => deckTab.key === activeRaidKey)
-      ? activeRaidKey
-      : deckTabs[0]?.key ?? "");
-  }, [activeRaidKey, deckTabs, savedDeckTab]);
+    setSavedDeckTab(getLatestSavedDeckTabKey(decks, deckTabs, activeRaidKey ?? ""));
+  }, [activeRaidKey, deckTabs, decks, savedDeckTab]);
+
+  useEffect(() => {
+    if (deckTabs.some((deckTab) => deckTab.key === recommendDeckTab)) return;
+    setRecommendDeckTab(getLatestSavedDeckTabKey(decks, deckTabs, activeRaidKey ?? ""));
+  }, [activeRaidKey, deckTabs, decks, recommendDeckTab]);
 
   async function refreshSupabase(forceSoloRaidActive?: boolean) {
     setLoadingData(true);
@@ -881,11 +1048,50 @@ export default function Page() {
     () => (activeRaidKey ? decks.filter((deck) => deck.raidKey === activeRaidKey) : []),
     [activeRaidKey, decks]
   );
+  const recommendRaidDecks = useMemo(
+    () => (recommendDeckTab ? decks.filter((deck) => deck.raidKey === recommendDeckTab) : []),
+    [decks, recommendDeckTab]
+  );
+  const recommendedDecks = useMemo(() => {
+    const grouped = new Map<string, { chars: string[]; totalScore: number; usedCount: number }>();
+
+    for (const deck of recommendRaidDecks) {
+      const key = deck.deckKey || buildDeckKey(deck.chars);
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.totalScore += deck.score;
+        existing.usedCount += 1;
+        continue;
+      }
+
+      grouped.set(key, {
+        chars: [...deck.chars],
+        totalScore: deck.score,
+        usedCount: 1,
+      });
+    }
+
+    return Array.from(grouped.entries())
+      .map(([deckKey, group]) => ({
+        deckKey,
+        chars: group.chars,
+        usedCount: group.usedCount,
+        avgScore: group.totalScore / group.usedCount,
+      }))
+      .sort((a, b) => {
+        if (a.usedCount !== b.usedCount) return b.usedCount - a.usedCount;
+        return b.avgScore - a.avgScore;
+      });
+  }, [recommendRaidDecks]);
   const best = useMemo(() => pickBest5(activeRaidDecks), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
   const activeRaidLabel = useMemo(
     () => deckTabs.find((deckTab) => deckTab.key === activeRaidKey)?.label ?? activeRaidKey ?? "",
     [activeRaidKey, deckTabs]
+  );
+  const recommendRaidLabel = useMemo(
+    () => deckTabs.find((deckTab) => deckTab.key === recommendDeckTab)?.label ?? recommendDeckTab ?? "",
+    [deckTabs, recommendDeckTab]
   );
   const sortedDecks = useMemo(
     () =>
@@ -896,6 +1102,14 @@ export default function Page() {
     [decks, savedDeckTab]
   );
   const visibleSavedDecks = sortedDecks;
+  const savedDeckTabs = useMemo(
+    () =>
+      deckTabs
+        .filter((tab) => tab.key.toLowerCase() !== "test" && tab.label.toLowerCase() !== "test")
+        .slice()
+        .reverse(),
+    [deckTabs]
+  );
   const isMaster = isMasterUser;
   const canManageBosses = isMaster || process.env.NODE_ENV !== "production";
 
@@ -1002,6 +1216,52 @@ export default function Page() {
     });
   }
 
+  async function toggleFavorite(name: string) {
+    const wasFavorite = favoriteNames.has(name);
+    const nextFavorites = new Set(favoriteNames);
+
+    if (wasFavorite) {
+      nextFavorites.delete(name);
+    } else {
+      nextFavorites.add(name);
+    }
+
+    setFavoriteNames(nextFavorites);
+
+    if (!userId) {
+      saveLocalFavorites(nextFavorites);
+      return;
+    }
+
+    try {
+      if (wasFavorite) {
+        const { error } = await supabase
+          .from(FAVORITES_TABLE)
+          .delete()
+          .eq("user_id", userId)
+          .eq("nikke_name", name);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from(FAVORITES_TABLE)
+          .insert({ user_id: userId, nikke_name: name });
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error(error);
+      setFavoriteNames((prev) => {
+        const reverted = new Set(prev);
+        if (wasFavorite) {
+          reverted.add(name);
+        } else {
+          reverted.delete(name);
+        }
+        return reverted;
+      });
+      showToast("즐겨찾기 저장 실패");
+    }
+  }
+
   async function onSyncBucket() {
     try {
       if (syncing) return;
@@ -1039,10 +1299,10 @@ export default function Page() {
       if (editingId && userId) {
         const { data, error } = await supabase
           .from("decks")
-          .update({ chars: [...draft], score: sc })
+          .update({ chars: [...draft], deck_key: buildDeckKey(draft), score: sc })
           .eq("id", editingId)
           .eq("user_id", userId)
-          .select("id,user_id,raid_key,chars,score,created_at")
+          .select("id,user_id,raid_key,deck_key,chars,score,created_at")
           .single();
         if (error) throw error;
         const updated = mapDeckRow(data as DeckRow);
@@ -1052,8 +1312,8 @@ export default function Page() {
       } else if (!editingId && userId) {
         const { data, error } = await supabase
           .from("decks")
-          .insert({ user_id: userId, raid_key: activeRaidKey, chars: [...draft], score: sc })
-          .select("id,user_id,raid_key,chars,score,created_at")
+          .insert({ user_id: userId, raid_key: activeRaidKey, deck_key: buildDeckKey(draft), chars: [...draft], score: sc })
+          .select("id,user_id,raid_key,deck_key,chars,score,created_at")
           .single();
         if (error) throw error;
         const inserted = mapDeckRow(data as DeckRow);
@@ -1064,7 +1324,7 @@ export default function Page() {
         setDecks((prev) => {
           const next = prev.map((deck) => (
             deck.id === editingId
-              ? { ...deck, raidKey: activeRaidKey, chars: [...draft], score: sc }
+              ? { ...deck, raidKey: activeRaidKey, deckKey: buildDeckKey(draft), chars: [...draft], score: sc }
               : deck
           ));
           saveLocalDecks(next);
@@ -1075,6 +1335,7 @@ export default function Page() {
         const inserted: Deck = {
           id: createLocalDeckId(),
           raidKey: activeRaidKey,
+          deckKey: buildDeckKey(draft),
           chars: [...draft],
           score: sc,
           createdAt: Date.now(),
@@ -1132,13 +1393,14 @@ export default function Page() {
         const insertRows = insertCandidates.map((candidate) => ({
           user_id: userId,
           raid_key: candidate.raidKey,
+          deck_key: buildDeckKey(candidate.chars),
           chars: candidate.chars,
           score: candidate.score,
         }));
         const { data, error } = await supabase
           .from("decks")
           .insert(insertRows)
-          .select("id,user_id,raid_key,chars,score,created_at");
+          .select("id,user_id,raid_key,deck_key,chars,score,created_at");
         if (error) throw error;
         added = ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
       } else {
@@ -1146,6 +1408,7 @@ export default function Page() {
         added = insertCandidates.map((candidate, index) => ({
           id: createLocalDeckId(),
           raidKey: candidate.raidKey,
+          deckKey: buildDeckKey(candidate.chars),
           chars: [...candidate.chars],
           score: candidate.score,
           createdAt: now + index,
@@ -1453,7 +1716,7 @@ export default function Page() {
         {tab === "saved" && (
           <SavedTab
             visibleSavedDecks={visibleSavedDecks}
-            deckTabs={deckTabs}
+            deckTabs={savedDeckTabs}
             savedDeckTab={savedDeckTab}
             onSavedDeckTabChange={setSavedDeckTab}
             onStartEditDeck={startEditDeck}
@@ -1468,6 +1731,8 @@ export default function Page() {
             selectedNames={selectedNames}
             toggleSelect={toggleSelect}
             setSelectedNames={setSelectedNames}
+            favoriteNames={favoriteNames}
+            onToggleFavorite={toggleFavorite}
             selectedBursts={selectedBursts}
             setSelectedBursts={setSelectedBursts}
             selectedElements={selectedElements}
@@ -1480,6 +1745,20 @@ export default function Page() {
             roles={roles}
             getPublicUrl={getPublicUrl}
             maxSelected={MAX_SELECTED}
+            onResetFilters={resetFilters}
+          />
+        )}
+
+        {tab === "recommend" && (
+          <RecommendTab
+            raidLabel={recommendRaidLabel}
+            deckTabs={savedDeckTabs}
+            recommendDeckTab={recommendDeckTab}
+            onRecommendDeckTabChange={setRecommendDeckTab}
+            recommendedDecks={recommendedDecks}
+            nikkeMap={nikkeMap}
+            getPublicUrl={getPublicUrl}
+            fmt={fmt}
           />
         )}
 
@@ -1503,30 +1782,38 @@ export default function Page() {
       </div>
 
       {/* Bottom Tab Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-neutral-800 bg-neutral-950/95 backdrop-blur">
-        <div className="mx-auto flex max-w-xl">
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-neutral-800 bg-neutral-950">
+        <div className="mx-auto flex max-w-xl flex-row justify-around">
           <button
             onClick={() => setTab("home")}
-            className="flex w-1/3 flex-col items-center gap-1 py-3 active:scale-[0.99]"
+            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
           >
             <HomeIcon active={tab === "home"} />
-            <div className={`text-xs ${tab === "home" ? "text-white" : "text-neutral-400"}`}>홈</div>
+            <div className={tab === "home" ? "text-white" : "text-neutral-400"}>홈</div>
           </button>
 
           <button
             onClick={() => setTab("saved")}
-            className="flex w-1/3 flex-col items-center gap-1 py-3 active:scale-[0.99]"
+            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
           >
             <SaveIcon active={tab === "saved"} />
-            <div className={`text-xs ${tab === "saved" ? "text-white" : "text-neutral-400"}`}>저장된 덱</div>
+            <div className={tab === "saved" ? "text-white" : "text-neutral-400"}>저장된 덱</div>
+          </button>
+
+          <button
+            onClick={() => setTab("recommend")}
+            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
+          >
+            <RecommendIcon active={tab === "recommend"} />
+            <div className={tab === "recommend" ? "text-white" : "text-neutral-400"}>추천</div>
           </button>
 
           <button
             onClick={() => setTab("settings")}
-            className="flex w-1/3 flex-col items-center gap-1 py-3 active:scale-[0.99]"
+            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
           >
             <GearIcon active={tab === "settings"} />
-            <div className={`text-xs ${tab === "settings" ? "text-white" : "text-neutral-400"}`}>설정</div>
+            <div className={tab === "settings" ? "text-white" : "text-neutral-400"}>설정</div>
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { formatNikkeDisplayNames } from "../../../lib/nikke-display";
 type Deck = {
   id: string;
   raidKey: string;
+  deckKey: string;
   chars: string[];
   score: number;
   createdAt: number;
