@@ -140,8 +140,6 @@ const LOCAL_DECKS_KEY = "soloraid_saved_decks_v1";
 const RECOMMENDATION_TABLE = "solo_raid_recommendations";
 const LOCAL_FAVORITES_KEY = "soloraid_favorite_nikkes_v1";
 const FAVORITES_TABLE = "favorite_nikkes";
-const SAVED_BOSS_TAB_KEY = "nikke-saved-active-boss-tab";
-const RECOMMEND_BOSS_TAB_KEY = "nikke-recommend-active-boss-tab";
 
 const MAX_SELECTED = 50;
 const MAX_DECK_CHARS = 5;
@@ -436,25 +434,11 @@ function saveLocalFavorites(nextFavorites: Iterable<string>) {
   } catch { }
 }
 
-function loadStoredTabKey(storageKey: string) {
-  if (typeof window === "undefined") return "";
-
-  try {
-    return localStorage.getItem(storageKey) ?? "";
-  } catch {
-    return "";
-  }
-}
-
 function getDeckSignature(deck: Pick<Deck, "raidKey" | "chars" | "score">) {
   return `${deck.raidKey}|${deck.score}|${deck.chars.map(normToken).join("|")}`;
 }
 
-function getLatestSavedDeckTabKey(
-  _decks: readonly Deck[],
-  deckTabs: readonly DeckTabItem[],
-  fallbackKey = ""
-) {
+function getLatestSavedDeckTabKey(_decks: readonly Deck[], deckTabs: readonly DeckTabItem[], fallbackKey = "") {
   const orderedTabs = deckTabs
     .filter((tab) => tab.key.toLowerCase() !== "test" && tab.label.toLowerCase() !== "test")
     .slice()
@@ -595,8 +579,6 @@ function GearIcon({ active }: { active: boolean }) {
 export default function Page() {
   const [tab, setTab] = useState<TabKey>("home");
   const [deckTabs, setDeckTabs] = useState<DeckTabItem[]>(DEFAULT_DECK_TABS);
-  const [savedDeckTab, setSavedDeckTab] = useState<string>(() => loadStoredTabKey(SAVED_BOSS_TAB_KEY) || (DEFAULT_DECK_TABS[0]?.key ?? ""));
-  const [recommendDeckTab, setRecommendDeckTab] = useState<string>(() => loadStoredTabKey(RECOMMEND_BOSS_TAB_KEY) || (DEFAULT_DECK_TABS[0]?.key ?? ""));
 
   // decks (Supabase)
   const [decks, setDecks] = useState<Deck[]>([]);
@@ -741,16 +723,6 @@ export default function Page() {
     setDeckTabs(resolvedTabs);
     setActiveRaidKey(nextActiveKey);
     setSoloRaidActive(config?.solo_raid_active ?? true);
-    setSavedDeckTab((prev) => {
-      if (resolvedTabs.some((tab) => tab.key === prev)) return prev;
-      if (nextActiveKey && resolvedTabs.some((tab) => tab.key === nextActiveKey)) return nextActiveKey;
-      return resolvedTabs[0]?.key ?? "";
-    });
-    setRecommendDeckTab((prev) => {
-      if (resolvedTabs.some((tab) => tab.key === prev)) return prev;
-      if (nextActiveKey && resolvedTabs.some((tab) => tab.key === nextActiveKey)) return nextActiveKey;
-      return resolvedTabs[0]?.key ?? "";
-    });
   }
 
   useEffect(() => {
@@ -969,26 +941,9 @@ export default function Page() {
   }, [selectedNames]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(SAVED_BOSS_TAB_KEY, savedDeckTab);
-    } catch { }
-  }, [savedDeckTab]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(RECOMMEND_BOSS_TAB_KEY, recommendDeckTab);
-    } catch { }
-  }, [recommendDeckTab]);
-
-  useEffect(() => {
-    if (deckTabs.some((deckTab) => deckTab.key === savedDeckTab)) return;
-    setSavedDeckTab(getLatestSavedDeckTabKey(decks, deckTabs, activeRaidKey ?? ""));
-  }, [activeRaidKey, deckTabs, decks, savedDeckTab]);
-
-  useEffect(() => {
-    if (deckTabs.some((deckTab) => deckTab.key === recommendDeckTab)) return;
-    setRecommendDeckTab(getLatestSavedDeckTabKey(decks, deckTabs, activeRaidKey ?? ""));
-  }, [activeRaidKey, deckTabs, decks, recommendDeckTab]);
+    if (activeRaidKey && deckTabs.some((deckTab) => deckTab.key === activeRaidKey)) return;
+    setActiveRaidKey(getLatestSavedDeckTabKey(decks, deckTabs, activeRaidKey ?? "") || null);
+  }, [activeRaidKey, deckTabs, decks]);
 
   async function refreshSupabase(forceSoloRaidActive?: boolean) {
     setLoadingData(true);
@@ -1048,14 +1003,10 @@ export default function Page() {
     () => (activeRaidKey ? decks.filter((deck) => deck.raidKey === activeRaidKey) : []),
     [activeRaidKey, decks]
   );
-  const recommendRaidDecks = useMemo(
-    () => (recommendDeckTab ? decks.filter((deck) => deck.raidKey === recommendDeckTab) : []),
-    [decks, recommendDeckTab]
-  );
   const recommendedDecks = useMemo(() => {
     const grouped = new Map<string, { chars: string[]; totalScore: number; usedCount: number }>();
 
-    for (const deck of recommendRaidDecks) {
+    for (const deck of activeRaidDecks) {
       const key = deck.deckKey || buildDeckKey(deck.chars);
       const existing = grouped.get(key);
       if (existing) {
@@ -1082,24 +1033,20 @@ export default function Page() {
         if (a.usedCount !== b.usedCount) return b.usedCount - a.usedCount;
         return b.avgScore - a.avgScore;
       });
-  }, [recommendRaidDecks]);
+  }, [activeRaidDecks]);
   const best = useMemo(() => pickBest5(activeRaidDecks), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
   const activeRaidLabel = useMemo(
     () => deckTabs.find((deckTab) => deckTab.key === activeRaidKey)?.label ?? activeRaidKey ?? "",
     [activeRaidKey, deckTabs]
   );
-  const recommendRaidLabel = useMemo(
-    () => deckTabs.find((deckTab) => deckTab.key === recommendDeckTab)?.label ?? recommendDeckTab ?? "",
-    [deckTabs, recommendDeckTab]
-  );
   const sortedDecks = useMemo(
     () =>
       decks
-        .filter((deck) => deck.raidKey === savedDeckTab)
+        .filter((deck) => deck.raidKey === activeRaidKey)
         .slice()
         .sort((a, b) => b.score - a.score),
-    [decks, savedDeckTab]
+    [activeRaidKey, decks]
   );
   const visibleSavedDecks = sortedDecks;
   const savedDeckTabs = useMemo(
@@ -1722,8 +1669,8 @@ export default function Page() {
           <SavedTab
             visibleSavedDecks={visibleSavedDecks}
             deckTabs={savedDeckTabs}
-            savedDeckTab={savedDeckTab}
-            onSavedDeckTabChange={setSavedDeckTab}
+            savedDeckTab={activeRaidKey ?? ""}
+            onSavedDeckTabChange={(key) => setActiveRaidKey(key)}
             onStartEditDeck={startEditDeck}
             onDeleteDeck={deleteDeck}
             fmt={fmt}
@@ -1756,10 +1703,10 @@ export default function Page() {
 
         {tab === "recommend" && (
           <RecommendTab
-            raidLabel={recommendRaidLabel}
+            raidLabel={activeRaidLabel}
             deckTabs={savedDeckTabs}
-            recommendDeckTab={recommendDeckTab}
-            onRecommendDeckTabChange={setRecommendDeckTab}
+            recommendDeckTab={activeRaidKey ?? ""}
+            onRecommendDeckTabChange={(key) => setActiveRaidKey(key)}
             recommendedDecks={recommendedDecks}
             nikkeMap={nikkeMap}
             getPublicUrl={getPublicUrl}
