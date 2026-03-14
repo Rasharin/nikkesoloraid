@@ -129,10 +129,8 @@ const roles = [
 ] as const;
 
 type TabKey = "home" | "saved" | "recommend" | "settings" | "mypage";
-const DEFAULT_DECK_TABS: DeckTabItem[] = [
-  { key: "altruia", label: "앨트루이아" },
-];
-const DEFAULT_ACTIVE_RAID_KEY = DEFAULT_DECK_TABS[0]?.key ?? null;
+const DEFAULT_DECK_TABS: DeckTabItem[] = [];
+const DEFAULT_ACTIVE_RAID_KEY = null;
 
 // -------------------- Constants --------------------
 const SELECTED_KEY = "soloraid_selected_nikkes_v2";
