@@ -1878,6 +1878,7 @@ export default function Page() {
             onShowToast={showToast}
             onSubmitDeck={submitDeckFromHome}
             onSubmitBulk={submitBulkFromHome}
+            onUpdateDeckScore={updateDeckScore}
           />
         )}
 

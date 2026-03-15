@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatNikkeDisplayNames } from "../../../lib/nikke-display";
+import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
 import DeckBuilderSection, {
   getDroppedSlotIndex,
   getHoveredSlotIndex,
@@ -67,9 +67,11 @@ type HomeTabProps = {
   onShowToast: (message: string) => void;
   onSubmitDeck: (payload: { draft: string[]; scoreText: string; editingId: string | null }) => Promise<boolean>;
   onSubmitBulk: (text: string) => Promise<boolean>;
+  onUpdateDeckScore: (id: string, scoreText: string) => Promise<boolean>;
 };
 
 const HOME_DRAFT_STORAGE_KEY = "soloraid_home_draft_v1";
+const HOME_MEMO_STORAGE_KEY = "soloraid_home_memo_v1";
 
 export default function HomeTab({
   boss,
@@ -90,6 +92,7 @@ export default function HomeTab({
   onShowToast,
   onSubmitDeck,
   onSubmitBulk,
+  onUpdateDeckScore,
 }: HomeTabProps) {
   const [draft, setDraft] = useState<DraftSlot[]>(() => createEmptyDraft());
   const [score, setScore] = useState("");
@@ -98,10 +101,16 @@ export default function HomeTab({
   const [activeDrag, setActiveDrag] = useState<DragItemData | null>(null);
   const [hoveredSlotIndex, setHoveredSlotIndex] = useState<number | null>(null);
   const [overlayWidth, setOverlayWidth] = useState<number | null>(null);
+  const [editingRecommendedDeckId, setEditingRecommendedDeckId] = useState<string | null>(null);
+  const [editingRecommendedScore, setEditingRecommendedScore] = useState("");
+  const [memoText, setMemoText] = useState("");
+  const [isMemoEditing, setIsMemoEditing] = useState(false);
+  const [bossInfoOpen, setBossInfoOpen] = useState(false);
   const [draftStorageReady, setDraftStorageReady] = useState(false);
   const [isDesktopDnd, setIsDesktopDnd] = useState(false);
   const scoreRef = useRef<HTMLInputElement | null>(null);
   const deckSectionRef = useRef<HTMLElement | null>(null);
+  const memoTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -162,6 +171,28 @@ export default function HomeTab({
 
     setDraftStorageReady(true);
   }, []);
+
+  useEffect(() => {
+    try {
+      const rawMemo = localStorage.getItem(HOME_MEMO_STORAGE_KEY);
+      if (typeof rawMemo === "string") {
+        setMemoText(rawMemo);
+      }
+    } catch { }
+  }, []);
+
+  useEffect(() => {
+    const textarea = memoTextareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "0px";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [memoText, isMemoEditing]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HOME_MEMO_STORAGE_KEY, memoText);
+    } catch { }
+  }, [memoText]);
 
   useEffect(() => {
     if (!editRequest) return;
@@ -308,110 +339,152 @@ export default function HomeTab({
   const overlayNikke = activeDrag?.nikkeName ? nikkeMap.get(activeDrag.nikkeName) : undefined;
   const overlayUrl = overlayNikke?.image_path ? getPublicUrl("nikke-images", overlayNikke.image_path) : "";
 
-  return (
-    <>
-      <div className="space-y-5 lg:hidden">
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold">보스 정보</h2>
+  async function saveRecommendedDeckScore(deckId: string) {
+    const saved = await onUpdateDeckScore(deckId, editingRecommendedScore);
+    if (!saved) return;
+    setEditingRecommendedDeckId(null);
+    setEditingRecommendedScore("");
+  }
+
+  function clearMemo() {
+    setMemoText("");
+    try {
+      localStorage.removeItem(HOME_MEMO_STORAGE_KEY);
+      onShowToast("메모 비우기 완료");
+    } catch {
+      onShowToast("메모 비우기 실패");
+    }
+    setIsMemoEditing(true);
+  }
+
+  function renderRecommendedDeckCard(deck: Deck, compact = false) {
+    return (
+      <div key={deck.id} className={`rounded-2xl border border-neutral-800 bg-neutral-950/70 ${compact ? "p-2" : "p-2.5"}`}>
+        <div className="flex items-end justify-between gap-3">
+          <div className={`flex items-start ${compact ? "gap-1.5" : "gap-2"}`}>
+            {deck.chars.map((name) => {
+              const nikke = nikkeMap.get(name);
+              const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+
+              return (
+                <div key={`${deck.id}-${name}`} className={`min-w-0 ${compact ? "max-w-[50px]" : "max-w-[58px]"}`}>
+                  <div className="aspect-square overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {imageUrl ? (
+                      <img src={imageUrl} alt={name} draggable={false} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
+                    )}
+                  </div>
+                  <div className={`mt-px text-center text-neutral-200 ${compact ? "text-[9px] leading-[1.1]" : "text-[10px] leading-[1.15]"}`}>
+                    {formatNikkeDisplayName(name)}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          {boss && boss.image_path ? (
-            <div className="mt-3 space-y-3">
-              <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/40">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={getPublicUrl("boss-images", boss.image_path)}
-                  alt={boss.title}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div>
-                <div className="text-lg font-semibold">{boss.title}</div>
-                <div className="mt-2 whitespace-pre-wrap text-sm text-neutral-400">{boss.description || "설명 없음"}</div>
-              </div>
-            </div>
-          ) : boss ? (
-            <div className="mt-2 text-sm text-neutral-300">보스는 있는데 이미지가 없어.</div>
+          {editingRecommendedDeckId === deck.id ? (
+            <input
+              autoFocus
+              inputMode="numeric"
+              value={editingRecommendedScore}
+              onChange={(event) => setEditingRecommendedScore(event.target.value)}
+              onBlur={() => void saveRecommendedDeckScore(deck.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void saveRecommendedDeckScore(deck.id);
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setEditingRecommendedDeckId(null);
+                  setEditingRecommendedScore("");
+                }
+              }}
+              style={{
+                width: `${Math.max(editingRecommendedScore.length, String(deck.score).length, compact ? 8 : 10) + 2}ch`,
+              }}
+              className={`shrink-0 self-center rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1 text-right font-semibold tabular-nums text-neutral-100 outline-none ${
+                compact ? "min-w-[112px] text-lg" : "min-w-[144px] text-2xl"
+              }`}
+            />
           ) : (
-            <div className="mt-2 text-sm text-neutral-300">보스 데이터가 없어.</div>
+            <button
+              type="button"
+              onDoubleClick={() => {
+                setEditingRecommendedDeckId(deck.id);
+                setEditingRecommendedScore(String(deck.score));
+              }}
+              className={`shrink-0 self-center font-semibold tabular-nums text-neutral-100 ${
+                compact ? "text-lg" : "text-2xl"
+              }`}
+              title="더블 클릭해서 점수 수정"
+            >
+              {fmt(deck.score)}
+            </button>
           )}
-        </section>
-
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">추천 조합</h2>
-            <div className="text-xs text-neutral-400">{decksCount}개 덱</div>
-          </div>
-
-          <div className="mt-3 rounded-2xl bg-neutral-950/40 p-3">
-            {canRecommend ? (
-              <>
-                <div className="mb-2 flex items-end justify-between">
-                  <div className="text-sm text-neutral-300">총합</div>
-                  <div className="text-2xl font-bold tabular-nums">{fmt(best.total)}</div>
-                </div>
-
-                <div className="space-y-2">
-                  {best.picked.map((deck) => (
-                    <div key={deck.id} className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0 text-sm text-neutral-200">{formatNikkeDisplayNames(deck.chars)}</div>
-                        <div className="flex-none text-sm tabular-nums text-neutral-200">{fmt(deck.score)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="text-sm text-neutral-300">5덱 이상 추가 시 추천 조합 생성</div>
-            )}
-          </div>
-        </section>
+        </div>
       </div>
+    );
+  }
 
-      <div className="hidden gap-5 lg:grid lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.95fr)] xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.95fr)]">
-        <section className="flex h-full flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-lg font-semibold">추천 조합</h2>
-            <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
-              {decksCount}개 덱
-            </div>
-          </div>
+  function renderMemoSection(className?: string) {
+    return (
+      <section className={`rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)] ${className ?? ""}`}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">메모장</h2>
+          <button
+            onClick={clearMemo}
+            className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99]"
+          >
+            비우기
+          </button>
+        </div>
 
-          <div className="mt-4 flex-1 rounded-2xl bg-neutral-950/50 p-4">
-            {canRecommend ? (
-              <>
-                <div className="mb-3 flex items-end justify-between">
-                  <div className="text-sm text-neutral-300">총합</div>
-                  <div className="text-3xl font-bold tabular-nums">{fmt(best.total)}</div>
-                </div>
+        <textarea
+          ref={memoTextareaRef}
+          value={memoText}
+          readOnly={!isMemoEditing}
+          onDoubleClick={() => setIsMemoEditing(true)}
+          onChange={(event) => setMemoText(event.target.value)}
+          placeholder="메모장은 기기에 저장됩니다."
+          className={`mt-4 w-full overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/50 p-3 text-sm outline-none ${isMemoEditing ? "" : "cursor-default text-neutral-300"}`}
+          rows={4}
+        />
+      </section>
+    );
+  }
 
-                <div className="space-y-3">
-                  {best.picked.map((deck) => (
-                    <div key={deck.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="min-w-0 text-sm leading-6 text-neutral-200">{formatNikkeDisplayNames(deck.chars)}</div>
-                        <div className="flex-none text-base tabular-nums text-neutral-100">{fmt(deck.score)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm text-neutral-300">
-                5덱 이상 추가 시 추천 조합 생성
-              </div>
-            )}
-          </div>
-        </section>
+  function renderBossSection(className?: string) {
+    return (
+      <section className={`flex self-start flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)] ${className ?? ""}`}>
+        <button
+          type="button"
+          onClick={() => setBossInfoOpen((prev) => !prev)}
+          className="flex items-center justify-between gap-4 text-left"
+        >
+          <h2 className="text-lg font-semibold">보스 정보</h2>
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            className={`text-neutral-400 transition ${bossInfoOpen ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          >
+            <path
+              d="M6 9L12 15L18 9"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
 
-        <section className="flex h-full flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-lg font-semibold">보스 정보</h2>
-          </div>
-
-          {boss && boss.image_path ? (
+        {bossInfoOpen ? (
+          boss && boss.image_path ? (
             <div className="mt-4 grid flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(240px,40%)]">
               <div className="min-w-0">
                 <div className="text-2xl font-semibold">{boss.title}</div>
@@ -433,8 +506,181 @@ export default function HomeTab({
             <div className="mt-4 text-sm text-neutral-300">보스는 있는데 이미지가 없어.</div>
           ) : (
             <div className="mt-4 text-sm text-neutral-300">보스 데이터가 없어.</div>
-          )}
+          )
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <>
+      <div className="space-y-5 lg:hidden">
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+          <button
+            type="button"
+            onClick={() => setBossInfoOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between gap-3 text-left"
+          >
+            <h2 className="text-base font-semibold">보스 정보</h2>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              className={`text-neutral-400 transition ${bossInfoOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            >
+              <path
+                d="M6 9L12 15L18 9"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+
+          {bossInfoOpen ? (
+            boss && boss.image_path ? (
+              <div className="mt-3 space-y-3">
+                <div className="relative aspect-[16/9] overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/40">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getPublicUrl("boss-images", boss.image_path)}
+                    alt={boss.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div>
+                  <div className="text-lg font-semibold">{boss.title}</div>
+                  <div className="mt-2 whitespace-pre-wrap text-sm text-neutral-400">{boss.description || "설명 없음"}</div>
+                </div>
+              </div>
+            ) : boss ? (
+              <div className="mt-2 text-sm text-neutral-300">보스는 있는데 이미지가 없어.</div>
+            ) : (
+              <div className="mt-2 text-sm text-neutral-300">보스 데이터가 없어.</div>
+            )
+          ) : null}
         </section>
+
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">추천 조합</h2>
+            <div className="text-xs text-neutral-400">{decksCount}개 덱</div>
+          </div>
+
+          <div className="mt-3 rounded-2xl bg-neutral-950/40 p-3">
+            {canRecommend ? (
+              <>
+                <div className="mb-2 flex items-end justify-end gap-2">
+                  <div className="text-base font-semibold text-neutral-200">총합</div>
+                  <div className="text-2xl font-bold tabular-nums">{fmt(best.total)}</div>
+                </div>
+
+                <div className="space-y-2">
+                  {best.picked.map((deck) => renderRecommendedDeckCard(deck, true))}
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-neutral-300">5덱 이상 추가 시 추천 조합 생성</div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div className="hidden">
+        <section className="flex self-start flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold">추천 조합</h2>
+            <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
+              {decksCount}개 덱
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl bg-neutral-950/50 p-3">
+            {canRecommend ? (
+              <>
+                <div className="mb-3 flex items-end justify-end gap-3">
+                  <div className="text-xl font-semibold text-neutral-200">총합</div>
+                  <div className="text-3xl font-bold tabular-nums">{fmt(best.total)}</div>
+                </div>
+
+                <div className="space-y-2">
+                  {best.picked.map((deck) => renderRecommendedDeckCard(deck))}
+                </div>
+              </>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-neutral-300">
+                5덱 이상 추가 시 추천 조합 생성
+              </div>
+            )}
+          </div>
+        </section>
+
+        <div className="space-y-5">
+          <section className="flex self-start flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-lg font-semibold">보스 정보</h2>
+            </div>
+
+            {boss && boss.image_path ? (
+              <div className="mt-4 grid flex-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(240px,40%)]">
+                <div className="min-w-0">
+                  <div className="text-2xl font-semibold">{boss.title}</div>
+                  <div className="mt-3 whitespace-pre-wrap text-sm leading-6 text-neutral-400">
+                    {boss.description || "설명 없음"}
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/40">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getPublicUrl("boss-images", boss.image_path)}
+                    alt={boss.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              </div>
+            ) : boss ? (
+              <div className="mt-4 text-sm text-neutral-300">보스는 있는데 이미지가 없어.</div>
+            ) : (
+              <div className="mt-4 text-sm text-neutral-300">보스 데이터가 없어.</div>
+            )}
+          </section>
+
+          {renderMemoSection()}
+
+          <section className="rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+            <h2 className="text-lg font-semibold">텍스트로 덱 추가</h2>
+            <div className="mt-1 text-sm text-neutral-400">여러 덱을 한 번에 붙여넣어 저장할 수 있어요.</div>
+
+            <textarea
+              value={bulkText}
+              onChange={(event) => setBulkText(event.target.value)}
+              placeholder={`예) 세이렌 이브 라피 크라운 프리바티 6510755443
+리타 / 앵커 / 리버렐리오 / 마스트 / 레이븐
+3896714666
+리타, 앵커, 리버렐리오, 마스트, 레이븐
+383838883`}
+              className="mt-4 h-[160px] w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 p-3 text-sm outline-none xl:h-[180px]"
+            />
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => void handleAddBulk()}
+                className="flex-1 rounded-2xl bg-neutral-100 px-4 py-3 text-base font-semibold text-neutral-900 active:scale-[0.99]"
+              >
+                텍스트 추가
+              </button>
+              <button
+                onClick={() => setBulkText("")}
+                className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
+              >
+                비우기
+              </button>
+            </div>
+          </section>
+        </div>
       </div>
 
       <DndContext
@@ -447,65 +693,129 @@ export default function HomeTab({
       >
         {isDesktopDnd ? (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.95fr)] xl:grid-cols-[minmax(0,1.25fr)_minmax(400px,0.95fr)]">
-            <section className="flex h-full min-h-0 flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">니케 선택</h2>
-                  <div className="mt-1 text-sm text-neutral-400">클릭 또는 드래그로 덱 구성</div>
+            <div className="space-y-5">
+              <section className="flex self-start flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+                <div className="flex items-center justify-between gap-4">
+                  <h2 className="text-lg font-semibold">추천 조합</h2>
+                  <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
+                    {decksCount}개 덱
+                  </div>
                 </div>
 
-                <div className="flex flex-wrap justify-end gap-2">
-                  <button
-                    onClick={onResetSelected}
-                    className="rounded-xl border border-white/30 px-3 py-2 text-sm text-white hover:bg-white/10 active:scale-[0.99]"
-                  >
-                    리스트 초기화
-                  </button>
+                <div className="mt-4 rounded-2xl bg-neutral-950/50 p-3">
+                  {canRecommend ? (
+                    <>
+                      <div className="mb-3 flex items-end justify-end gap-3">
+                        <div className="text-xl font-semibold text-neutral-200">총합</div>
+                        <div className="text-3xl font-bold tabular-nums">{fmt(best.total)}</div>
+                      </div>
 
-                  <button
-                    onClick={onGoToSettings}
-                    className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
-                  >
-                    설정으로
-                  </button>
-                </div>
-              </div>
-
-              {selectedNikkes.length === 0 ? (
-                <div className="mt-4 text-sm text-neutral-300">
-                  <span className="text-neutral-200">설정 탭</span>에서 최대 {maxSelected}개 선택 가능.
-                </div>
-              ) : (
-                <>
-                  <div className="mt-4 flex items-center justify-between gap-3 text-sm text-neutral-400">
-                    <div>
-                      선택됨: <span className="text-neutral-200">{selectedNikkes.length}</span> / {maxSelected}
+                      <div className="space-y-2">
+                        {best.picked.map((deck) => renderRecommendedDeckCard(deck))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-neutral-300">
+                      5덱 이상 추가 시 추천 조합 생성
                     </div>
-                    <div>니케를 드래그 하거나 클릭하여 덱에 추가 가능</div>
+                  )}
+                </div>
+              </section>
+
+              <section className="flex min-h-0 flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold">니케 선택</h2>
+                    <div className="mt-1 text-sm text-neutral-400">클릭 또는 드래그로 덱 구성</div>
                   </div>
 
-                  <div className="visible-scrollbar mt-4 min-h-0 flex-1 overflow-y-auto pr-1 overscroll-contain">
-                    <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-x-2 gap-y-3 xl:grid-cols-[repeat(auto-fill,minmax(80px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(88px,1fr))]">
-                      {selectedNikkes.map((nikke) => {
-                        const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button
+                      onClick={onResetSelected}
+                      className="rounded-xl border border-white/30 px-3 py-2 text-sm text-white hover:bg-white/10 active:scale-[0.99]"
+                    >
+                      리스트 초기화
+                    </button>
 
-                        return (
-                          <DraggableNikkeCard
-                            key={nikke.id}
-                            nikke={nikke}
-                            imageUrl={imageUrl}
-                            onAdd={addToDraft}
-                            onRemove={onRemoveSelectedNikke}
-                          />
-                        );
-                      })}
-                    </div>
+                    <button
+                      onClick={onGoToSettings}
+                      className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
+                    >
+                      설정으로
+                    </button>
                   </div>
-                </>
-              )}
-            </section>
+                </div>
 
-            <div className="min-w-0">
+                {selectedNikkes.length === 0 ? (
+                  <div className="mt-4 text-sm text-neutral-300">
+                    <span className="text-neutral-200">설정 탭</span>에서 최대 {maxSelected}개 선택 가능.
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-4 flex items-center justify-between gap-3 text-sm text-neutral-400">
+                      <div>
+                        선택됨: <span className="text-neutral-200">{selectedNikkes.length}</span> / {maxSelected}
+                      </div>
+                      <div>니케를 드래그 하거나 클릭하여 덱에 추가 가능</div>
+                    </div>
+
+                    <div className="visible-scrollbar mt-4 min-h-0 flex-1 overflow-y-auto pr-1 overscroll-contain">
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-x-2 gap-y-3 xl:grid-cols-[repeat(auto-fill,minmax(80px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(88px,1fr))]">
+                        {selectedNikkes.map((nikke) => {
+                          const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+
+                          return (
+                            <DraggableNikkeCard
+                              key={nikke.id}
+                              nikke={nikke}
+                              imageUrl={imageUrl}
+                              onAdd={addToDraft}
+                              onRemove={onRemoveSelectedNikke}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </section>
+            </div>
+
+            <div className="space-y-5 min-w-0">
+              {renderBossSection()}
+
+              {renderMemoSection()}
+
+              <section className="rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+                <h2 className="text-lg font-semibold">텍스트로 덱 추가</h2>
+                <div className="mt-1 text-sm text-neutral-400">여러 덱을 한 번에 붙여넣어 저장할 수 있어요.</div>
+
+                <textarea
+                  value={bulkText}
+                  onChange={(event) => setBulkText(event.target.value)}
+                  placeholder={`예) 세이렌 이브 라피 크라운 프리바티 6510755443
+리타 / 앵커 / 리버렐리오 / 마스트 / 레이븐
+3896714666
+리타, 앵커, 리버렐리오, 마스트, 레이븐
+383838883`}
+                  className="mt-4 h-[160px] w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 p-3 text-sm outline-none xl:h-[180px]"
+                />
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => void handleAddBulk()}
+                    className="flex-1 rounded-2xl bg-neutral-100 px-4 py-3 text-base font-semibold text-neutral-900 active:scale-[0.99]"
+                  >
+                    텍스트 추가
+                  </button>
+                  <button
+                    onClick={() => setBulkText("")}
+                    className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
+                  >
+                    비우기
+                  </button>
+                </div>
+              </section>
+
               <DeckBuilderSection
                 title={title}
                 draft={draft}
@@ -523,36 +833,6 @@ export default function HomeTab({
                 onClearDraft={clearDraft}
                 className="w-full min-w-0 rounded-3xl bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]"
               />
-
-              <section className="mt-5 rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
-                <h2 className="text-lg font-semibold">텍스트로 덱 추가</h2>
-                <div className="mt-1 text-sm text-neutral-400">여러 덱을 한 번에 붙여넣어 저장할 수 있어요.</div>
-
-                <textarea
-                  value={bulkText}
-                  onChange={(event) => setBulkText(event.target.value)}
-                  placeholder={`예) 세이렌 이브 라피 크라운 프리바티 6510755443
-리타 / 앵커 / 리버렐리오 / 마스트 / 레이븐
-3896714666
-리타, 앵커, 리버렐리오, 마스트, 레이븐
-383838883`}
-                  className="mt-4 h-[240px] w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 p-3 text-sm outline-none xl:h-[260px]"
-                />
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => void handleAddBulk()}
-                    className="flex-1 rounded-2xl bg-neutral-100 px-4 py-3 text-base font-semibold text-neutral-900 active:scale-[0.99]"
-                  >
-                    텍스트 추가
-                  </button>
-                  <button
-                    onClick={() => setBulkText("")}
-                    className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
-                  >
-                    비우기
-                  </button>
-                </div>
-              </section>
             </div>
           </div>
         ) : (
@@ -681,4 +961,3 @@ function isDroppedOutsideDeckSection(event: DragEndEvent, sectionElement: HTMLEl
 
   return centerX < rect.left || centerX > rect.right || centerY < rect.top || centerY > rect.bottom;
 }
-
