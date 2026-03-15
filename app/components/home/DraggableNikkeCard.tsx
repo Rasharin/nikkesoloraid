@@ -37,8 +37,8 @@ function DraggableNikkeCardComponent({ nikke, imageUrl, onAdd, onRemove }: Dragg
           onAdd(nikke.name);
         }
       }}
-      className={`relative flex flex-col items-center outline-none transition ${
-        isDragging ? "z-10 opacity-60" : "opacity-100"
+      className={`relative flex touch-none flex-col items-center outline-none transition ${
+        isDragging ? "opacity-0" : "opacity-100"
       }`}
       title={nikke.name}
       {...attributes}
@@ -75,7 +75,7 @@ function DraggableNikkeCardComponent({ nikke, imageUrl, onAdd, onRemove }: Dragg
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {imageUrl ? (
-          <img src={imageUrl} alt={nikke.name} className="h-full w-full object-cover" />
+          <img src={imageUrl} alt={nikke.name} draggable={false} className="h-full w-full object-cover pointer-events-none" />
         ) : (
           <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
         )}

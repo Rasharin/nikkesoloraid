@@ -138,20 +138,23 @@ export function getDroppedSlotIndex(event: DragEndEvent): number | null {
   return parseDeckSlotIndex(event.over?.id);
 }
 
-export function renderDragOverlayCard(nikke: NikkeRow | undefined, imageUrl: string) {
+export function renderDragOverlayCard(nikke: NikkeRow | undefined, imageUrl: string, width?: number | null) {
   if (!nikke) return null;
 
   return (
-    <div className="w-[88px] rounded-2xl border border-white/30 bg-neutral-900/95 p-1.5 shadow-2xl">
+    <div
+      className="pointer-events-none relative z-[80] origin-center scale-[1.03] cursor-grabbing rounded-2xl border border-cyan-200/70 bg-neutral-900/95 p-1.5 shadow-[0_28px_70px_rgba(0,0,0,0.5)] ring-2 ring-cyan-300/45"
+      style={{ width: width ? `${Math.round(width)}px` : "88px" }}
+    >
       <div className="aspect-square overflow-hidden rounded-xl border border-neutral-700 bg-neutral-950/60">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {imageUrl ? (
-          <img src={imageUrl} alt={nikke.name} className="h-full w-full object-cover" />
+          <img src={imageUrl} alt={nikke.name} draggable={false} className="h-full w-full object-cover" />
         ) : (
           <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
         )}
       </div>
-      <div className="mt-1 text-center text-[11px] leading-tight text-neutral-100">
+      <div className="mt-1 min-h-[2.5rem] text-center text-[11px] leading-tight text-neutral-100">
         {formatNikkeDisplayName(nikke.name)}
       </div>
     </div>
