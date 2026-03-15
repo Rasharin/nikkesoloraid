@@ -1898,7 +1898,7 @@ export default function Page() {
         )}
 
         {tab === "settings" && (
-          <div className="mx-auto w-full lg:max-w-6xl">
+          <div className="mx-auto w-full pt-2 lg:max-w-6xl lg:pt-3">
             <SettingsTab
               nikkes={nikkes}
               selectedNames={selectedNames}

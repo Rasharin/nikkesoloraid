@@ -117,7 +117,7 @@ function NikkeCard({ nikke, selected, favorite, onSelect, onToggleFavorite, getP
           onSelect(nikke.name);
         }
       }}
-      className={`relative min-w-0 rounded-2xl border p-1 text-left active:scale-[0.99] ${
+      className={`relative isolate min-w-0 overflow-hidden rounded-2xl border p-1 text-left active:scale-[0.99] ${
         selected ? "border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
       }`}
     >
@@ -128,7 +128,7 @@ function NikkeCard({ nikke, selected, favorite, onSelect, onToggleFavorite, getP
           event.stopPropagation();
           void onToggleFavorite(nikke.name);
         }}
-        className={`absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full border transition ${
+        className={`absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border transition ${
           favorite
             ? "border-yellow-500/70 bg-yellow-500/20 text-yellow-300"
             : "border-neutral-700 bg-neutral-950/80 text-neutral-500 hover:border-neutral-500 hover:text-neutral-300"
@@ -159,7 +159,7 @@ type NikkeSectionProps = {
 
 function NikkeSection({ title, open, onToggle, children }: NikkeSectionProps) {
   return (
-    <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40">
+    <section className="relative isolate overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/40">
       <button
         type="button"
         onClick={onToggle}
@@ -170,7 +170,7 @@ function NikkeSection({ title, open, onToggle, children }: NikkeSectionProps) {
           <ChevronIcon open={open} />
         </span>
       </button>
-      {open ? <div className="border-t border-neutral-800 p-4">{children}</div> : null}
+      {open ? <div className="overflow-x-hidden border-t border-neutral-800 p-4">{children}</div> : null}
     </section>
   );
 }
@@ -234,7 +234,7 @@ export default function SettingsTab({
     }
 
     return (
-      <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
+      <div className="grid grid-cols-4 gap-2 overflow-x-hidden sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
         {list.map((nikke) => (
           <NikkeCard
             key={nikke.id}
