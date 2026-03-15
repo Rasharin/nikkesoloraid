@@ -22,6 +22,7 @@ type DeckBuilderSectionProps = {
   onRemoveFromDraft: (index: number) => void;
   onSaveDeck: () => void;
   onClearDraft: () => void;
+  className?: string;
 };
 
 function DeckBuilderSectionComponent({
@@ -39,11 +40,12 @@ function DeckBuilderSectionComponent({
   onRemoveFromDraft,
   onSaveDeck,
   onClearDraft,
+  className,
 }: DeckBuilderSectionProps) {
   const slotIds = useMemo(() => draft.map((_, index) => getDeckSlotId(index)), [draft]);
 
   return (
-    <section ref={sectionRef} className="mb-5 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+    <section ref={sectionRef} className={`rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 ${className ?? ""}`}>
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold">{title}</h2>
         <div className="text-xs text-neutral-500">드래그 또는 클릭으로 구성</div>

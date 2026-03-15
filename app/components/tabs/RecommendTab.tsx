@@ -47,35 +47,17 @@ export default function RecommendTab({
   fmt,
 }: RecommendTabProps) {
   return (
-    <div className="space-y-3">
-      {videoEmbedUrl ? (
-        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
-          <div className="aspect-video overflow-hidden rounded-2xl border border-neutral-800 bg-black">
-            <iframe
-              src={videoEmbedUrl}
-              title="추천 영상"
-              className="h-full w-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-        </section>
-      ) : (
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400">
-          등록된 추천 영상이 없습니다.
-        </div>
-      )}
-
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-        <div className="flex items-center justify-between">
+    <div className="grid gap-2 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)]">
+      <section className="order-2 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 lg:order-1">
+        <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">추천</h2>
-            <div className="text-sm text-neutral-400">덱 도우미 로그인 사용자의 덱들을 기반한 추천입니다.</div>
+            <div className="text-sm text-neutral-400">{raidLabel} 기준 추천 덱입니다.</div>
           </div>
           <div className="text-xs text-neutral-400">{recommendedDecks.length}개</div>
         </div>
 
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           {deckTabs.map((tab) => (
             <button
               key={tab.key}
@@ -92,15 +74,15 @@ export default function RecommendTab({
           ))}
         </div>
 
-        <div className="mt-3 space-y-3">
+        <div className="mt-4 grid gap-3">
           {recommendedDecks.length === 0 ? (
             <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-300">
               추천 덱이 없습니다.
             </div>
           ) : (
             recommendedDecks.map((deck) => (
-              <article key={deck.deckKey} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
-                <div className="grid grid-cols-5 gap-2">
+              <article key={deck.deckKey} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
+                <div className="grid grid-cols-5 gap-3">
                   {deck.chars.map((name) => {
                     const nikke = nikkeMap.get(name);
                     const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
@@ -120,9 +102,9 @@ export default function RecommendTab({
                   })}
                 </div>
 
-                <div className="mt-3 text-sm font-medium text-neutral-100">{formatNikkeDisplayNames(deck.chars)}</div>
+                <div className="mt-3 text-base font-medium leading-6 text-neutral-100">{formatNikkeDisplayNames(deck.chars)}</div>
 
-                <div className="mt-2 flex items-center justify-between text-sm">
+                <div className="mt-3 flex items-center justify-between text-base">
                   <div className="text-neutral-300">사용 횟수 {deck.usedCount}회</div>
                   <div className="font-semibold text-neutral-100">평균 {fmt(Math.round(deck.avgScore))}</div>
                 </div>
@@ -131,6 +113,26 @@ export default function RecommendTab({
           )}
         </div>
       </section>
+
+      {videoEmbedUrl ? (
+        <section className="order-1 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 lg:order-2">
+          <div className="mb-2 text-sm font-semibold text-neutral-100">추천 영상</div>
+          <div className="aspect-video overflow-hidden rounded-2xl border border-neutral-800 bg-black">
+            <iframe
+              src={videoEmbedUrl}
+              title="추천 영상"
+              className="h-full w-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </section>
+      ) : (
+        <section className="order-1 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 lg:order-2">
+          <div className="mb-2 text-sm font-semibold text-neutral-100">추천 영상</div>
+          <div className="text-sm text-neutral-400">등록된 추천 영상이 없습니다.</div>
+        </section>
+      )}
     </div>
   );
 }

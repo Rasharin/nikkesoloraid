@@ -639,6 +639,8 @@ export default function Page() {
   // supabase data
   const [nikkes, setnikkes] = useState<NikkeRow[]>([]);
   const [boss, setBoss] = useState<BossRow | null>(null);
+  const [bosses, setBosses] = useState<BossRow[]>([]);
+  const [selectedBossId, setSelectedBossId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
   // selected nikkes (max 50) - localStorage
@@ -1060,13 +1062,21 @@ export default function Page() {
         .from(bossSource)
         .select("id,title,description,image_path,starts_at,ends_at,created_at")
         .order("created_at", { ascending: false })
-        .limit(1);
+        .limit(20);
 
       if (bossErr) {
         console.error(bossErr);
         showToast("보스 정보 불러오기 실패");
       } else {
-        setBoss((bossData && bossData[0]) || null);
+        const nextBosses = (bossData ?? []) as BossRow[];
+        setBosses(nextBosses);
+        setBoss((currentBoss) => {
+          if (selectedBossId) {
+            const selectedBoss = nextBosses.find((item) => item.id === selectedBossId) ?? null;
+            if (selectedBoss) return selectedBoss;
+          }
+          return nextBosses[0] ?? null;
+        });
       }
     } catch (e) {
       console.error(e);
@@ -1082,6 +1092,25 @@ export default function Page() {
     refreshSupabase();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appConfigLoaded, soloRaidActive]);
+
+  useEffect(() => {
+    if (bosses.length === 0) {
+      if (boss !== null) setBoss(null);
+      if (selectedBossId !== null) setSelectedBossId(null);
+      return;
+    }
+
+    const selectedBoss = selectedBossId ? bosses.find((item) => item.id === selectedBossId) ?? null : null;
+    const nextBoss = selectedBoss ?? bosses[0];
+
+    if (!selectedBossId || !selectedBoss) {
+      if (selectedBossId !== nextBoss.id) setSelectedBossId(nextBoss.id);
+    }
+
+    if (boss?.id !== nextBoss.id) {
+      setBoss(nextBoss);
+    }
+  }, [boss, bosses, selectedBossId]);
 
   const nikkeMap = useMemo(() => {
     const m = new Map<string, NikkeRow>();
@@ -1219,6 +1248,50 @@ export default function Page() {
   function startEditDeck(d: Deck) {
     setTab("home");
     setHomeEditRequest(d);
+  }
+
+  async function updateDeckScore(id: string, scoreText: string) {
+    const sc = Number(scoreText.replaceAll(",", "").replaceAll(" ", "").trim());
+    if (!Number.isFinite(sc) || sc <= 0) {
+      showToast("점수는 숫자로 입력해줘.");
+      return false;
+    }
+
+    const targetDeck = decks.find((deck) => deck.id === id);
+    if (!targetDeck) {
+      showToast("덱을 찾을 수 없어");
+      return false;
+    }
+
+    try {
+      if (userId) {
+        const { data, error } = await supabase
+          .from("decks")
+          .update({ score: sc })
+          .eq("id", id)
+          .eq("user_id", userId)
+          .select("id,user_id,raid_key,deck_key,chars,score,created_at")
+          .single();
+
+        if (error) throw error;
+        const updated = mapDeckRow(data as DeckRow);
+        if (!updated) throw new Error("Invalid deck row");
+        setDecks((prev) => prev.map((deck) => (deck.id === id ? updated : deck)));
+      } else {
+        setDecks((prev) => {
+          const next = prev.map((deck) => (deck.id === id ? { ...deck, score: sc } : deck));
+          saveLocalDecks(next);
+          return next;
+        });
+      }
+
+      showToast("점수 수정 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("점수 수정 실패");
+      return false;
+    }
   }
 
   async function deleteDeck(id: string) {
@@ -1733,13 +1806,13 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-50">
-      <div className="mx-auto max-w-xl px-4 pb-28 pt-6">
+      <div className="mx-auto max-w-xl px-4 pb-28 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
         {/* Header */}
-        <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3 backdrop-blur">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-semibold">니케 솔로레이드 덱 도우미</h1>
+        <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3 backdrop-blur lg:-mx-8 lg:px-8">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <h1 className="text-2xl font-semibold lg:text-[1.75rem]">니케 솔로레이드 덱 도우미</h1>
 
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-col items-end gap-2 lg:flex-row lg:items-center">
               <LoginButton onProfileClick={() => setTab("mypage")} />
               {process.env.NODE_ENV !== "production" ? (
                 <button
@@ -1788,6 +1861,7 @@ export default function Page() {
         {tab === "home" && (
           <HomeTab
             boss={boss}
+            bosses={bosses}
             decksCount={activeRaidDecks.length}
             canRecommend={canRecommend}
             best={best}
@@ -1808,53 +1882,61 @@ export default function Page() {
         )}
 
         {tab === "saved" && (
-          <SavedTab
-            visibleSavedDecks={visibleSavedDecks}
-            deckTabs={savedDeckTabs}
-            savedDeckTab={activeRaidKey ?? ""}
-            onSavedDeckTabChange={(key) => setActiveRaidKey(key)}
-            onStartEditDeck={startEditDeck}
-            onDeleteDeck={deleteDeck}
-            fmt={fmt}
-          />
+          <div className="mx-auto w-full lg:max-w-4xl">
+            <SavedTab
+              visibleSavedDecks={visibleSavedDecks}
+              deckTabs={savedDeckTabs}
+              savedDeckTab={activeRaidKey ?? ""}
+              onSavedDeckTabChange={(key) => setActiveRaidKey(key)}
+              onUpdateDeckScore={updateDeckScore}
+              onDeleteDeck={deleteDeck}
+              nikkeMap={nikkeMap}
+              getPublicUrl={getPublicUrl}
+              fmt={fmt}
+            />
+          </div>
         )}
 
         {tab === "settings" && (
-          <SettingsTab
-            nikkes={nikkes}
-            selectedNames={selectedNames}
-            toggleSelect={toggleSelect}
-            setSelectedNames={setSelectedNames}
-            favoriteNames={favoriteNames}
-            onToggleFavorite={toggleFavorite}
-            selectedBursts={selectedBursts}
-            setSelectedBursts={setSelectedBursts}
-            selectedElements={selectedElements}
-            setSelectedElements={setSelectedElements}
-            selectedRoles={selectedRoles}
-            setSelectedRoles={setSelectedRoles}
-            toggleSet={toggleSet}
-            btnClass={btnClass}
-            elements={elements}
-            roles={roles}
-            getPublicUrl={getPublicUrl}
-            maxSelected={MAX_SELECTED}
-            onResetFilters={resetFilters}
-          />
+          <div className="mx-auto w-full lg:max-w-6xl">
+            <SettingsTab
+              nikkes={nikkes}
+              selectedNames={selectedNames}
+              toggleSelect={toggleSelect}
+              setSelectedNames={setSelectedNames}
+              favoriteNames={favoriteNames}
+              onToggleFavorite={toggleFavorite}
+              selectedBursts={selectedBursts}
+              setSelectedBursts={setSelectedBursts}
+              selectedElements={selectedElements}
+              setSelectedElements={setSelectedElements}
+              selectedRoles={selectedRoles}
+              setSelectedRoles={setSelectedRoles}
+              toggleSet={toggleSet}
+              btnClass={btnClass}
+              elements={elements}
+              roles={roles}
+              getPublicUrl={getPublicUrl}
+              maxSelected={MAX_SELECTED}
+              onResetFilters={resetFilters}
+            />
+          </div>
         )}
 
         {tab === "recommend" && (
-          <RecommendTab
-            raidLabel={activeRaidLabel}
-            deckTabs={savedDeckTabs}
-            recommendDeckTab={activeRaidKey ?? ""}
-            onRecommendDeckTabChange={(key) => setActiveRaidKey(key)}
-            recommendedDecks={recommendedDecks}
-            videoEmbedUrl={toYouTubeEmbedUrl(recommendedVideoUrl)}
-            nikkeMap={nikkeMap}
-            getPublicUrl={getPublicUrl}
-            fmt={fmt}
-          />
+          <div className="mx-auto w-full lg:max-w-4xl">
+            <RecommendTab
+              raidLabel={activeRaidLabel}
+              deckTabs={savedDeckTabs}
+              recommendDeckTab={activeRaidKey ?? ""}
+              onRecommendDeckTabChange={(key) => setActiveRaidKey(key)}
+              recommendedDecks={recommendedDecks}
+              videoEmbedUrl={toYouTubeEmbedUrl(recommendedVideoUrl)}
+              nikkeMap={nikkeMap}
+              getPublicUrl={getPublicUrl}
+              fmt={fmt}
+            />
+          </div>
         )}
 
         {tab === "mypage" && (

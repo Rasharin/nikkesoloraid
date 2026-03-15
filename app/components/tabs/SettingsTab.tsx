@@ -78,6 +78,7 @@ function StarIcon({ active }: { active: boolean }) {
 function NikkeName({ name }: { name: string }) {
   const displayName = formatNikkeDisplayName(name);
   const parts = displayName.split(":");
+
   return (
     <div className="mt-1 h-[2.4em] overflow-hidden break-words text-xs font-medium leading-tight">
       {parts.length > 1 ? (
@@ -233,7 +234,7 @@ export default function SettingsTab({
     }
 
     return (
-      <div className="grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
         {list.map((nikke) => (
           <NikkeCard
             key={nikke.id}
@@ -258,142 +259,145 @@ export default function SettingsTab({
         </div>
       </div>
 
-      <div className="mt-3">
-        <div className="flex items-center rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4">
-          <input
-            value={q}
-            onChange={(event) => setQ(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                setQ("");
-              }
-            }}
-            placeholder="니케 이름 검색"
-            className="flex-1 bg-transparent py-3 text-sm text-neutral-100 outline-none placeholder:text-neutral-500"
-          />
-
-          <button
-            type="button"
-            onClick={() => setQ("")}
-            aria-label="검색어 지우기"
-            disabled={!q}
-            style={{ borderRadius: "9999px" }}
-            className={`ml-2 flex h-9 min-w-[36px] shrink-0 items-center justify-center appearance-none overflow-hidden border-0 p-0 transition active:scale-[0.98] ${
-              q ? "bg-neutral-800 text-neutral-100 hover:bg-neutral-700" : "bg-neutral-900/70 text-neutral-600"
-            }`}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-            >
-              <path d="M6 6L18 18" />
-              <path d="M18 6L6 18" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <section className="mb-3 mt-2 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
-        <div className="grid gap-2">
-          <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">버스트</div>
-            <div className="flex flex-1 flex-wrap gap-2">
-              {[
-                { n: 1, label: "I" },
-                { n: 2, label: "II" },
-                { n: 3, label: "III" },
-              ].map((burst) => (
-                <button
-                  key={burst.n}
-                  type="button"
-                  onClick={() => setSelectedBursts((prev) => toggleSet(prev, burst.n))}
-                  className={btnClass(selectedBursts.has(burst.n))}
-                >
-                  {burst.label}
-                </button>
-              ))}
-            </div>
+      <div className="mt-3 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1.35fr)_300px] lg:items-start lg:gap-3">
+        <div className="order-2 space-y-2 lg:order-1">
+          <div className="mb-2 flex justify-end">
             <button
               type="button"
-              onClick={onResetFilters}
-              className="shrink-0 rounded-2xl border border-red-800/60 bg-red-950/40 px-4 py-2 text-sm text-red-300 active:scale-[0.99]"
+              onClick={() => setSelectedNames([])}
+              className="rounded-2xl border border-red-800/60 bg-red-950/40 px-4 py-2 text-sm text-red-300 active:scale-[0.99]"
             >
-              필터 초기화
+              전체 해제
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">속성</div>
-            <div className="flex flex-wrap gap-2">
-              {elements.map((element) => (
-                <button
-                  key={element.v}
-                  type="button"
-                  onClick={() => setSelectedElements((prev) => toggleSet(prev, element.v))}
-                  className={btnClass(selectedElements.has(element.v))}
-                >
-                  {element.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <NikkeSection title="즐겨찾기" open={favoriteOpen} onToggle={() => setFavoriteOpen((prev) => !prev)}>
+            {renderNikkeGrid(
+              favoriteFilteredNikkes,
+              q || selectedBursts.size || selectedElements.size || selectedRoles.size
+                ? "조건에 맞는 즐겨찾기 니케가 없습니다."
+                : "즐겨찾기한 니케가 없습니다."
+            )}
+          </NikkeSection>
 
-          <div className="flex items-center gap-3">
-            <div className="w-14 shrink-0 text-sm font-semibold text-neutral-200">역할</div>
-            <div className="flex flex-wrap gap-2">
-              {roles.map((role) => (
-                <button
-                  key={role.v}
-                  type="button"
-                  onClick={() => setSelectedRoles((prev) => toggleSet(prev, role.v))}
-                  className={btnClass(selectedRoles.has(role.v))}
-                >
-                  {role.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <NikkeSection title="전체 니케 목록" open={allNikkesOpen} onToggle={() => setAllNikkesOpen((prev) => !prev)}>
+            {renderNikkeGrid(
+              filteredNikkes,
+              q || selectedBursts.size || selectedElements.size || selectedRoles.size
+                ? "조건에 맞는 니케가 없습니다."
+                : "표시할 니케가 없습니다."
+            )}
+          </NikkeSection>
         </div>
-      </section>
 
-      <div className="mb-3 flex justify-end">
-        <button
-          type="button"
-          onClick={() => setSelectedNames([])}
-          className="rounded-2xl border border-red-800/60 bg-red-950/40 px-4 py-2 text-sm text-red-300 active:scale-[0.99]"
-        >
-          전체 해제
-        </button>
-      </div>
+        <aside className="order-1 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 lg:order-2 lg:sticky lg:top-24 lg:w-full">
+          <h3 className="text-sm font-semibold text-neutral-100">이름 검색 및 필터</h3>
 
-      <div className="space-y-3">
-        <NikkeSection title="즐겨찾기" open={favoriteOpen} onToggle={() => setFavoriteOpen((prev) => !prev)}>
-          {renderNikkeGrid(
-            favoriteFilteredNikkes,
-            q || selectedBursts.size || selectedElements.size || selectedRoles.size
-              ? "조건에 맞는 즐겨찾기 니케가 없습니다."
-              : "즐겨찾기한 니케가 없습니다."
-          )}
-        </NikkeSection>
+          <div className="mt-2">
+            <div className="flex items-center rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4">
+              <input
+                value={q}
+                onChange={(event) => setQ(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setQ("");
+                  }
+                }}
+                placeholder="니케 이름 검색"
+                className="flex-1 bg-transparent py-2.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-500"
+              />
 
-        <NikkeSection
-          title="전체 니케 목록"
-          open={allNikkesOpen}
-          onToggle={() => setAllNikkesOpen((prev) => !prev)}
-        >
-          {renderNikkeGrid(
-            filteredNikkes,
-            q || selectedBursts.size || selectedElements.size || selectedRoles.size
-              ? "조건에 맞는 니케가 없습니다."
-              : "표시할 니케가 없습니다."
-          )}
-        </NikkeSection>
+              <button
+                type="button"
+                onClick={() => setQ("")}
+                aria-label="검색어 지우기"
+                disabled={!q}
+                style={{ borderRadius: "9999px" }}
+                className={`ml-2 flex h-9 min-w-[36px] shrink-0 items-center justify-center appearance-none overflow-hidden border-0 p-0 transition active:scale-[0.98] ${
+                  q ? "bg-neutral-800 text-neutral-100 hover:bg-neutral-700" : "bg-neutral-900/70 text-neutral-600"
+                }`}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                >
+                  <path d="M6 6L18 18" />
+                  <path d="M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <section className="mt-2 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
+            <div className="grid gap-2.5">
+              <div className="grid gap-1.5">
+                <div className="text-sm font-semibold text-neutral-200">버스트</div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { n: 1, label: "I" },
+                    { n: 2, label: "II" },
+                    { n: 3, label: "III" },
+                  ].map((burst) => (
+                    <button
+                      key={burst.n}
+                      type="button"
+                      onClick={() => setSelectedBursts((prev) => toggleSet(prev, burst.n))}
+                      className={btnClass(selectedBursts.has(burst.n))}
+                    >
+                      {burst.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-1.5">
+                <div className="text-sm font-semibold text-neutral-200">속성</div>
+                <div className="flex flex-wrap gap-2">
+                  {elements.map((element) => (
+                    <button
+                      key={element.v}
+                      type="button"
+                      onClick={() => setSelectedElements((prev) => toggleSet(prev, element.v))}
+                      className={btnClass(selectedElements.has(element.v))}
+                    >
+                      {element.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-1.5">
+                <div className="text-sm font-semibold text-neutral-200">역할</div>
+                <div className="flex flex-wrap gap-2">
+                  {roles.map((role) => (
+                    <button
+                      key={role.v}
+                      type="button"
+                      onClick={() => setSelectedRoles((prev) => toggleSet(prev, role.v))}
+                      className={btnClass(selectedRoles.has(role.v))}
+                    >
+                      {role.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onResetFilters}
+                className="mt-1 rounded-2xl border border-red-800/60 bg-red-950/40 px-4 py-2 text-sm text-red-300 active:scale-[0.99]"
+              >
+                필터 초기화
+              </button>
+            </div>
+          </section>
+        </aside>
       </div>
     </section>
   );
