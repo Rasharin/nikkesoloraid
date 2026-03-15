@@ -214,7 +214,7 @@ export default function HomeTab({
               선택됨: <span className="text-neutral-200">{selectedNikkes.length}</span> / {maxSelected}
             </div>
 
-            <div className="mt-3 max-h-[30vh] overflow-y-auto pr-1 no-scrollbar overscroll-contain">
+            <div className="visible-scrollbar mt-3 max-h-[30vh] overflow-y-auto pr-1 overscroll-contain">
               <div className="grid grid-cols-5 gap-2">
                 {selectedNikkes.map((nikke) => {
                   const url = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";

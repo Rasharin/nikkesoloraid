@@ -34,3 +34,26 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+.visible-scrollbar {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #737373 transparent;
+}
+
+.visible-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.visible-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.visible-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: #737373;
+}
+
+.visible-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: #a3a3a3;
+}
