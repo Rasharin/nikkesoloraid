@@ -6,6 +6,7 @@ import MyPageTab from "./components/tabs/MyPageTab";
 import RecommendTab from "./components/tabs/RecommendTab";
 import SavedTab from "./components/tabs/SavedTab";
 import SettingsTab from "./components/tabs/SettingsTab";
+import ContactTab from "./components/tabs/ContactTab";
 import { supabase } from "../lib/supabase";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
@@ -75,6 +76,19 @@ type SoloRaidTipRow = {
 type SoloRaidTip = {
   id: string;
   raidKey: string;
+  content: string;
+  userId: string | null;
+  createdAt: number;
+  source: "remote" | "local";
+};
+type ContactInquiryRow = {
+  id: string;
+  content: string;
+  user_id: string | null;
+  created_at: string;
+};
+type ContactInquiry = {
+  id: string;
   content: string;
   userId: string | null;
   createdAt: number;
@@ -151,7 +165,7 @@ const roles = [
   { v: "defender", label: "방어형" },
 ] as const;
 
-type TabKey = "home" | "saved" | "recommend" | "settings" | "mypage";
+type TabKey = "home" | "saved" | "recommend" | "settings" | "contact" | "mypage";
 const DEFAULT_DECK_TABS: DeckTabItem[] = [];
 const DEFAULT_ACTIVE_RAID_KEY = null;
 
@@ -166,6 +180,8 @@ const RECOMMENDED_VIDEO_KEY = "recommended_video_url";
 const SOLO_RAID_TIPS_TABLE = "solo_raid_tips";
 const LOCAL_TIPS_KEY = "soloraid_local_tips_v1";
 const DEV_LOCAL_TIP_USER_ID = "__dev_local_tip_user__";
+const CONTACT_INQUIRIES_TABLE = "contact_inquiries";
+const LOCAL_CONTACT_INQUIRIES_KEY = "soloraid_local_contact_inquiries_v1";
 
 const MAX_SELECTED = 50;
 const MAX_DECK_CHARS = 5;
@@ -497,6 +513,19 @@ function mapSoloRaidTipRow(row: SoloRaidTipRow): SoloRaidTip | null {
   };
 }
 
+function mapContactInquiryRow(row: ContactInquiryRow): ContactInquiry | null {
+  if (!row?.id || !row.content || !row.created_at) return null;
+
+  const createdAt = Date.parse(row.created_at);
+  return {
+    id: row.id,
+    content: row.content.trim(),
+    userId: row.user_id ?? null,
+    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+    source: "remote",
+  };
+}
+
 function loadLocalTips(): SoloRaidTip[] {
   try {
     const raw = localStorage.getItem(LOCAL_TIPS_KEY);
@@ -535,6 +564,45 @@ function loadLocalTips(): SoloRaidTip[] {
 function saveLocalTips(tips: SoloRaidTip[]) {
   try {
     localStorage.setItem(LOCAL_TIPS_KEY, JSON.stringify(tips));
+  } catch { }
+}
+
+function loadLocalContactInquiries(): ContactInquiry[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_CONTACT_INQUIRIES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown[];
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item): ContactInquiry | null => {
+        if (!item || typeof item !== "object") return null;
+        const candidate = item as Record<string, unknown>;
+        if (
+          typeof candidate.id !== "string" ||
+          typeof candidate.content !== "string" ||
+          typeof candidate.createdAt !== "number"
+        ) {
+          return null;
+        }
+
+        return {
+          id: candidate.id,
+          content: candidate.content,
+          userId: typeof candidate.userId === "string" ? candidate.userId : null,
+          createdAt: candidate.createdAt,
+          source: "local" as const,
+        };
+      })
+      .filter((inquiry): inquiry is ContactInquiry => inquiry !== null);
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalContactInquiries(inquiries: ContactInquiry[]) {
+  try {
+    localStorage.setItem(LOCAL_CONTACT_INQUIRIES_KEY, JSON.stringify(inquiries));
   } catch { }
 }
 
@@ -731,6 +799,19 @@ function GearIcon({ active }: { active: boolean }) {
   );
 }
 
+function ContactIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 13.5v-7Z"
+        stroke={active ? "white" : "#a3a3a3"}
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 // -------------------- Page --------------------
 export default function Page() {
   const [tab, setTab] = useState<TabKey>("home");
@@ -773,6 +854,8 @@ export default function Page() {
   const [recommendedVideoUrl, setRecommendedVideoUrl] = useState<string>("");
   const [soloRaidTips, setSoloRaidTips] = useState<SoloRaidTip[]>([]);
   const [loadingSoloRaidTips, setLoadingSoloRaidTips] = useState(false);
+  const [contactInquiries, setContactInquiries] = useState<ContactInquiry[]>([]);
+  const [loadingContactInquiries, setLoadingContactInquiries] = useState(false);
 
   async function fetchUserDecks(currentUserId: string) {
     const { data, error } = await supabase
@@ -820,6 +903,18 @@ export default function Page() {
 
     if (error) throw error;
     return ((data ?? []) as SoloRaidTipRow[]).map(mapSoloRaidTipRow).filter((tip): tip is SoloRaidTip => tip !== null);
+  }
+
+  async function fetchContactInquiries() {
+    const { data, error } = await supabase
+      .from(CONTACT_INQUIRIES_TABLE)
+      .select("id,content,user_id,created_at")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return ((data ?? []) as ContactInquiryRow[])
+      .map(mapContactInquiryRow)
+      .filter((inquiry): inquiry is ContactInquiry => inquiry !== null);
   }
 
   async function syncLocalDecksToAccount(currentUserId: string) {
@@ -1044,6 +1139,50 @@ export default function Page() {
       cancelled = true;
     };
   }, [userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadContactInquiries() {
+      if (process.env.NODE_ENV !== "production" && !userId) {
+        if (!cancelled) {
+          setContactInquiries(loadLocalContactInquiries().sort((a, b) => b.createdAt - a.createdAt));
+        }
+        return;
+      }
+
+      if (!isMasterUser) {
+        if (!cancelled) {
+          setContactInquiries([]);
+        }
+        return;
+      }
+
+      setLoadingContactInquiries(true);
+      try {
+        const inquiries = await fetchContactInquiries();
+        if (!cancelled) {
+          setContactInquiries(inquiries);
+        }
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setContactInquiries([]);
+          showToast("문의 불러오기 실패");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingContactInquiries(false);
+        }
+      }
+    }
+
+    void loadContactInquiries();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isMasterUser, userId]);
 
   // selected 목록만 localStorage 사용
   useEffect(() => {
@@ -2147,13 +2286,18 @@ export default function Page() {
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from(SOLO_RAID_TIPS_TABLE)
         .update({
           content: trimmedContent,
         })
-        .eq("id", payload.id)
-        .eq("user_id", currentUserId)
+        .eq("id", payload.id);
+
+      if (!isMasterUser) {
+        query = query.eq("user_id", currentUserId);
+      }
+
+      const { data, error } = await query
         .select("id,raid_key,content,user_id,created_at")
         .single();
 
@@ -2188,11 +2332,16 @@ export default function Page() {
     }
 
     try {
-      const { error } = await supabase
+      let query = supabase
         .from(SOLO_RAID_TIPS_TABLE)
         .delete()
-        .eq("id", id)
-        .eq("user_id", currentUserId);
+        .eq("id", id);
+
+      if (!isMasterUser) {
+        query = query.eq("user_id", currentUserId);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
 
@@ -2202,6 +2351,60 @@ export default function Page() {
     } catch (error) {
       console.error(error);
       showToast("글 삭제 실패");
+      return false;
+    }
+  }
+
+  async function submitContactInquiry(payload: { content: string }) {
+    const trimmedContent = payload.content.trim();
+
+    if (!trimmedContent) {
+      showToast("문의 내용을 입력해줘");
+      return false;
+    }
+
+    if (process.env.NODE_ENV !== "production" && !userId) {
+      const nextInquiry: ContactInquiry = {
+        id: createLocalTipId(),
+        content: trimmedContent,
+        userId: null,
+        createdAt: Date.now(),
+        source: "local",
+      };
+
+      const nextInquiries = [nextInquiry, ...loadLocalContactInquiries()];
+      saveLocalContactInquiries(nextInquiries);
+      setContactInquiries((prev) => [nextInquiry, ...prev]);
+      showToast("로컬 문의 저장 완료");
+      return true;
+    }
+
+    const currentUserId = await getCurrentUserId();
+
+    try {
+      const { data, error } = await supabase
+        .from(CONTACT_INQUIRIES_TABLE)
+        .insert({
+          content: trimmedContent,
+          user_id: currentUserId,
+        })
+        .select("id,content,user_id,created_at")
+        .single();
+
+      if (error) throw error;
+
+      const inserted = mapContactInquiryRow(data as ContactInquiryRow);
+      if (!inserted) throw new Error("Invalid contact inquiry row");
+
+      if (isMasterUser) {
+        setContactInquiries((prev) => [inserted, ...prev]);
+      }
+
+      showToast("문의 전송 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("문의 전송 실패");
       return false;
     }
   }
@@ -2341,6 +2544,7 @@ export default function Page() {
               tips={soloRaidTips}
               loadingTips={loadingSoloRaidTips}
               currentUserId={userId}
+              isMaster={isMaster}
               canWriteTips={Boolean(userId) || process.env.NODE_ENV !== "production"}
               editorUserId={userId ?? (process.env.NODE_ENV !== "production" ? DEV_LOCAL_TIP_USER_ID : null)}
               onSubmitTip={submitSoloRaidTip}
@@ -2350,6 +2554,12 @@ export default function Page() {
               getPublicUrl={getPublicUrl}
               fmt={fmt}
             />
+          </div>
+        )}
+
+        {tab === "contact" && (
+          <div className="mx-auto w-full lg:max-w-2xl">
+            <ContactTab onSubmitInquiry={submitContactInquiry} />
           </div>
         )}
 
@@ -2369,6 +2579,9 @@ export default function Page() {
             onEndSoloRaid={endSoloRaid}
             recommendedVideoUrl={recommendedVideoUrl}
             onSaveRecommendedVideo={saveRecommendedVideo}
+            inquiries={contactInquiries}
+            loadingInquiries={loadingContactInquiries}
+            showInquirySection={canManageBosses}
             fmt={fmt}
           />
         )}
@@ -2376,7 +2589,7 @@ export default function Page() {
 
       {/* Bottom Tab Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-neutral-800 bg-neutral-950">
-        <div className="mx-auto flex max-w-xl flex-row justify-around">
+        <div className="mx-auto flex max-w-2xl flex-row justify-around">
           <button
             onClick={() => setTab("home")}
             className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
@@ -2407,6 +2620,14 @@ export default function Page() {
           >
             <GearIcon active={tab === "settings"} />
             <div className={tab === "settings" ? "text-white" : "text-neutral-400"}>설정</div>
+          </button>
+
+          <button
+            onClick={() => setTab("contact")}
+            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
+          >
+            <ContactIcon active={tab === "contact"} />
+            <div className={tab === "contact" ? "text-white" : "text-neutral-400"}>문의하기</div>
           </button>
         </div>
       </div>

@@ -43,6 +43,7 @@ type RecommendTabProps = {
   tips: SoloRaidTip[];
   loadingTips: boolean;
   currentUserId: string | null;
+  isMaster: boolean;
   canWriteTips: boolean;
   editorUserId: string | null;
   onSubmitTip: (payload: { content: string }) => Promise<boolean>;
@@ -64,6 +65,7 @@ export default function RecommendTab({
   tips,
   loadingTips,
   currentUserId,
+  isMaster,
   canWriteTips,
   editorUserId,
   onSubmitTip,
@@ -99,9 +101,7 @@ export default function RecommendTab({
 
     setSavingTip(true);
     try {
-      const saved = await onSubmitTip({
-        content: tipContent,
-      });
+      const saved = await onSubmitTip({ content: tipContent });
       if (!saved) return;
       setTipContent("");
       setShowWriteForm(false);
@@ -110,8 +110,13 @@ export default function RecommendTab({
     }
   }
 
+  function canManageTip(tip: SoloRaidTip) {
+    return isMaster || (tip.userId !== null && tip.userId === editorUserId);
+  }
+
   function handleTipClick(tip: SoloRaidTip) {
-    if (tip.userId !== editorUserId) return;
+    if (!canManageTip(tip)) return;
+
     setOpenedTipId((prev) => (prev === tip.id ? null : tip.id));
     if (editingTipId !== tip.id) return;
     setEditingTipId(null);
@@ -129,10 +134,7 @@ export default function RecommendTab({
 
     setSavingEdit(true);
     try {
-      const saved = await onUpdateTip({
-        id: tipId,
-        content: editingContent,
-      });
+      const saved = await onUpdateTip({ id: tipId, content: editingContent });
       if (!saved) return;
       setEditingTipId(null);
       setEditingContent("");
@@ -163,7 +165,7 @@ export default function RecommendTab({
       <section className="order-2 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 lg:order-1">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold">추천</h2>
+            <h2 className="text-lg font-semibold">추천 조합</h2>
             <div className="text-sm text-neutral-400">{raidLabel} 기준 추천 조합입니다.</div>
           </div>
           <div className="text-xs text-neutral-400">{recommendedDecks.length}개</div>
@@ -252,7 +254,7 @@ export default function RecommendTab({
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold text-neutral-100">솔레 팁</h3>
-              <div className="mt-1 text-xs text-neutral-400">{raidLabel} 게시판</div>
+              <div className="mt-1 text-xs text-neutral-400">{raidLabel} 팁 게시판</div>
             </div>
             <div className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">{tips.length}개 글</div>
           </div>
@@ -289,10 +291,8 @@ export default function RecommendTab({
 
             {canWriteTips ? (
               <>
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <div className="text-xs text-neutral-400">
-                    {currentUserId ? "로그인한 사용자는 글을 작성할 수 있습니다." : "로컬 개발 환경 테스트용 글쓰기입니다."}
-                  </div>
+                <div className="mt-3 text-xs text-neutral-400">
+                  {currentUserId ? "로그인한 사용자만 글을 작성할 수 있어요." : "로컬 개발 환경 테스트용 글쓰기입니다."}
                 </div>
 
                 {showWriteForm ? (
@@ -300,7 +300,7 @@ export default function RecommendTab({
                     <textarea
                       value={tipContent}
                       onChange={(event) => setTipContent(event.target.value)}
-                      placeholder={`${raidKey} 기준 공략, 패턴, 조합 팁을 적어주세요.`}
+                      placeholder={`${raidKey} 기준 공략, 조합, 팁을 적어주세요.`}
                       disabled={savingTip}
                       className="h-32 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/60 px-4 py-3 text-sm outline-none disabled:opacity-60"
                     />
@@ -318,7 +318,7 @@ export default function RecommendTab({
                 ) : null}
               </>
             ) : (
-              <div className="text-xs text-neutral-400">비로그인 상태에서는 게시글 읽기만 가능합니다.</div>
+              <div className="mt-3 text-xs text-neutral-400">비로그인 상태에서는 게시글 읽기만 가능합니다.</div>
             )}
           </div>
 
@@ -334,6 +334,7 @@ export default function RecommendTab({
             ) : (
               tips.map((tip) => {
                 const isMine = Boolean(editorUserId) && tip.userId === editorUserId;
+                const manageable = canManageTip(tip);
                 const isOpened = openedTipId === tip.id;
                 const isEditing = editingTipId === tip.id;
 
@@ -341,7 +342,7 @@ export default function RecommendTab({
                   <article
                     key={tip.id}
                     onClick={() => handleTipClick(tip)}
-                    className={`rounded-2xl border bg-neutral-950/40 p-4 ${isMine ? "cursor-pointer border-neutral-700" : "border-neutral-800"}`}
+                    className={`rounded-2xl border bg-neutral-950/40 p-4 ${manageable ? "cursor-pointer border-neutral-700" : "border-neutral-800"}`}
                   >
                     {isEditing ? (
                       <div className="space-y-2" onClick={(event) => event.stopPropagation()}>
@@ -377,11 +378,11 @@ export default function RecommendTab({
                       <>
                         <div className="text-xs text-neutral-400">
                           {tipDateFormatter.format(new Date(tip.createdAt))}
-                          {isMine ? " · 내 글" : ""}
+                          {isMaster ? " · 마스터 관리 가능" : isMine ? " · 내 글" : ""}
                         </div>
                         <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-200">{tip.content}</div>
 
-                        {isMine && isOpened ? (
+                        {manageable && isOpened ? (
                           <div className="mt-3 flex justify-end gap-2" onClick={(event) => event.stopPropagation()}>
                             <button
                               type="button"

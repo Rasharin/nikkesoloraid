@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayNames } from "../../../lib/nikke-display";
 
 type RecommendationDeck = {
@@ -24,6 +24,13 @@ type DeckTabItem = {
 type FilterOption = {
   readonly v: string;
   readonly label: string;
+};
+type ContactInquiry = {
+  id: string;
+  content: string;
+  userId: string | null;
+  createdAt: number;
+  source: "remote" | "local";
 };
 
 type NikkeElementValue = "iron" | "fire" | "wind" | "water" | "electric" | null;
@@ -56,6 +63,9 @@ type MyPageTabProps = {
   onEndSoloRaid: () => Promise<boolean>;
   recommendedVideoUrl: string;
   onSaveRecommendedVideo: (url: string) => Promise<boolean>;
+  inquiries: ContactInquiry[];
+  loadingInquiries: boolean;
+  showInquirySection: boolean;
   fmt: (value: number) => string;
 };
 
@@ -80,6 +90,9 @@ export default function MyPageTab({
   onEndSoloRaid,
   recommendedVideoUrl,
   onSaveRecommendedVideo,
+  inquiries,
+  loadingInquiries,
+  showInquirySection,
   fmt,
 }: MyPageTabProps) {
   const [openRaidKey, setOpenRaidKey] = useState<string>("");
@@ -92,6 +105,17 @@ export default function MyPageTab({
   const [endingRaid, setEndingRaid] = useState(false);
   const [videoUrlInput, setVideoUrlInput] = useState(recommendedVideoUrl);
   const [savingVideo, setSavingVideo] = useState(false);
+  const inquiryDateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("ko-KR", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    []
+  );
 
   const [nikkeName, setNikkeName] = useState("");
   const [nikkeBurst, setNikkeBurst] = useState<number | null>(null);
@@ -463,6 +487,41 @@ export default function MyPageTab({
           })}
         </div>
       </section>
+
+      {showInquirySection ? (
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">문의</h2>
+              <div className="mt-1 text-sm text-neutral-400">하단 문의하기 탭에서 보낸 메시지입니다.</div>
+            </div>
+            <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">{inquiries.length}개</div>
+          </div>
+
+          <div className="mt-3 space-y-3">
+            {loadingInquiries ? (
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
+                문의 불러오는 중...
+              </div>
+            ) : inquiries.length === 0 ? (
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
+                아직 들어온 문의가 없습니다.
+              </div>
+            ) : (
+              inquiries.map((inquiry) => (
+                <article key={inquiry.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
+                  <div className="text-xs text-neutral-400">
+                    {inquiryDateFormatter.format(new Date(inquiry.createdAt))}
+                    {inquiry.userId ? " · 로그인 사용자" : " · 익명"}
+                    {inquiry.source === "local" ? " · 로컬 테스트" : ""}
+                  </div>
+                  <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-200">{inquiry.content}</div>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
