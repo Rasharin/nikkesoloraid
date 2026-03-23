@@ -15,6 +15,7 @@ alter table public.contact_inquiries enable row level security;
 
 drop policy if exists "contact_inquiries_insert_all" on public.contact_inquiries;
 drop policy if exists "contact_inquiries_select_master_only" on public.contact_inquiries;
+drop policy if exists "contact_inquiries_delete_master_only" on public.contact_inquiries;
 
 create policy "contact_inquiries_insert_all"
 on public.contact_inquiries
@@ -27,6 +28,18 @@ with check (
 create policy "contact_inquiries_select_master_only"
 on public.contact_inquiries
 for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.app_config
+    where public.app_config.master_user_id = auth.uid()
+  )
+);
+
+create policy "contact_inquiries_delete_master_only"
+on public.contact_inquiries
+for delete
 to authenticated
 using (
   exists (

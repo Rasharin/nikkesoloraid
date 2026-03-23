@@ -2409,6 +2409,44 @@ export default function Page() {
     }
   }
 
+  async function deleteContactInquiry(id: string) {
+    if (process.env.NODE_ENV !== "production" && !userId) {
+      const nextInquiries = loadLocalContactInquiries().filter((inquiry) => inquiry.id !== id);
+      saveLocalContactInquiries(nextInquiries);
+      setContactInquiries((prev) => prev.filter((inquiry) => inquiry.id !== id));
+      showToast("로컬 문의 삭제 완료");
+      return true;
+    }
+
+    if (!isMasterUser) {
+      showToast("마스터 계정만 삭제 가능");
+      return false;
+    }
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 삭제 가능");
+      return false;
+    }
+
+    try {
+      const { error } = await supabase
+        .from(CONTACT_INQUIRIES_TABLE)
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setContactInquiries((prev) => prev.filter((inquiry) => inquiry.id !== id));
+      showToast("문의 삭제 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("문의 삭제 실패");
+      return false;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-50">
       <div className="mx-auto max-w-xl px-4 pb-28 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
@@ -2582,6 +2620,7 @@ export default function Page() {
             inquiries={contactInquiries}
             loadingInquiries={loadingContactInquiries}
             showInquirySection={canManageBosses}
+            onDeleteInquiry={deleteContactInquiry}
             fmt={fmt}
           />
         )}

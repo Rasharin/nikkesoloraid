@@ -66,6 +66,7 @@ type MyPageTabProps = {
   inquiries: ContactInquiry[];
   loadingInquiries: boolean;
   showInquirySection: boolean;
+  onDeleteInquiry: (id: string) => Promise<boolean>;
   fmt: (value: number) => string;
 };
 
@@ -93,6 +94,7 @@ export default function MyPageTab({
   inquiries,
   loadingInquiries,
   showInquirySection,
+  onDeleteInquiry,
   fmt,
 }: MyPageTabProps) {
   const [openRaidKey, setOpenRaidKey] = useState<string>("");
@@ -105,6 +107,7 @@ export default function MyPageTab({
   const [endingRaid, setEndingRaid] = useState(false);
   const [videoUrlInput, setVideoUrlInput] = useState(recommendedVideoUrl);
   const [savingVideo, setSavingVideo] = useState(false);
+  const [deletingInquiryId, setDeletingInquiryId] = useState<string | null>(null);
   const inquiryDateFormatter = useMemo(
     () =>
       new Intl.DateTimeFormat("ko-KR", {
@@ -206,6 +209,17 @@ export default function MyPageTab({
       setVideoUrlInput((prev) => prev.trim());
     } finally {
       setSavingVideo(false);
+    }
+  }
+
+  async function handleDeleteInquiry(id: string) {
+    if (deletingInquiryId) return;
+
+    setDeletingInquiryId(id);
+    try {
+      await onDeleteInquiry(id);
+    } finally {
+      setDeletingInquiryId(null);
     }
   }
 
@@ -510,10 +524,20 @@ export default function MyPageTab({
             ) : (
               inquiries.map((inquiry) => (
                 <article key={inquiry.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
-                  <div className="text-xs text-neutral-400">
-                    {inquiryDateFormatter.format(new Date(inquiry.createdAt))}
-                    {inquiry.userId ? " · 로그인 사용자" : " · 익명"}
-                    {inquiry.source === "local" ? " · 로컬 테스트" : ""}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-xs text-neutral-400">
+                      {inquiryDateFormatter.format(new Date(inquiry.createdAt))}
+                      {inquiry.userId ? " · 로그인 사용자" : " · 익명"}
+                      {inquiry.source === "local" ? " · 로컬 테스트" : ""}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteInquiry(inquiry.id)}
+                      disabled={deletingInquiryId === inquiry.id}
+                      className="shrink-0 rounded-xl border border-red-800/70 px-3 py-1 text-xs text-red-300 active:scale-[0.99] disabled:opacity-50"
+                    >
+                      {deletingInquiryId === inquiry.id ? "삭제 중..." : "삭제"}
+                    </button>
                   </div>
                   <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-200">{inquiry.content}</div>
                 </article>
