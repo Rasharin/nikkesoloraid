@@ -69,7 +69,6 @@ type SoloRaidTipRow = {
   id: string;
   raid_key: string;
   content: string;
-  author_name: string | null;
   user_id: string | null;
   created_at: string;
 };
@@ -77,7 +76,6 @@ type SoloRaidTip = {
   id: string;
   raidKey: string;
   content: string;
-  authorName: string;
   userId: string | null;
   createdAt: number;
   source: "remote" | "local";
@@ -493,7 +491,6 @@ function mapSoloRaidTipRow(row: SoloRaidTipRow): SoloRaidTip | null {
     id: row.id,
     raidKey: row.raid_key,
     content: row.content.trim(),
-    authorName: (row.author_name ?? "").trim() || "사용자",
     userId: row.user_id ?? null,
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
     source: "remote",
@@ -515,7 +512,6 @@ function loadLocalTips(): SoloRaidTip[] {
           typeof candidate.id !== "string" ||
           typeof candidate.raidKey !== "string" ||
           typeof candidate.content !== "string" ||
-          typeof candidate.authorName !== "string" ||
           typeof candidate.createdAt !== "number"
         ) {
           return null;
@@ -525,7 +521,6 @@ function loadLocalTips(): SoloRaidTip[] {
           id: candidate.id,
           raidKey: candidate.raidKey,
           content: candidate.content,
-          authorName: candidate.authorName,
           userId: typeof candidate.userId === "string" ? candidate.userId : null,
           createdAt: candidate.createdAt,
           source: "local" as const,
@@ -819,7 +814,7 @@ export default function Page() {
   async function fetchSoloRaidTips(raidKey: string) {
     const { data, error } = await supabase
       .from(SOLO_RAID_TIPS_TABLE)
-      .select("id,raid_key,content,author_name,user_id,created_at")
+      .select("id,raid_key,content,user_id,created_at")
       .eq("raid_key", raidKey)
       .order("created_at", { ascending: false });
 
@@ -2026,7 +2021,6 @@ export default function Page() {
         id: createLocalTipId(),
         raidKey: activeRaidKey,
         content: trimmedContent,
-        authorName: "로컬 테스트",
         userId: DEV_LOCAL_TIP_USER_ID,
         createdAt: Date.now(),
         source: "local",
@@ -2053,7 +2047,7 @@ export default function Page() {
           content: trimmedContent,
           user_id: currentUserId,
         })
-        .select("id,raid_key,content,author_name,user_id,created_at")
+        .select("id,raid_key,content,user_id,created_at")
         .single();
 
       if (error) throw error;
@@ -2115,7 +2109,7 @@ export default function Page() {
         })
         .eq("id", payload.id)
         .eq("user_id", currentUserId)
-        .select("id,raid_key,content,author_name,user_id,created_at")
+        .select("id,raid_key,content,user_id,created_at")
         .single();
 
       if (error) throw error;
