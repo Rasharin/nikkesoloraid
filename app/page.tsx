@@ -8,6 +8,7 @@ import SavedTab from "./components/tabs/SavedTab";
 import SettingsTab from "./components/tabs/SettingsTab";
 import ContactTab from "./components/tabs/ContactTab";
 import UsageTab from "./components/tabs/UsageTab";
+import type { ImageBlock, TextBlock, UsageBlock, UsageEditorBlock, UsagePost } from "./components/tabs/usage/types";
 import { supabase } from "../lib/supabase";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
 const btnClass = (selected: boolean) =>
@@ -100,20 +101,10 @@ type UsagePostRow = {
   id: string;
   category_key: string;
   title: string;
-  content: string;
-  image_path: string;
+  blocks: unknown;
   user_id: string | null;
   created_at: string;
-};
-type UsagePost = {
-  id: string;
-  categoryKey: string;
-  title: string;
-  content: string;
-  imagePath: string;
-  userId: string | null;
-  createdAt: number;
-  source: "remote";
+  updated_at: string;
 };
 type AppConfigRow = {
   master_user_id: string | null;
@@ -150,8 +141,7 @@ type AddNikkePayload = {
 type AddUsagePostPayload = {
   categoryKey: string;
   title: string;
-  content: string;
-  imageFile: File | null;
+  blocks: UsageEditorBlock[];
 };
 
 type NikkeElement = "iron" | "fire" | "wind" | "water" | "electric" | null
@@ -559,20 +549,68 @@ function mapContactInquiryRow(row: ContactInquiryRow): ContactInquiry | null {
   };
 }
 
-function mapUsagePostRow(row: UsagePostRow): UsagePost | null {
-  if (!row?.id || !row.category_key || !row.title || !row.content || !row.image_path || !row.created_at) return null;
+function createUsageBlockId(prefix: "text" | "image" = "text") {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
+function mapUsageBlocks(value: unknown): UsageBlock[] {
+  if (!Array.isArray(value)) return [];
+
+  const blocks: UsageBlock[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const candidate = item as Record<string, unknown>;
+    const id = typeof candidate.id === "string" && candidate.id.trim() ? candidate.id : createUsageBlockId();
+    if (candidate.type === "text" && typeof candidate.content === "string") {
+      blocks.push({
+        id,
+        type: "text",
+        content: candidate.content,
+      } satisfies TextBlock);
+      continue;
+    }
+
+    if (candidate.type === "image" && typeof candidate.imagePath === "string") {
+      blocks.push({
+        id,
+        type: "image",
+        imagePath: candidate.imagePath,
+        caption: typeof candidate.caption === "string" ? candidate.caption : "",
+      } satisfies ImageBlock);
+    }
+  }
+
+  return blocks;
+}
+
+function mapUsagePostRow(row: UsagePostRow): UsagePost | null {
+  if (!row?.id || !row.category_key || !row.title || !row.created_at) return null;
   const createdAt = Date.parse(row.created_at);
+  const updatedAt = Date.parse(row.updated_at);
+  const blocks = mapUsageBlocks(row.blocks);
+  if (blocks.length === 0) return null;
+
   return {
     id: row.id,
     categoryKey: row.category_key,
     title: row.title.trim(),
-    content: row.content.trim(),
-    imagePath: row.image_path,
+    blocks,
     userId: row.user_id ?? null,
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+    updatedAt: Number.isFinite(updatedAt) ? updatedAt : (Number.isFinite(createdAt) ? createdAt : Date.now()),
     source: "remote",
   };
+}
+
+function getUsageImagePaths(blocks: readonly UsageBlock[]) {
+  return blocks.filter((block): block is ImageBlock => block.type === "image").map((block) => block.imagePath);
+}
+
+function getUsageDraftImagePaths(blocks: readonly UsageEditorBlock[]) {
+  return blocks
+    .filter((block): block is Extract<UsageEditorBlock, { type: "image" }> => block.type === "image")
+    .map((block) => block.imagePath)
+    .filter((path) => path.trim().length > 0);
 }
 
 function loadLocalTips(): SoloRaidTip[] {
@@ -927,6 +965,8 @@ export default function Page() {
   const [loadingContactInquiries, setLoadingContactInquiries] = useState(false);
   const [usagePosts, setUsagePosts] = useState<UsagePost[]>([]);
   const [loadingUsagePosts, setLoadingUsagePosts] = useState(false);
+  const [savingUsagePost, setSavingUsagePost] = useState(false);
+  const [deletingUsagePostId, setDeletingUsagePostId] = useState<string | null>(null);
   const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>("number");
 
   async function fetchUserDecks(currentUserId: string) {
@@ -992,9 +1032,10 @@ export default function Page() {
   async function fetchUsagePosts(categoryKey: UsageBoardCategoryKey) {
     const { data, error } = await supabase
       .from(USAGE_POSTS_TABLE)
-      .select("id,category_key,title,content,image_path,user_id,created_at")
+      .select("id,category_key,title,blocks,user_id,created_at,updated_at")
       .eq("category_key", categoryKey)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(1);
 
     if (error) throw error;
     return ((data ?? []) as UsagePostRow[]).map(mapUsagePostRow).filter((post): post is UsagePost => post !== null);
@@ -2579,8 +2620,7 @@ export default function Page() {
 
   async function submitUsagePost(payload: AddUsagePostPayload) {
     const trimmedTitle = payload.title.trim();
-    const trimmedContent = payload.content.trim();
-    const imageFile = payload.imageFile;
+    const existingPost = usagePosts[0] ?? null;
 
     if (!isMasterUser) {
       showToast("마스터 계정만 작성 가능");
@@ -2603,58 +2643,123 @@ export default function Page() {
       return false;
     }
 
-    if (!trimmedContent) {
-      showToast("내용을 입력해줘");
+    if (payload.blocks.length === 0) {
+      showToast("본문 블록을 하나 이상 추가해줘");
       return false;
     }
 
-    if (!imageFile) {
-      showToast("이미지를 선택해줘");
+    const hasMeaningfulBlock = payload.blocks.some((block) =>
+      block.type === "text" ? block.content.trim().length > 0 : Boolean(block.file || block.imagePath.trim())
+    );
+    if (!hasMeaningfulBlock) {
+      showToast("본문 내용을 입력해줘");
       return false;
     }
 
-    const extension = imageFile.name.includes(".")
-      ? imageFile.name.split(".").pop()?.toLowerCase() ?? "png"
-      : "png";
-    const imagePath = `${payload.categoryKey}/${slugifyStorageKey(trimmedTitle) || "usage"}-${Date.now()}.${extension}`;
-
+    setSavingUsagePost(true);
     try {
-      const { error: uploadError } = await supabase.storage
-        .from("usage-board-images")
-        .upload(imagePath, imageFile, {
-          cacheControl: "3600",
-          upsert: false,
+      const nextBlocks: UsageBlock[] = [];
+
+      for (const block of payload.blocks) {
+        if (block.type === "text") {
+          if (!block.content.trim()) continue;
+          nextBlocks.push({
+            id: block.id,
+            type: "text",
+            content: block.content,
+          });
+          continue;
+        }
+
+        let imagePath = block.imagePath;
+        if (block.file) {
+          const extension = block.file.name.includes(".")
+            ? block.file.name.split(".").pop()?.toLowerCase() ?? "png"
+            : "png";
+          imagePath = `${payload.categoryKey}/${slugifyStorageKey(trimmedTitle) || "usage"}/${block.id}-${Date.now()}.${extension}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from("usage-board-images")
+            .upload(imagePath, block.file, {
+              cacheControl: "3600",
+              upsert: false,
+            });
+
+          if (uploadError) throw uploadError;
+        }
+
+        if (!imagePath.trim()) continue;
+        nextBlocks.push({
+          id: block.id,
+          type: "image",
+          imagePath,
+          caption: block.caption.trim(),
         });
-
-      if (uploadError) throw uploadError;
-
-      const { data, error } = await supabase
-        .from(USAGE_POSTS_TABLE)
-        .insert({
-          category_key: payload.categoryKey,
-          title: trimmedTitle,
-          content: trimmedContent,
-          image_path: imagePath,
-          user_id: currentUserId,
-        })
-        .select("id,category_key,title,content,image_path,user_id,created_at")
-        .single();
-
-      if (error) throw error;
-
-      const inserted = mapUsagePostRow(data as UsagePostRow);
-      if (!inserted) throw new Error("Invalid usage post row");
-
-      if (inserted.categoryKey === usageBoardTab) {
-        setUsagePosts((prev) => [inserted, ...prev]);
       }
 
-      showToast("사용법 게시글 등록 완료");
+      if (nextBlocks.length === 0) {
+        showToast("저장할 블록이 없어");
+        return false;
+      }
+
+      let data: UsagePostRow | null = null;
+
+      if (existingPost?.categoryKey === payload.categoryKey) {
+        const response = await supabase
+          .from(USAGE_POSTS_TABLE)
+          .update({
+            title: trimmedTitle,
+            blocks: nextBlocks,
+            user_id: currentUserId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingPost.id)
+          .select("id,category_key,title,blocks,user_id,created_at,updated_at")
+          .single();
+
+        if (response.error) throw response.error;
+        data = response.data as UsagePostRow;
+      } else {
+        const response = await supabase
+          .from(USAGE_POSTS_TABLE)
+          .insert({
+            category_key: payload.categoryKey,
+            title: trimmedTitle,
+            blocks: nextBlocks,
+            user_id: currentUserId,
+          })
+          .select("id,category_key,title,blocks,user_id,created_at,updated_at")
+          .single();
+
+        if (response.error) throw response.error;
+        data = response.data as UsagePostRow;
+      }
+
+      const inserted = mapUsagePostRow(data);
+      if (!inserted) throw new Error("Invalid usage post row");
+
+      const oldImagePaths = new Set(existingPost ? getUsageImagePaths(existingPost.blocks) : []);
+      const nextImagePaths = new Set(getUsageImagePaths(inserted.blocks));
+      const removedImagePaths = [...oldImagePaths].filter((path) => !nextImagePaths.has(path));
+      if (removedImagePaths.length > 0) {
+        const { error: removeError } = await supabase.storage.from("usage-board-images").remove(removedImagePaths);
+        if (removeError) {
+          console.error(removeError);
+        }
+      }
+
+      if (inserted.categoryKey === usageBoardTab) {
+        setUsagePosts([inserted]);
+      }
+
+      showToast(existingPost ? "사용법 게시글 수정 완료" : "사용법 게시글 등록 완료");
       return true;
     } catch (error) {
       console.error(error);
-      showToast("사용법 게시글 등록 실패");
+      showToast(existingPost ? "사용법 게시글 수정 실패" : "사용법 게시글 등록 실패");
       return false;
+    } finally {
+      setSavingUsagePost(false);
     }
   }
 
@@ -2670,6 +2775,7 @@ export default function Page() {
       return false;
     }
 
+    setDeletingUsagePostId(id);
     try {
       const target = usagePosts.find((post) => post.id === id) ?? null;
 
@@ -2680,8 +2786,9 @@ export default function Page() {
 
       if (error) throw error;
 
-      if (target?.imagePath) {
-        const { error: storageError } = await supabase.storage.from("usage-board-images").remove([target.imagePath]);
+      const targetPaths = target ? getUsageImagePaths(target.blocks) : [];
+      if (targetPaths.length > 0) {
+        const { error: storageError } = await supabase.storage.from("usage-board-images").remove(targetPaths);
         if (storageError) {
           console.error(storageError);
         }
@@ -2694,6 +2801,8 @@ export default function Page() {
       console.error(error);
       showToast("사용법 게시글 삭제 실패");
       return false;
+    } finally {
+      setDeletingUsagePostId(null);
     }
   }
 
@@ -2854,6 +2963,8 @@ export default function Page() {
               posts={usagePosts}
               loadingPosts={loadingUsagePosts}
               isMaster={isMaster}
+              savingPost={savingUsagePost}
+              deletingPostId={deletingUsagePostId}
               onSubmitPost={submitUsagePost}
               onDeletePost={deleteUsagePost}
               getPublicUrl={getPublicUrl}

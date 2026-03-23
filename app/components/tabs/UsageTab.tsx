@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import UsagePostEditor from "./usage/UsagePostEditor";
+import UsagePostViewer from "./usage/UsagePostViewer";
+import type { UsageEditorBlock, UsagePost, UsagePostSubmitPayload } from "./usage/types";
 
 type UsageBoardTab = {
   key: string;
@@ -52,16 +55,6 @@ function UsageBoardTabIcon({ tabKey, active }: { tabKey: string; active: boolean
   return null;
 }
 
-type UsagePost = {
-  id: string;
-  categoryKey: string;
-  title: string;
-  content: string;
-  imagePath: string;
-  userId: string | null;
-  createdAt: number;
-};
-
 type UsageTabProps = {
   tabs: readonly UsageBoardTab[];
   activeTab: string;
@@ -69,10 +62,35 @@ type UsageTabProps = {
   posts: readonly UsagePost[];
   loadingPosts: boolean;
   isMaster: boolean;
-  onSubmitPost: (payload: { categoryKey: string; title: string; content: string; imageFile: File | null }) => Promise<boolean>;
+  savingPost: boolean;
+  deletingPostId: string | null;
+  onSubmitPost: (payload: UsagePostSubmitPayload) => Promise<boolean>;
   onDeletePost: (id: string) => Promise<boolean>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images" | "usage-board-images", path: string) => string;
 };
+
+function createDefaultTextBlock(): UsageEditorBlock {
+  return {
+    id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type: "text",
+    content: "",
+  };
+}
+
+function toEditorBlocks(post: UsagePost | null, getPublicUrl: UsageTabProps["getPublicUrl"]): UsageEditorBlock[] {
+  if (!post) return [createDefaultTextBlock()];
+
+  return post.blocks.map((block) =>
+    block.type === "text"
+      ? { ...block }
+      : {
+          ...block,
+          file: null,
+          previewUrl: getPublicUrl("usage-board-images", block.imagePath),
+          isUploading: false,
+        }
+  );
+}
 
 export default function UsageTab({
   tabs,
@@ -81,79 +99,76 @@ export default function UsageTab({
   posts,
   loadingPosts,
   isMaster,
+  savingPost,
+  deletingPostId,
   onSubmitPost,
   onDeletePost,
   getPublicUrl,
 }: UsageTabProps) {
   const [showWriteForm, setShowWriteForm] = useState(false);
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  const dateFormatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat("ko-KR", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    []
-  );
-
-  async function handleSubmit() {
-    if (saving || !isMaster) return;
-
-    setSaving(true);
-    try {
-      const saved = await onSubmitPost({
-        categoryKey: activeTab,
-        title,
-        content,
-        imageFile,
-      });
-      if (!saved) return;
-      setTitle("");
-      setContent("");
-      setImageFile(null);
-      setShowWriteForm(false);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete(id: string) {
-    if (deletingId) return;
-
-    setDeletingId(id);
-    try {
-      await onDeletePost(id);
-    } finally {
-      setDeletingId(null);
-    }
-  }
+  const [blocks, setBlocks] = useState<UsageEditorBlock[]>([createDefaultTextBlock()]);
 
   const activeLabel = tabs.find((tab) => tab.key === activeTab)?.label ?? activeTab;
+  const currentPost = posts[0] ?? null;
+
+  useEffect(() => {
+    setShowWriteForm(false);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!showWriteForm) return;
+    setTitle(currentPost?.title ?? "");
+    setBlocks(toEditorBlocks(currentPost, getPublicUrl));
+  }, [currentPost, getPublicUrl, showWriteForm]);
+
+  const hasContent = useMemo(
+    () =>
+      blocks.some((block) =>
+        block.type === "text" ? block.content.trim().length > 0 : Boolean(block.previewUrl || block.imagePath || block.file)
+      ),
+    [blocks]
+  );
+
+  async function handleSubmit(payload: UsagePostSubmitPayload) {
+    const uploadingBlocks = payload.blocks.map((block) =>
+      block.type === "image" && block.file ? { ...block, isUploading: true } : block
+    );
+    setBlocks(uploadingBlocks);
+
+    const saved = await onSubmitPost({
+      ...payload,
+      blocks: uploadingBlocks,
+    });
+
+    setBlocks((prev) => prev.map((block) => (block.type === "image" ? { ...block, isUploading: false } : block)));
+    if (!saved) return;
+    setShowWriteForm(false);
+  }
 
   return (
     <div className="space-y-3">
       <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-semibold text-neutral-100">덱 도우미 웹 사용법</h2>
-            <div className="mt-1 text-sm text-neutral-400">{activeLabel} 관련 사용법과 안내 이미지를 볼 수 있어요.</div>
+            <h2 className="text-2xl font-semibold text-neutral-100">니케 도우미 사용법</h2>
+            <div className="mt-1 text-sm text-neutral-400">{activeLabel} 관련 사용법을 텍스트와 이미지 블록으로 정리할 수 있어요.</div>
           </div>
 
           {isMaster ? (
             <button
               type="button"
-              onClick={() => setShowWriteForm((prev) => !prev)}
+              onClick={() => {
+                const nextOpen = !showWriteForm;
+                setShowWriteForm(nextOpen);
+                if (nextOpen) {
+                  setTitle(currentPost?.title ?? "");
+                  setBlocks(toEditorBlocks(currentPost, getPublicUrl));
+                }
+              }}
               className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm text-neutral-100 active:scale-[0.99]"
             >
-              {showWriteForm ? "닫기" : "게시글 작성"}
+              {showWriteForm ? "닫기" : currentPost ? "사용법 수정" : "사용법 작성"}
             </button>
           ) : null}
         </div>
@@ -179,47 +194,21 @@ export default function UsageTab({
         </div>
 
         {isMaster ? (
-          <div className="mt-3 text-xs text-neutral-500">게시글 작성은 마스터 계정만 가능하고, 이미지는 필수예요.</div>
+          <div className="mt-3 text-xs text-neutral-500">각 탭은 게시글 1개만 유지되고, 블록 순서대로 본문이 렌더링돼요.</div>
         ) : null}
 
         {isMaster && showWriteForm ? (
-          <div className="mt-4 space-y-3 rounded-2xl border border-neutral-800 bg-neutral-950/50 p-4">
-            <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder={`${activeLabel} 게시글 제목`}
-              disabled={saving}
-              className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/70 px-4 py-3 text-sm text-neutral-100 outline-none disabled:opacity-60"
-            />
-            <textarea
-              value={content}
-              onChange={(event) => setContent(event.target.value)}
-              placeholder={`${activeLabel} 사용법을 입력해 주세요.`}
-              disabled={saving}
-              className="h-36 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/70 px-4 py-3 text-sm text-neutral-100 outline-none disabled:opacity-60"
-            />
-            <label className="block rounded-2xl border border-dashed border-neutral-700 bg-neutral-950/40 px-4 py-3 text-sm text-neutral-300">
-              <div>이미지 업로드</div>
-              <input
-                type="file"
-                accept="image/*"
-                disabled={saving}
-                onChange={(event) => setImageFile(event.target.files?.[0] ?? null)}
-                className="mt-3 block w-full text-xs text-neutral-400 file:mr-3 file:rounded-xl file:border file:border-neutral-700 file:bg-neutral-900 file:px-3 file:py-2 file:text-neutral-200"
-              />
-              <div className="mt-2 text-xs text-neutral-500">{imageFile ? imageFile.name : "선택된 이미지가 없어요."}</div>
-            </label>
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => void handleSubmit()}
-                disabled={saving}
-                className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm text-neutral-100 active:scale-[0.99] disabled:opacity-50"
-              >
-                {saving ? "저장 중.." : "게시글 저장"}
-              </button>
-            </div>
-          </div>
+          <UsagePostEditor
+            title={title}
+            blocks={blocks}
+            activeLabel={activeLabel}
+            currentPost={currentPost}
+            saving={savingPost}
+            onTitleChange={setTitle}
+            onBlocksChange={setBlocks}
+            onSubmit={handleSubmit}
+            categoryKey={activeTab}
+          />
         ) : null}
       </section>
 
@@ -228,47 +217,19 @@ export default function UsageTab({
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400">
             게시글을 불러오는 중..
           </div>
-        ) : posts.length === 0 ? (
+        ) : !currentPost ? (
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400">
-            아직 등록된 {activeLabel} 게시글이 없어요.
+            아직 등록된 {activeLabel} 사용법이 없어요.
+            {isMaster && !showWriteForm && !hasContent ? " 작성 버튼으로 첫 블록 글을 만들 수 있어요." : ""}
           </div>
         ) : (
-          posts.map((post) => {
-            const imageUrl = getPublicUrl("usage-board-images", post.imagePath);
-
-            return (
-              <article key={post.id} className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/40">
-                <div className="border-b border-neutral-800 px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-semibold text-neutral-100">{post.title}</h3>
-                      <div className="mt-1 text-xs text-neutral-500">{dateFormatter.format(new Date(post.createdAt))}</div>
-                    </div>
-
-                    {isMaster ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(post.id)}
-                        disabled={deletingId === post.id}
-                        className="rounded-xl border border-red-800/70 px-3 py-2 text-xs text-red-300 active:scale-[0.99] disabled:opacity-50"
-                      >
-                        {deletingId === post.id ? "삭제 중.." : "삭제"}
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="bg-black/20">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={imageUrl} alt={post.title} className="h-auto w-full object-cover" />
-                </div>
-
-                <div className="px-4 py-4">
-                  <div className="whitespace-pre-wrap text-sm leading-6 text-neutral-200">{post.content}</div>
-                </div>
-              </article>
-            );
-          })
+          <UsagePostViewer
+            post={currentPost}
+            isMaster={isMaster}
+            deleting={deletingPostId === currentPost.id}
+            getPublicUrl={getPublicUrl}
+            onDelete={() => void onDeletePost(currentPost.id)}
+          />
         )}
       </section>
     </div>

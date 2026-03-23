@@ -1,0 +1,49 @@
+export type TextBlock = {
+  id: string;
+  type: "text";
+  content: string;
+};
+
+export type ImageBlock = {
+  id: string;
+  type: "image";
+  imagePath: string;
+  caption: string;
+};
+
+export type UsageBlock = TextBlock | ImageBlock;
+
+export type UsagePost = {
+  id: string;
+  categoryKey: string;
+  title: string;
+  blocks: UsageBlock[];
+  userId: string | null;
+  createdAt: number;
+  updatedAt: number;
+  source: "remote";
+};
+
+export type UsageEditorTextBlock = {
+  id: string;
+  type: "text";
+  content: string;
+};
+
+export type UsageEditorImageBlock = {
+  id: string;
+  type: "image";
+  imagePath: string;
+  caption: string;
+  file: File | null;
+  previewUrl: string;
+  isUploading: boolean;
+};
+
+export type UsageEditorBlock = UsageEditorTextBlock | UsageEditorImageBlock;
+
+export type UsagePostSubmitPayload = {
+  categoryKey: string;
+  title: string;
+  blocks: UsageEditorBlock[];
+};
