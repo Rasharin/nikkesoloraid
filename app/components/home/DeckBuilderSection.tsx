@@ -119,6 +119,10 @@ function getSlotDropAvailability(index: number, draft: DraftSlot[], activeDrag: 
     return !draft.includes(activeDrag.nikkeName);
   }
 
+  if (activeDrag.source !== "deck") {
+    return false;
+  }
+
   if (typeof activeDrag.slotIndex !== "number" || activeDrag.slotIndex === index) {
     return false;
   }

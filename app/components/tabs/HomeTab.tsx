@@ -7,6 +7,7 @@ import {
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
+  useDraggable,
   useDroppable,
   useSensor,
   useSensors,
@@ -15,6 +16,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
 import DeckBuilderSection, {
@@ -86,9 +88,25 @@ type RecommendedDeckSlotProps = {
 };
 
 function RecommendedDeckSlot({ deckId, slotIndex, name, imageUrl, highlighted, canDrop }: RecommendedDeckSlotProps) {
+  const { attributes, listeners, setNodeRef: setDraggableNodeRef, transform, isDragging } = useDraggable({
+    id: `recommended-${deckId}-${slotIndex}`,
+    data: {
+      source: "recommended",
+      nikkeName: name,
+      slotIndex,
+      recommendedDeckId: deckId,
+    } satisfies DragItemData,
+  });
   const { setNodeRef, isOver } = useDroppable({
     id: getRecommendedSlotId(deckId, slotIndex),
   });
+  const style = {
+    transform: CSS.Translate.toString(transform),
+  };
+  const setRefs = (node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    setDraggableNodeRef(node);
+  };
 
   const stateClass = highlighted || isOver
     ? canDrop
@@ -98,7 +116,15 @@ function RecommendedDeckSlot({ deckId, slotIndex, name, imageUrl, highlighted, c
 
   return (
     <div key={`${deckId}-${slotIndex}`} className="min-w-0">
-      <div ref={setNodeRef} className={`aspect-square overflow-hidden rounded-lg border bg-neutral-900 transition-all duration-150 ${stateClass}`}>
+      <div
+        ref={setRefs}
+        style={style}
+        className={`aspect-square overflow-hidden rounded-lg border bg-neutral-900 transition-all duration-150 ${
+          isDragging ? "opacity-35" : ""
+        } ${stateClass}`}
+        {...attributes}
+        {...listeners}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {imageUrl ? (
           <img src={imageUrl} alt={name} draggable={false} className="h-full w-full object-cover" />
@@ -313,10 +339,10 @@ export default function HomeTab({
   }
 
   function handleDragStart(event: DragStartEvent) {
-    const { source, nikkeName, slotIndex } = (event.active.data.current ?? {}) as Partial<DragItemData>;
+    const { source, nikkeName, slotIndex, recommendedDeckId } = (event.active.data.current ?? {}) as Partial<DragItemData>;
     const initialRect = event.active.rect.current.initial;
 
-    if (!nikkeName || (source !== "selected" && source !== "deck")) {
+    if (!nikkeName || (source !== "selected" && source !== "deck" && source !== "recommended")) {
       setActiveDrag(null);
       setOverlayWidth(null);
       return;
@@ -326,6 +352,7 @@ export default function HomeTab({
       source,
       nikkeName,
       slotIndex,
+      recommendedDeckId,
     });
     setOverlayWidth(initialRect?.width ?? null);
   }
@@ -355,6 +382,19 @@ export default function HomeTab({
     if (!dragItem) return;
 
     if (recommendedTarget && dragItem.nikkeName) {
+      if (
+        dragItem.source === "recommended" &&
+        typeof dragItem.slotIndex === "number" &&
+        dragItem.recommendedDeckId
+      ) {
+        if (dragItem.recommendedDeckId !== recommendedTarget.deckId) {
+          return;
+        }
+
+        void moveRecommendedDeckNikke(dragItem.recommendedDeckId, dragItem.slotIndex, recommendedTarget.slotIndex);
+        return;
+      }
+
       void replaceRecommendedDeckNikke(recommendedTarget, dragItem.nikkeName);
       return;
     }
@@ -432,6 +472,28 @@ export default function HomeTab({
     }
   }
 
+  async function moveRecommendedDeckNikke(deckId: string, fromSlotIndex: number, toSlotIndex: number) {
+    if (fromSlotIndex === toSlotIndex) return;
+
+    const targetDeck = best.picked.find((deck) => deck.id === deckId);
+    if (!targetDeck) return;
+
+    const nextDraft = [...targetDeck.chars];
+    const [moved] = nextDraft.splice(fromSlotIndex, 1);
+    if (!moved) return;
+    nextDraft.splice(toSlotIndex, 0, moved);
+
+    const saved = await onSubmitDeck({
+      draft: nextDraft,
+      scoreText: String(targetDeck.score),
+      editingId: targetDeck.id,
+    });
+
+    if (saved) {
+      onShowToast("추천 조합 순서 변경 완료");
+    }
+  }
+
   function clearMemo() {
     setMemoText("");
     try {
@@ -462,7 +524,7 @@ export default function HomeTab({
                     name={name}
                     imageUrl={imageUrl}
                     highlighted={isHighlighted}
-                    canDrop={canDropOnRecommendedSlot(deck.chars, name, activeDrag)}
+                    canDrop={canDropOnRecommendedSlot(deck.id, slotIndex, deck.chars, name, activeDrag)}
                   />
                 </div>
               );
@@ -1066,8 +1128,22 @@ function parseRecommendedDropTarget(id: unknown): RecommendedDropTarget | null {
   return { deckId, slotIndex };
 }
 
-function canDropOnRecommendedSlot(deckChars: string[], currentName: string, activeDrag: DragItemData | null): boolean {
+function canDropOnRecommendedSlot(
+  deckId: string,
+  slotIndex: number,
+  deckChars: string[],
+  currentName: string,
+  activeDrag: DragItemData | null
+): boolean {
   if (!activeDrag?.nikkeName) return false;
+
+  if (activeDrag.source === "recommended") {
+    if (activeDrag.recommendedDeckId !== deckId) return false;
+    return activeDrag.slotIndex !== slotIndex;
+  }
+
+  if (activeDrag.source !== "selected") return false;
   if (activeDrag.nikkeName === currentName) return true;
+
   return !deckChars.includes(activeDrag.nikkeName);
 }

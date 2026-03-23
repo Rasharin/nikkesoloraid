@@ -11,12 +11,13 @@ export type NikkeRow = {
 };
 
 export type DraftSlot = string | null;
-export type DragSource = "selected" | "deck";
+export type DragSource = "selected" | "deck" | "recommended";
 
 export type DragItemData = {
   source: DragSource;
   nikkeName: string;
   slotIndex?: number;
+  recommendedDeckId?: string;
 };
 
 export function createEmptyDraft(): DraftSlot[] {
