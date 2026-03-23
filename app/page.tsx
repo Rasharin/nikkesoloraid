@@ -1485,6 +1485,51 @@ export default function Page() {
     }
   }
 
+  async function updateDeckChars(id: string, nextChars: string[]) {
+    if (nextChars.length !== MAX_DECK_CHARS || new Set(nextChars).size !== MAX_DECK_CHARS) {
+      showToast("니케 5명을 중복 없이 맞춰줘.");
+      return false;
+    }
+
+    const targetDeck = decks.find((deck) => deck.id === id);
+    if (!targetDeck) {
+      showToast("덱을 찾을 수 없어");
+      return false;
+    }
+
+    try {
+      if (userId) {
+        const { data, error } = await supabase
+          .from("decks")
+          .update({ chars: [...nextChars], deck_key: buildDeckKey(nextChars) })
+          .eq("id", id)
+          .eq("user_id", userId)
+          .select("id,user_id,raid_key,deck_key,chars,score,created_at")
+          .single();
+
+        if (error) throw error;
+        const updated = mapDeckRow(data as DeckRow);
+        if (!updated) throw new Error("Invalid deck row");
+        setDecks((prev) => prev.map((deck) => (deck.id === id ? updated : deck)));
+      } else {
+        setDecks((prev) => {
+          const next = prev.map((deck) =>
+            deck.id === id ? { ...deck, deckKey: buildDeckKey(nextChars), chars: [...nextChars] } : deck
+          );
+          saveLocalDecks(next);
+          return next;
+        });
+      }
+
+      showToast("덱 니케 변경 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("덱 니케 변경 실패");
+      return false;
+    }
+  }
+
   async function deleteDeck(id: string) {
     if (!userId) {
       setDecks((prev) => {
@@ -2247,7 +2292,9 @@ export default function Page() {
               savedDeckTab={activeRaidKey ?? ""}
               onSavedDeckTabChange={(key) => setActiveRaidKey(key)}
               onUpdateDeckScore={updateDeckScore}
+              onUpdateDeckChars={updateDeckChars}
               onDeleteDeck={deleteDeck}
+              allNikkeNames={nikkes.map((nikke) => nikke.name)}
               nikkeMap={nikkeMap}
               getPublicUrl={getPublicUrl}
               fmt={fmt}

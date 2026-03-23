@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatNikkeDisplayNames } from "../../../lib/nikke-display";
+import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 
 type NikkeRow = {
   id: string;
@@ -209,12 +209,13 @@ export default function RecommendTab({
                             <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
                           )}
                         </div>
+                        <div className="mt-2 text-center text-xs leading-5 text-neutral-200">
+                          {formatNikkeDisplayName(name)}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-
-                <div className="mt-3 text-base font-medium leading-6 text-neutral-100">{formatNikkeDisplayNames(deck.chars)}</div>
 
                 <div className="mt-3 flex items-center justify-between text-base">
                   <div className="text-neutral-300">사용 횟수 {deck.usedCount}회</div>

@@ -410,6 +410,17 @@ export default function HomeTab({
 
     const nextDraft = [...targetDeck.chars];
     nextDraft[target.slotIndex] = nextName;
+
+    const otherRecommendedNames = new Set(
+      best.picked
+        .filter((deck) => deck.id !== target.deckId)
+        .flatMap((deck) => deck.chars)
+    );
+    if (nextDraft.some((name) => otherRecommendedNames.has(name))) {
+      onShowToast("추천 5덱끼리 니케가 겹치면 추천 조합이 깨져");
+      return;
+    }
+
     const saved = await onSubmitDeck({
       draft: nextDraft,
       scoreText: String(targetDeck.score),
