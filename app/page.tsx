@@ -2806,7 +2806,8 @@ export default function Page() {
         {/* Header */}
         <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3 backdrop-blur lg:-mx-8 lg:px-8">
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <h1 className="text-2xl font-semibold lg:text-[1.75rem]">니케 솔로레이드 덱 도우미</h1>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="니케 솔로레이드 덱 도우미" className="h-12 w-auto object-contain lg:h-14" />
 
             <div className="flex flex-col items-end gap-2 lg:flex-row lg:items-center">
               <LoginButton onProfileClick={() => setTab("mypage")} />
