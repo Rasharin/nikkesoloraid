@@ -106,7 +106,6 @@ export default function UsageTab({
   getPublicUrl,
 }: UsageTabProps) {
   const [showWriteForm, setShowWriteForm] = useState(false);
-  const [title, setTitle] = useState("");
   const [blocks, setBlocks] = useState<UsageEditorBlock[]>([createDefaultTextBlock()]);
 
   const activeLabel = tabs.find((tab) => tab.key === activeTab)?.label ?? activeTab;
@@ -118,7 +117,6 @@ export default function UsageTab({
 
   useEffect(() => {
     if (!showWriteForm) return;
-    setTitle(currentPost?.title ?? "");
     setBlocks(toEditorBlocks(currentPost, getPublicUrl));
   }, [currentPost, getPublicUrl, showWriteForm]);
 
@@ -152,7 +150,6 @@ export default function UsageTab({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold text-neutral-100">니케 도우미 사용법</h2>
-            <div className="mt-1 text-sm text-neutral-400">{activeLabel} 관련 사용법을 텍스트와 이미지 블록으로 정리할 수 있어요.</div>
           </div>
 
           {isMaster ? (
@@ -162,7 +159,6 @@ export default function UsageTab({
                 const nextOpen = !showWriteForm;
                 setShowWriteForm(nextOpen);
                 if (nextOpen) {
-                  setTitle(currentPost?.title ?? "");
                   setBlocks(toEditorBlocks(currentPost, getPublicUrl));
                 }
               }}
@@ -193,18 +189,12 @@ export default function UsageTab({
           ))}
         </div>
 
-        {isMaster ? (
-          <div className="mt-3 text-xs text-neutral-500">각 탭은 게시글 1개만 유지되고, 블록 순서대로 본문이 렌더링돼요.</div>
-        ) : null}
-
         {isMaster && showWriteForm ? (
           <UsagePostEditor
-            title={title}
             blocks={blocks}
             activeLabel={activeLabel}
             currentPost={currentPost}
             saving={savingPost}
-            onTitleChange={setTitle}
             onBlocksChange={setBlocks}
             onSubmit={handleSubmit}
             categoryKey={activeTab}

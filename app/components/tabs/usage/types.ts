@@ -16,7 +16,6 @@ export type UsageBlock = TextBlock | ImageBlock;
 export type UsagePost = {
   id: string;
   categoryKey: string;
-  title: string;
   blocks: UsageBlock[];
   userId: string | null;
   createdAt: number;
@@ -44,6 +43,5 @@ export type UsageEditorBlock = UsageEditorTextBlock | UsageEditorImageBlock;
 
 export type UsagePostSubmitPayload = {
   categoryKey: string;
-  title: string;
   blocks: UsageEditorBlock[];
 };

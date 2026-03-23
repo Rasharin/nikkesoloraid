@@ -23,10 +23,7 @@ export default function UsagePostViewer({ post, isMaster, deleting, getPublicUrl
     <article className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/40">
       <div className="border-b border-neutral-800 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-neutral-100">{post.title}</h3>
-            <div className="mt-1 text-xs text-neutral-500">{dateText}</div>
-          </div>
+          <div className="text-xs text-neutral-500">{dateText}</div>
 
           {isMaster ? (
             <button
@@ -53,7 +50,7 @@ export default function UsagePostViewer({ post, isMaster, deleting, getPublicUrl
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={getPublicUrl("usage-board-images", block.imagePath)}
-                  alt={block.caption || post.title}
+                  alt={block.caption || "사용법 이미지"}
                   className="h-auto max-w-full object-cover"
                 />
               </div>

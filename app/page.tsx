@@ -100,7 +100,7 @@ type ContactInquiry = {
 type UsagePostRow = {
   id: string;
   category_key: string;
-  title: string;
+  title: string | null;
   blocks: unknown;
   user_id: string | null;
   created_at: string;
@@ -140,7 +140,6 @@ type AddNikkePayload = {
 };
 type AddUsagePostPayload = {
   categoryKey: string;
-  title: string;
   blocks: UsageEditorBlock[];
 };
 
@@ -584,7 +583,7 @@ function mapUsageBlocks(value: unknown): UsageBlock[] {
 }
 
 function mapUsagePostRow(row: UsagePostRow): UsagePost | null {
-  if (!row?.id || !row.category_key || !row.title || !row.created_at) return null;
+  if (!row?.id || !row.category_key || !row.created_at) return null;
   const createdAt = Date.parse(row.created_at);
   const updatedAt = Date.parse(row.updated_at);
   const blocks = mapUsageBlocks(row.blocks);
@@ -593,7 +592,6 @@ function mapUsagePostRow(row: UsagePostRow): UsagePost | null {
   return {
     id: row.id,
     categoryKey: row.category_key,
-    title: row.title.trim(),
     blocks,
     userId: row.user_id ?? null,
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
@@ -2619,7 +2617,6 @@ export default function Page() {
   }
 
   async function submitUsagePost(payload: AddUsagePostPayload) {
-    const trimmedTitle = payload.title.trim();
     const existingPost = usagePosts[0] ?? null;
 
     if (!isMasterUser) {
@@ -2635,11 +2632,6 @@ export default function Page() {
 
     if (!USAGE_BOARD_TABS.some((tab) => tab.key === payload.categoryKey)) {
       showToast("게시판 탭 정보가 올바르지 않아");
-      return false;
-    }
-
-    if (!trimmedTitle) {
-      showToast("제목을 입력해줘");
       return false;
     }
 
@@ -2676,7 +2668,7 @@ export default function Page() {
           const extension = block.file.name.includes(".")
             ? block.file.name.split(".").pop()?.toLowerCase() ?? "png"
             : "png";
-          imagePath = `${payload.categoryKey}/${slugifyStorageKey(trimmedTitle) || "usage"}/${block.id}-${Date.now()}.${extension}`;
+          imagePath = `${payload.categoryKey}/usage-blocks/${block.id}-${Date.now()}.${extension}`;
 
           const { error: uploadError } = await supabase.storage
             .from("usage-board-images")
@@ -2708,7 +2700,7 @@ export default function Page() {
         const response = await supabase
           .from(USAGE_POSTS_TABLE)
           .update({
-            title: trimmedTitle,
+            title: null,
             blocks: nextBlocks,
             user_id: currentUserId,
             updated_at: new Date().toISOString(),
@@ -2724,7 +2716,7 @@ export default function Page() {
           .from(USAGE_POSTS_TABLE)
           .insert({
             category_key: payload.categoryKey,
-            title: trimmedTitle,
+            title: null,
             blocks: nextBlocks,
             user_id: currentUserId,
           })

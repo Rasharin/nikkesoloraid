@@ -4,12 +4,10 @@ import UsageBlockEditor from "./UsageBlockEditor";
 import type { UsageEditorBlock, UsagePost, UsagePostSubmitPayload } from "./types";
 
 type UsagePostEditorProps = {
-  title: string;
   blocks: UsageEditorBlock[];
   activeLabel: string;
   currentPost: UsagePost | null;
   saving: boolean;
-  onTitleChange: (value: string) => void;
   onBlocksChange: (blocks: UsageEditorBlock[]) => void;
   onSubmit: (payload: UsagePostSubmitPayload) => Promise<void>;
   categoryKey: string;
@@ -42,12 +40,10 @@ function insertAfter(blocks: UsageEditorBlock[], index: number, block: UsageEdit
 }
 
 export default function UsagePostEditor({
-  title,
   blocks,
   activeLabel,
   currentPost,
   saving,
-  onTitleChange,
   onBlocksChange,
   onSubmit,
   categoryKey,
@@ -74,21 +70,12 @@ export default function UsagePostEditor({
   async function handleSubmit() {
     await onSubmit({
       categoryKey,
-      title,
       blocks,
     });
   }
 
   return (
     <div className="mt-4 space-y-4 rounded-2xl border border-neutral-800 bg-neutral-950/50 p-4">
-      <input
-        value={title}
-        onChange={(event) => onTitleChange(event.target.value)}
-        placeholder={`${activeLabel} 게시글 제목`}
-        disabled={saving}
-        className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/70 px-4 py-3 text-sm text-neutral-100 outline-none disabled:opacity-60"
-      />
-
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -128,7 +115,7 @@ export default function UsagePostEditor({
 
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs text-neutral-500">
-          {currentPost ? "기존 글을 이어서 수정하고 있어요." : "기본 텍스트 블록 1개로 시작해요."}
+          {currentPost ? `${activeLabel} 사용법을 이어서 수정하고 있어요.` : "기본 텍스트 블록 1개로 시작해요."}
         </div>
         <button
           type="button"
@@ -136,7 +123,7 @@ export default function UsagePostEditor({
           disabled={saving}
           className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm text-neutral-100 disabled:opacity-50"
         >
-          {saving ? "저장 중.." : currentPost ? "게시글 업데이트" : "게시글 저장"}
+          {saving ? "저장 중.." : currentPost ? "사용법 업데이트" : "사용법 저장"}
         </button>
       </div>
     </div>

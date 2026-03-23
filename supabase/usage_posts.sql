@@ -1,12 +1,18 @@
 create table if not exists public.usage_posts (
   id uuid primary key default gen_random_uuid(),
   category_key text not null,
-  title text not null,
+  title text,
   blocks jsonb not null default '[]'::jsonb,
   user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.usage_posts
+  add column if not exists title text;
+
+alter table public.usage_posts
+  alter column title drop not null;
 
 alter table public.usage_posts
   add column if not exists blocks jsonb not null default '[]'::jsonb;
