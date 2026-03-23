@@ -27,7 +27,7 @@ export default function ContactTab({ onSubmitInquiry }: ContactTabProps) {
     <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
       <h2 className="text-lg font-semibold">문의하기</h2>
       <div className="mt-1 text-sm text-neutral-400">
-        불편한 점이나 추가했으면 하는 기능을 남겨주세요. 마스터 계정 마이페이지에서 확인합니다.
+        불편한 점이나 추가했으면 하는 기능을 남겨주세요.
       </div>
 
       <textarea
