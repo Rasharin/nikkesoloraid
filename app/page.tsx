@@ -7,6 +7,7 @@ import RecommendTab from "./components/tabs/RecommendTab";
 import SavedTab from "./components/tabs/SavedTab";
 import SettingsTab from "./components/tabs/SettingsTab";
 import ContactTab from "./components/tabs/ContactTab";
+import UsageTab from "./components/tabs/UsageTab";
 import { supabase } from "../lib/supabase";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
 const btnClass = (selected: boolean) =>
@@ -95,6 +96,25 @@ type ContactInquiry = {
   createdAt: number;
   source: "remote" | "local";
 };
+type UsagePostRow = {
+  id: string;
+  category_key: string;
+  title: string;
+  content: string;
+  image_path: string;
+  user_id: string | null;
+  created_at: string;
+};
+type UsagePost = {
+  id: string;
+  categoryKey: string;
+  title: string;
+  content: string;
+  imagePath: string;
+  userId: string | null;
+  createdAt: number;
+  source: "remote";
+};
 type AppConfigRow = {
   master_user_id: string | null;
   active_raid_key: string | null;
@@ -125,6 +145,12 @@ type AddNikkePayload = {
   element: NikkeElement;
   role: NikkeRole;
   aliases: string[];
+  imageFile: File | null;
+};
+type AddUsagePostPayload = {
+  categoryKey: string;
+  title: string;
+  content: string;
   imageFile: File | null;
 };
 
@@ -166,9 +192,16 @@ const roles = [
   { v: "defender", label: "방어형" },
 ] as const;
 
-type TabKey = "home" | "saved" | "recommend" | "settings" | "contact" | "mypage";
+type TabKey = "home" | "saved" | "recommend" | "usage" | "settings" | "contact" | "mypage";
+type UsageBoardCategoryKey = "home" | "saved" | "recommend" | "settings";
 const DEFAULT_DECK_TABS: DeckTabItem[] = [];
 const DEFAULT_ACTIVE_RAID_KEY = null;
+const USAGE_BOARD_TABS: ReadonlyArray<{ key: UsageBoardCategoryKey; label: string }> = [
+  { key: "home", label: "홈" },
+  { key: "saved", label: "저장된 덱" },
+  { key: "recommend", label: "추천" },
+  { key: "settings", label: "설정" },
+];
 
 // -------------------- Constants --------------------
 const SELECTED_KEY = "soloraid_selected_nikkes_v2";
@@ -184,6 +217,7 @@ const DEV_LOCAL_TIP_USER_ID = "__dev_local_tip_user__";
 const CONTACT_INQUIRIES_TABLE = "contact_inquiries";
 const LOCAL_CONTACT_INQUIRIES_KEY = "soloraid_local_contact_inquiries_v1";
 const SCORE_DISPLAY_MODE_KEY = "soloraid_score_display_mode_v1";
+const USAGE_POSTS_TABLE = "usage_posts";
 
 const MAX_SELECTED = 50;
 const MAX_DECK_CHARS = 5;
@@ -364,7 +398,7 @@ function pickBest5(decks: Deck[]): { picked: Deck[]; total: number } {
   return { picked, total: Math.max(0, bestTotal) };
 }
 
-function getPublicUrl(bucket: "nikke-images" | "boss-images", path: string) {
+function getPublicUrl(bucket: "nikke-images" | "boss-images" | "usage-board-images", path: string) {
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }
@@ -519,6 +553,22 @@ function mapContactInquiryRow(row: ContactInquiryRow): ContactInquiry | null {
   return {
     id: row.id,
     content: row.content.trim(),
+    userId: row.user_id ?? null,
+    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+    source: "remote",
+  };
+}
+
+function mapUsagePostRow(row: UsagePostRow): UsagePost | null {
+  if (!row?.id || !row.category_key || !row.title || !row.content || !row.image_path || !row.created_at) return null;
+
+  const createdAt = Date.parse(row.created_at);
+  return {
+    id: row.id,
+    categoryKey: row.category_key,
+    title: row.title.trim(),
+    content: row.content.trim(),
+    imagePath: row.image_path,
     userId: row.user_id ?? null,
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
     source: "remote",
@@ -811,9 +861,29 @@ function ContactIcon({ active }: { active: boolean }) {
   );
 }
 
+function UsageIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4 6.5A2.5 2.5 0 0 1 6.5 4H12v14H6.5A2.5 2.5 0 0 0 4 20.5v-14Z"
+        stroke={active ? "white" : "#a3a3a3"}
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M20 6.5A2.5 2.5 0 0 0 17.5 4H12v14h5.5a2.5 2.5 0 0 1 2.5 2.5v-14Z"
+        stroke={active ? "white" : "#a3a3a3"}
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 // -------------------- Page --------------------
 export default function Page() {
   const [tab, setTab] = useState<TabKey>("home");
+  const [usageBoardTab, setUsageBoardTab] = useState<UsageBoardCategoryKey>("home");
   const [deckTabs, setDeckTabs] = useState<DeckTabItem[]>(DEFAULT_DECK_TABS);
 
   // decks (Supabase)
@@ -855,6 +925,8 @@ export default function Page() {
   const [loadingSoloRaidTips, setLoadingSoloRaidTips] = useState(false);
   const [contactInquiries, setContactInquiries] = useState<ContactInquiry[]>([]);
   const [loadingContactInquiries, setLoadingContactInquiries] = useState(false);
+  const [usagePosts, setUsagePosts] = useState<UsagePost[]>([]);
+  const [loadingUsagePosts, setLoadingUsagePosts] = useState(false);
   const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>("number");
 
   async function fetchUserDecks(currentUserId: string) {
@@ -915,6 +987,17 @@ export default function Page() {
     return ((data ?? []) as ContactInquiryRow[])
       .map(mapContactInquiryRow)
       .filter((inquiry): inquiry is ContactInquiry => inquiry !== null);
+  }
+
+  async function fetchUsagePosts(categoryKey: UsageBoardCategoryKey) {
+    const { data, error } = await supabase
+      .from(USAGE_POSTS_TABLE)
+      .select("id,category_key,title,content,image_path,user_id,created_at")
+      .eq("category_key", categoryKey)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return ((data ?? []) as UsagePostRow[]).map(mapUsagePostRow).filter((post): post is UsagePost => post !== null);
   }
 
   async function syncLocalDecksToAccount(currentUserId: string) {
@@ -1185,6 +1268,36 @@ export default function Page() {
       cancelled = true;
     };
   }, [isMasterUser, userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadUsagePosts() {
+      setLoadingUsagePosts(true);
+      try {
+        const posts = await fetchUsagePosts(usageBoardTab);
+        if (!cancelled) {
+          setUsagePosts(posts);
+        }
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setUsagePosts([]);
+          showToast("사용법 게시글 불러오기 실패");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingUsagePosts(false);
+        }
+      }
+    }
+
+    void loadUsagePosts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [usageBoardTab]);
 
   // selected 목록만 localStorage 사용
   useEffect(() => {
@@ -2464,6 +2577,126 @@ export default function Page() {
     }
   }
 
+  async function submitUsagePost(payload: AddUsagePostPayload) {
+    const trimmedTitle = payload.title.trim();
+    const trimmedContent = payload.content.trim();
+    const imageFile = payload.imageFile;
+
+    if (!isMasterUser) {
+      showToast("마스터 계정만 작성 가능");
+      return false;
+    }
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 작성 가능");
+      return false;
+    }
+
+    if (!USAGE_BOARD_TABS.some((tab) => tab.key === payload.categoryKey)) {
+      showToast("게시판 탭 정보가 올바르지 않아");
+      return false;
+    }
+
+    if (!trimmedTitle) {
+      showToast("제목을 입력해줘");
+      return false;
+    }
+
+    if (!trimmedContent) {
+      showToast("내용을 입력해줘");
+      return false;
+    }
+
+    if (!imageFile) {
+      showToast("이미지를 선택해줘");
+      return false;
+    }
+
+    const extension = imageFile.name.includes(".")
+      ? imageFile.name.split(".").pop()?.toLowerCase() ?? "png"
+      : "png";
+    const imagePath = `${payload.categoryKey}/${slugifyStorageKey(trimmedTitle) || "usage"}-${Date.now()}.${extension}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("usage-board-images")
+        .upload(imagePath, imageFile, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data, error } = await supabase
+        .from(USAGE_POSTS_TABLE)
+        .insert({
+          category_key: payload.categoryKey,
+          title: trimmedTitle,
+          content: trimmedContent,
+          image_path: imagePath,
+          user_id: currentUserId,
+        })
+        .select("id,category_key,title,content,image_path,user_id,created_at")
+        .single();
+
+      if (error) throw error;
+
+      const inserted = mapUsagePostRow(data as UsagePostRow);
+      if (!inserted) throw new Error("Invalid usage post row");
+
+      if (inserted.categoryKey === usageBoardTab) {
+        setUsagePosts((prev) => [inserted, ...prev]);
+      }
+
+      showToast("사용법 게시글 등록 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("사용법 게시글 등록 실패");
+      return false;
+    }
+  }
+
+  async function deleteUsagePost(id: string) {
+    if (!isMasterUser) {
+      showToast("마스터 계정만 삭제 가능");
+      return false;
+    }
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 삭제 가능");
+      return false;
+    }
+
+    try {
+      const target = usagePosts.find((post) => post.id === id) ?? null;
+
+      const { error } = await supabase
+        .from(USAGE_POSTS_TABLE)
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      if (target?.imagePath) {
+        const { error: storageError } = await supabase.storage.from("usage-board-images").remove([target.imagePath]);
+        if (storageError) {
+          console.error(storageError);
+        }
+      }
+
+      setUsagePosts((prev) => prev.filter((post) => post.id !== id));
+      showToast("사용법 게시글 삭제 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("사용법 게시글 삭제 실패");
+      return false;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-50">
       <div className="mx-auto max-w-xl px-4 pb-28 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
@@ -2612,6 +2845,22 @@ export default function Page() {
           </div>
         )}
 
+        {tab === "usage" && (
+          <div className="mx-auto w-full lg:max-w-4xl">
+            <UsageTab
+              tabs={USAGE_BOARD_TABS}
+              activeTab={usageBoardTab}
+              onTabChange={(key) => setUsageBoardTab(key as UsageBoardCategoryKey)}
+              posts={usagePosts}
+              loadingPosts={loadingUsagePosts}
+              isMaster={isMaster}
+              onSubmitPost={submitUsagePost}
+              onDeletePost={deleteUsagePost}
+              getPublicUrl={getPublicUrl}
+            />
+          </div>
+        )}
+
         {tab === "contact" && (
           <div className="mx-auto w-full lg:max-w-2xl">
             <ContactTab onSubmitInquiry={submitContactInquiry} />
@@ -2670,6 +2919,14 @@ export default function Page() {
           >
             <RecommendIcon active={tab === "recommend"} />
             <div className={tab === "recommend" ? "text-white" : "text-neutral-400"}>추천</div>
+          </button>
+
+          <button
+            onClick={() => setTab("usage")}
+            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
+          >
+            <UsageIcon active={tab === "usage"} />
+            <div className={tab === "usage" ? "text-white" : "text-neutral-400"}>사용법</div>
           </button>
 
           <button
