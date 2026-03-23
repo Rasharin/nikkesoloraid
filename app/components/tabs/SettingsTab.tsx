@@ -10,6 +10,7 @@ type NikkeRow = {
   burst: number | null;
   element: string | null;
   role: string | null;
+  aliases: string[];
 };
 
 type ToggleValue = string | number;
@@ -201,10 +202,14 @@ export default function SettingsTab({
   const [allNikkesOpen, setAllNikkesOpen] = useState(true);
 
   const filteredNikkes = useMemo(() => {
-    const query = q.trim();
+    const query = q.trim().toLowerCase();
 
     return nikkes.filter((nikke) => {
-      if (query && !nikke.name.includes(query)) return false;
+      if (query) {
+        const matchesName = nikke.name.toLowerCase().includes(query);
+        const matchesAlias = nikke.aliases.some((alias) => alias.toLowerCase().includes(query));
+        if (!matchesName && !matchesAlias) return false;
+      }
 
       if (selectedBursts.size > 0) {
         const burst = nikke.burst ?? -1;

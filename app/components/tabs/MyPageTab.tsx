@@ -43,6 +43,7 @@ type MyPageTabProps = {
     burst: number | null;
     element: NikkeElementValue;
     role: NikkeRoleValue;
+    aliases: string[];
     imageFile: File | null;
   }) => Promise<boolean>;
   elements: readonly FilterOption[];
@@ -96,6 +97,7 @@ export default function MyPageTab({
   const [nikkeBurst, setNikkeBurst] = useState<number | null>(null);
   const [nikkeElement, setNikkeElement] = useState<NikkeElementValue>(null);
   const [nikkeRole, setNikkeRole] = useState<NikkeRoleValue>(null);
+  const [nikkeAliases, setNikkeAliases] = useState("");
   const [nikkeImageFile, setNikkeImageFile] = useState<File | null>(null);
   const [nikkeImageInputKey, setNikkeImageInputKey] = useState(0);
   const [savingNikke, setSavingNikke] = useState(false);
@@ -142,6 +144,10 @@ export default function MyPageTab({
         burst: nikkeBurst,
         element: nikkeElement,
         role: nikkeRole,
+        aliases: nikkeAliases
+          .split(",")
+          .map((alias) => alias.trim())
+          .filter((alias, index, list) => alias.length > 0 && list.indexOf(alias) === index),
         imageFile: nikkeImageFile,
       });
       if (!saved) return;
@@ -149,6 +155,7 @@ export default function MyPageTab({
       setNikkeBurst(null);
       setNikkeElement(null);
       setNikkeRole(null);
+      setNikkeAliases("");
       setNikkeImageFile(null);
       setNikkeImageInputKey((prev) => prev + 1);
     } finally {
@@ -235,6 +242,13 @@ export default function MyPageTab({
                     value={nikkeName}
                     onChange={(event) => setNikkeName(event.target.value)}
                     placeholder="니케 이름"
+                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                  />
+
+                  <input
+                    value={nikkeAliases}
+                    onChange={(event) => setNikkeAliases(event.target.value)}
+                    placeholder="aliases (comma separated)"
                     className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                   />
 

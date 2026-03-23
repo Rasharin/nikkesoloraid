@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { formatNikkeDisplayNames } from "../../../lib/nikke-display";
 
 type NikkeRow = {
@@ -23,13 +24,30 @@ type RecommendTabItem = {
   readonly label: string;
 };
 
+type SoloRaidTip = {
+  id: string;
+  content: string;
+  userId: string | null;
+  createdAt: number;
+  source: "remote" | "local";
+};
+
 type RecommendTabProps = {
   raidLabel: string;
+  raidKey: string;
   deckTabs: readonly RecommendTabItem[];
   recommendDeckTab: string;
   onRecommendDeckTabChange: (key: string) => void;
   recommendedDecks: RecommendedDeck[];
   videoEmbedUrl: string | null;
+  tips: SoloRaidTip[];
+  loadingTips: boolean;
+  currentUserId: string | null;
+  canWriteTips: boolean;
+  editorUserId: string | null;
+  onSubmitTip: (payload: { content: string }) => Promise<boolean>;
+  onUpdateTip: (payload: { id: string; content: string }) => Promise<boolean>;
+  onDeleteTip: (id: string) => Promise<boolean>;
   nikkeMap: Map<string, NikkeRow>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   fmt: (value: number) => string;
@@ -37,22 +55,116 @@ type RecommendTabProps = {
 
 export default function RecommendTab({
   raidLabel,
+  raidKey,
   deckTabs,
   recommendDeckTab,
   onRecommendDeckTabChange,
   recommendedDecks,
   videoEmbedUrl,
+  tips,
+  loadingTips,
+  currentUserId,
+  canWriteTips,
+  editorUserId,
+  onSubmitTip,
+  onUpdateTip,
+  onDeleteTip,
   nikkeMap,
   getPublicUrl,
   fmt,
 }: RecommendTabProps) {
+  const [showWriteForm, setShowWriteForm] = useState(false);
+  const [tipContent, setTipContent] = useState("");
+  const [savingTip, setSavingTip] = useState(false);
+  const [openedTipId, setOpenedTipId] = useState<string | null>(null);
+  const [editingTipId, setEditingTipId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingTipId, setDeletingTipId] = useState<string | null>(null);
+
+  const tipDateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("ko-KR", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    []
+  );
+
+  async function handleSubmitTip() {
+    if (savingTip || !canWriteTips) return;
+
+    setSavingTip(true);
+    try {
+      const saved = await onSubmitTip({
+        content: tipContent,
+      });
+      if (!saved) return;
+      setTipContent("");
+      setShowWriteForm(false);
+    } finally {
+      setSavingTip(false);
+    }
+  }
+
+  function handleTipClick(tip: SoloRaidTip) {
+    if (tip.userId !== editorUserId) return;
+    setOpenedTipId((prev) => (prev === tip.id ? null : tip.id));
+    if (editingTipId !== tip.id) return;
+    setEditingTipId(null);
+    setEditingContent("");
+  }
+
+  function startEditingTip(tip: SoloRaidTip) {
+    setOpenedTipId(tip.id);
+    setEditingTipId(tip.id);
+    setEditingContent(tip.content);
+  }
+
+  async function handleSaveTipEdit(tipId: string) {
+    if (savingEdit) return;
+
+    setSavingEdit(true);
+    try {
+      const saved = await onUpdateTip({
+        id: tipId,
+        content: editingContent,
+      });
+      if (!saved) return;
+      setEditingTipId(null);
+      setEditingContent("");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function handleDeleteTip(tipId: string) {
+    if (deletingTipId) return;
+
+    setDeletingTipId(tipId);
+    try {
+      const deleted = await onDeleteTip(tipId);
+      if (!deleted) return;
+      setOpenedTipId((prev) => (prev === tipId ? null : prev));
+      if (editingTipId === tipId) {
+        setEditingTipId(null);
+        setEditingContent("");
+      }
+    } finally {
+      setDeletingTipId(null);
+    }
+  }
+
   return (
-    <div className="grid gap-2 lg:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)]">
+    <div className="grid gap-2 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
       <section className="order-2 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 lg:order-1">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">추천</h2>
-            <div className="text-sm text-neutral-400">{raidLabel} 기준 추천 덱입니다.</div>
+            <div className="text-sm text-neutral-400">{raidLabel} 기준 추천 조합입니다.</div>
           </div>
           <div className="text-xs text-neutral-400">{recommendedDecks.length}개</div>
         </div>
@@ -77,7 +189,7 @@ export default function RecommendTab({
         <div className="mt-4 grid gap-3">
           {recommendedDecks.length === 0 ? (
             <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-300">
-              추천 덱이 없습니다.
+              추천 조합이 없습니다.
             </div>
           ) : (
             recommendedDecks.map((deck) => (
@@ -114,25 +226,188 @@ export default function RecommendTab({
         </div>
       </section>
 
-      {videoEmbedUrl ? (
-        <section className="order-1 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 lg:order-2">
-          <div className="mb-2 text-sm font-semibold text-neutral-100">추천 영상</div>
-          <div className="aspect-video overflow-hidden rounded-2xl border border-neutral-800 bg-black">
-            <iframe
-              src={videoEmbedUrl}
-              title="추천 영상"
-              className="h-full w-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+      <div className="order-1 space-y-2 lg:order-2">
+        {videoEmbedUrl ? (
+          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
+            <div className="mb-2 text-sm font-semibold text-neutral-100">추천 영상</div>
+            <div className="aspect-video overflow-hidden rounded-2xl border border-neutral-800 bg-black">
+              <iframe
+                src={videoEmbedUrl}
+                title="추천 영상"
+                className="h-full w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </section>
+        ) : (
+          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+            <div className="mb-2 text-sm font-semibold text-neutral-100">추천 영상</div>
+            <div className="text-sm text-neutral-400">등록된 추천 영상이 없습니다.</div>
+          </section>
+        )}
+
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-neutral-100">솔레 팁</h3>
+              <div className="mt-1 text-xs text-neutral-400">{raidLabel} 게시판</div>
+            </div>
+            <div className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">{tips.length}개 글</div>
+          </div>
+
+          <div className="mt-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2">
+                {deckTabs.map((tab) => (
+                  <button
+                    key={`tip-${tab.key}`}
+                    type="button"
+                    onClick={() => onRecommendDeckTabChange(tab.key)}
+                    className={`rounded-xl border px-3 py-1 text-sm transition ${
+                      recommendDeckTab === tab.key
+                        ? "border-white bg-white text-black"
+                        : "border-neutral-700 bg-transparent text-neutral-200 hover:border-neutral-400"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {canWriteTips ? (
+                <button
+                  type="button"
+                  onClick={() => setShowWriteForm((prev) => !prev)}
+                  className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99]"
+                >
+                  {showWriteForm ? "닫기" : "글쓰기"}
+                </button>
+              ) : null}
+            </div>
+
+            {canWriteTips ? (
+              <>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <div className="text-xs text-neutral-400">
+                    {currentUserId ? "로그인한 사용자는 글을 작성할 수 있습니다." : "로컬 개발 환경 테스트용 글쓰기입니다."}
+                  </div>
+                </div>
+
+                {showWriteForm ? (
+                  <div className="mt-3 space-y-2">
+                    <textarea
+                      value={tipContent}
+                      onChange={(event) => setTipContent(event.target.value)}
+                      placeholder={`${raidKey} 기준 공략, 패턴, 조합 팁을 적어주세요.`}
+                      disabled={savingTip}
+                      className="h-32 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/60 px-4 py-3 text-sm outline-none disabled:opacity-60"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => void handleSubmitTip()}
+                        disabled={savingTip}
+                        className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
+                      >
+                        {savingTip ? "저장 중..." : "저장"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="text-xs text-neutral-400">비로그인 상태에서는 게시글 읽기만 가능합니다.</div>
+            )}
+          </div>
+
+          <div className="mt-3 space-y-3">
+            {loadingTips ? (
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
+                게시글 불러오는 중...
+              </div>
+            ) : tips.length === 0 ? (
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
+                아직 등록된 솔레 팁이 없습니다.
+              </div>
+            ) : (
+              tips.map((tip) => {
+                const isMine = Boolean(editorUserId) && tip.userId === editorUserId;
+                const isOpened = openedTipId === tip.id;
+                const isEditing = editingTipId === tip.id;
+
+                return (
+                  <article
+                    key={tip.id}
+                    onClick={() => handleTipClick(tip)}
+                    className={`rounded-2xl border bg-neutral-950/40 p-4 ${isMine ? "cursor-pointer border-neutral-700" : "border-neutral-800"}`}
+                  >
+                    {isEditing ? (
+                      <div className="space-y-2" onClick={(event) => event.stopPropagation()}>
+                        <textarea
+                          value={editingContent}
+                          onChange={(event) => setEditingContent(event.target.value)}
+                          placeholder="내용"
+                          disabled={savingEdit}
+                          className="h-32 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/60 px-4 py-3 text-sm outline-none disabled:opacity-60"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingTipId(null);
+                              setEditingContent("");
+                            }}
+                            className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99]"
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleSaveTipEdit(tip.id)}
+                            disabled={savingEdit}
+                            className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99] disabled:opacity-50"
+                          >
+                            {savingEdit ? "저장 중..." : "저장"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-xs text-neutral-400">
+                          {tipDateFormatter.format(new Date(tip.createdAt))}
+                          {isMine ? " · 내 글" : ""}
+                        </div>
+                        <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-200">{tip.content}</div>
+
+                        {isMine && isOpened ? (
+                          <div className="mt-3 flex justify-end gap-2" onClick={(event) => event.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => startEditingTip(tip)}
+                              className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99]"
+                            >
+                              수정
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteTip(tip.id)}
+                              disabled={deletingTipId === tip.id}
+                              className="rounded-2xl border border-red-800/70 px-4 py-2 text-sm text-red-300 active:scale-[0.99] disabled:opacity-50"
+                            >
+                              {deletingTipId === tip.id ? "삭제 중..." : "삭제"}
+                            </button>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                  </article>
+                );
+              })
+            )}
           </div>
         </section>
-      ) : (
-        <section className="order-1 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 lg:order-2">
-          <div className="mb-2 text-sm font-semibold text-neutral-100">추천 영상</div>
-          <div className="text-sm text-neutral-400">등록된 추천 영상이 없습니다.</div>
-        </section>
-      )}
+      </div>
     </div>
   );
 }

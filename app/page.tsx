@@ -65,6 +65,23 @@ type SiteSettingRow = {
   updated_at: string | null;
   updated_by: string | null;
 };
+type SoloRaidTipRow = {
+  id: string;
+  raid_key: string;
+  content: string;
+  author_name: string | null;
+  user_id: string | null;
+  created_at: string;
+};
+type SoloRaidTip = {
+  id: string;
+  raidKey: string;
+  content: string;
+  authorName: string;
+  userId: string | null;
+  createdAt: number;
+  source: "remote" | "local";
+};
 type AppConfigRow = {
   master_user_id: string | null;
   active_raid_key: string | null;
@@ -94,6 +111,7 @@ type AddNikkePayload = {
   burst: number | null;
   element: NikkeElement;
   role: NikkeRole;
+  aliases: string[];
   imageFile: File | null;
 };
 
@@ -108,6 +126,7 @@ type NikkeRow = {
   burst: number | null;
   element: NikkeElement;
   role: NikkeRole;
+  aliases: string[];
 };
 
 type BossRow = {
@@ -146,6 +165,9 @@ const LOCAL_FAVORITES_KEY = "soloraid_favorite_nikkes_v1";
 const FAVORITES_TABLE = "favorite_nikkes";
 const SITE_SETTINGS_TABLE = "site_settings";
 const RECOMMENDED_VIDEO_KEY = "recommended_video_url";
+const SOLO_RAID_TIPS_TABLE = "solo_raid_tips";
+const LOCAL_TIPS_KEY = "soloraid_local_tips_v1";
+const DEV_LOCAL_TIP_USER_ID = "__dev_local_tip_user__";
 
 const MAX_SELECTED = 50;
 const MAX_DECK_CHARS = 5;
@@ -153,6 +175,10 @@ const MAX_DECK_CHARS = 5;
 // -------------------- Utils --------------------
 function fmt(n: number) {
   return n.toLocaleString("en-US");
+}
+
+function createLocalTipId() {
+  return `local-tip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function slugifyRaidLabel(label: string) {
@@ -223,6 +249,32 @@ function splitCharsFlexible(input: string): string[] {
     .split("/")
     .map((v) => v.trim())
     .filter(Boolean);
+}
+
+function normalizeAliases(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function resolveDeckChars(chars: string[], nikkeNameLookup: Map<string, string>): string[] | null {
+  const resolved = chars.map((char) => nikkeNameLookup.get(normToken(char)) ?? char.trim());
+  if (resolved.some((char) => !char)) return null;
+  if (new Set(resolved).size !== MAX_DECK_CHARS) return null;
+  return resolved;
+}
+
+function compareNikkeNamePriority(a: NikkeRow, b: NikkeRow): number {
+  const aHasParentheses = /[()]/.test(a.name);
+  const bHasParentheses = /[()]/.test(b.name);
+
+  if (aHasParentheses !== bHasParentheses) {
+    return aHasParentheses ? 1 : -1;
+  }
+
+  return a.name.localeCompare(b.name);
 }
 
 function deckCharSet(chars: string[]): Set<string> {
@@ -431,6 +483,64 @@ function mapLocalDeck(value: unknown): Deck | null {
     score,
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
   };
+}
+
+function mapSoloRaidTipRow(row: SoloRaidTipRow): SoloRaidTip | null {
+  if (!row?.id || !row.raid_key || !row.content || !row.created_at) return null;
+
+  const createdAt = Date.parse(row.created_at);
+  return {
+    id: row.id,
+    raidKey: row.raid_key,
+    content: row.content.trim(),
+    authorName: (row.author_name ?? "").trim() || "사용자",
+    userId: row.user_id ?? null,
+    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+    source: "remote",
+  };
+}
+
+function loadLocalTips(): SoloRaidTip[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_TIPS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown[];
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item): SoloRaidTip | null => {
+        if (!item || typeof item !== "object") return null;
+        const candidate = item as Record<string, unknown>;
+        if (
+          typeof candidate.id !== "string" ||
+          typeof candidate.raidKey !== "string" ||
+          typeof candidate.content !== "string" ||
+          typeof candidate.authorName !== "string" ||
+          typeof candidate.createdAt !== "number"
+        ) {
+          return null;
+        }
+
+        return {
+          id: candidate.id,
+          raidKey: candidate.raidKey,
+          content: candidate.content,
+          authorName: candidate.authorName,
+          userId: typeof candidate.userId === "string" ? candidate.userId : null,
+          createdAt: candidate.createdAt,
+          source: "local" as const,
+        };
+      })
+      .filter((tip): tip is SoloRaidTip => tip !== null);
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalTips(tips: SoloRaidTip[]) {
+  try {
+    localStorage.setItem(LOCAL_TIPS_KEY, JSON.stringify(tips));
+  } catch { }
 }
 
 function loadLocalDecks(): Deck[] {
@@ -666,6 +776,8 @@ export default function Page() {
   const [recommendationHistory, setRecommendationHistory] = useState<Record<string, RecommendationRecord>>({});
   const [recommendationLoaded, setRecommendationLoaded] = useState(false);
   const [recommendedVideoUrl, setRecommendedVideoUrl] = useState<string>("");
+  const [soloRaidTips, setSoloRaidTips] = useState<SoloRaidTip[]>([]);
+  const [loadingSoloRaidTips, setLoadingSoloRaidTips] = useState(false);
 
   async function fetchUserDecks(currentUserId: string) {
     const { data, error } = await supabase
@@ -702,6 +814,17 @@ export default function Page() {
 
     if (error) throw error;
     return ((data as SiteSettingRow | null)?.value ?? "").trim();
+  }
+
+  async function fetchSoloRaidTips(raidKey: string) {
+    const { data, error } = await supabase
+      .from(SOLO_RAID_TIPS_TABLE)
+      .select("id,raid_key,content,author_name,user_id,created_at")
+      .eq("raid_key", raidKey)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return ((data ?? []) as SoloRaidTipRow[]).map(mapSoloRaidTipRow).filter((tip): tip is SoloRaidTip => tip !== null);
   }
 
   async function syncLocalDecksToAccount(currentUserId: string) {
@@ -842,6 +965,51 @@ export default function Page() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSoloRaidTips() {
+      if (!activeRaidKey) {
+        setSoloRaidTips([]);
+        return;
+      }
+
+      setLoadingSoloRaidTips(true);
+      try {
+        const localTips = loadLocalTips()
+          .filter((tip) => tip.raidKey === activeRaidKey)
+          .sort((a, b) => b.createdAt - a.createdAt);
+
+        if (process.env.NODE_ENV !== "production" && !userId) {
+          if (!cancelled) {
+            setSoloRaidTips(localTips);
+          }
+          return;
+        }
+
+        const remoteTips = await fetchSoloRaidTips(activeRaidKey);
+        if (cancelled) return;
+        setSoloRaidTips(process.env.NODE_ENV !== "production" ? [...localTips, ...remoteTips] : remoteTips);
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setSoloRaidTips(loadLocalTips().filter((tip) => tip.raidKey === activeRaidKey).sort((a, b) => b.createdAt - a.createdAt));
+          showToast("솔레 팁 불러오기 실패");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingSoloRaidTips(false);
+        }
+      }
+    }
+
+    void loadSoloRaidTips();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeRaidKey, userId]);
 
   useEffect(() => {
     if (!userId) {
@@ -1047,14 +1215,19 @@ export default function Page() {
     try {
       const { data: nikkeData, error: nikkeErr } = await supabase
         .from("nikkes")
-        .select("id,name,image_path,created_at,burst,element,role")
+        .select("id,name,image_path,created_at,burst,element,role,aliases")
         .order("name", { ascending: true });
 
       if (nikkeErr) {
         console.error(nikkeErr);
         showToast("니케 목록 불러오기 실패");
       } else {
-        setnikkes((nikkeData ?? []) as NikkeRow[]);
+        setnikkes(
+          ((nikkeData ?? []) as Array<Omit<NikkeRow, "aliases"> & { aliases?: unknown }>).map((nikke) => ({
+            ...nikke,
+            aliases: normalizeAliases(nikke.aliases),
+          }))
+        );
       }
 
       const bossSource = (forceSoloRaidActive ?? soloRaidActive) ? "bosses" : "boss_default";
@@ -1116,6 +1289,29 @@ export default function Page() {
     const m = new Map<string, NikkeRow>();
     for (const n of nikkes) m.set(n.name, n);
     return m;
+  }, [nikkes]);
+
+  const nikkeNameLookup = useMemo(() => {
+    const lookup = new Map<string, string>();
+    const prioritizedNikkes = [...nikkes].sort(compareNikkeNamePriority);
+
+    for (const nikke of prioritizedNikkes) {
+      const canonicalKey = normToken(nikke.name);
+      if (canonicalKey && !lookup.has(canonicalKey)) {
+        lookup.set(canonicalKey, nikke.name);
+      }
+    }
+
+    for (const nikke of prioritizedNikkes) {
+      for (const alias of nikke.aliases) {
+        const aliasKey = normToken(alias);
+        if (aliasKey && !lookup.has(aliasKey)) {
+          lookup.set(aliasKey, nikke.name);
+        }
+      }
+    }
+
+    return lookup;
   }, [nikkes]);
 
   const selectednikkes = useMemo(() => {
@@ -1475,7 +1671,13 @@ export default function Page() {
   }
 
   async function submitBulkFromHome(text: string) {
-    const parsed = parseBulk(text);
+    const parsed = parseBulk(text)
+      .map((entry) => {
+        const chars = resolveDeckChars(entry.chars, nikkeNameLookup);
+        return chars ? { ...entry, chars } : null;
+      })
+      .filter((entry): entry is { chars: string[]; score: number } => entry !== null);
+
     if (parsed.length === 0) {
       showToast("맞는 덱이 없음.");
       return false;
@@ -1653,6 +1855,7 @@ export default function Page() {
 
   async function addNikke(payload: AddNikkePayload) {
     const trimmedName = payload.name.trim();
+    const aliases = Array.from(new Set(payload.aliases.map((alias) => alias.trim()).filter(Boolean)));
     const imageFile = payload.imageFile;
 
     if (!isMaster) {
@@ -1703,6 +1906,7 @@ export default function Page() {
           burst: payload.burst,
           element: payload.element,
           role: payload.role,
+          aliases,
         },
         { onConflict: "name" }
       );
@@ -1800,6 +2004,165 @@ export default function Page() {
     } catch (error) {
       console.error(error);
       showToast("추천 영상 저장 실패");
+      return false;
+    }
+  }
+
+  async function submitSoloRaidTip(payload: { content: string }) {
+    const trimmedContent = payload.content.trim();
+
+    if (!activeRaidKey) {
+      showToast("현재 솔로레이드가 없어");
+      return false;
+    }
+
+    if (!trimmedContent) {
+      showToast("내용을 입력해줘");
+      return false;
+    }
+
+    if (process.env.NODE_ENV !== "production" && !userId) {
+      const nextTip: SoloRaidTip = {
+        id: createLocalTipId(),
+        raidKey: activeRaidKey,
+        content: trimmedContent,
+        authorName: "로컬 테스트",
+        userId: DEV_LOCAL_TIP_USER_ID,
+        createdAt: Date.now(),
+        source: "local",
+      };
+
+      const nextTips = [nextTip, ...loadLocalTips()];
+      saveLocalTips(nextTips);
+      setSoloRaidTips((prev) => [nextTip, ...prev]);
+      showToast("로컬 테스트 글 저장 완료");
+      return true;
+    }
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 작성 가능");
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from(SOLO_RAID_TIPS_TABLE)
+        .insert({
+          raid_key: activeRaidKey,
+          content: trimmedContent,
+          user_id: currentUserId,
+        })
+        .select("id,raid_key,content,author_name,user_id,created_at")
+        .single();
+
+      if (error) throw error;
+
+      const inserted = mapSoloRaidTipRow(data as SoloRaidTipRow);
+      if (!inserted) throw new Error("Invalid solo raid tip row");
+
+      setSoloRaidTips((prev) => [inserted, ...prev]);
+      showToast("솔레 팁 등록 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("솔레 팁 등록 실패");
+      return false;
+    }
+  }
+
+  async function updateSoloRaidTip(payload: { id: string; content: string }) {
+    const trimmedContent = payload.content.trim();
+
+    if (!trimmedContent) {
+      showToast("내용을 입력해줘");
+      return false;
+    }
+
+    if (process.env.NODE_ENV !== "production" && !userId) {
+      const localTips = loadLocalTips();
+      const target = localTips.find((tip) => tip.id === payload.id);
+      if (!target) {
+        showToast("수정할 글을 찾을 수 없어");
+        return false;
+      }
+
+      const nextTips = localTips.map((tip) =>
+        tip.id === payload.id
+          ? {
+            ...tip,
+            content: trimmedContent,
+          }
+          : tip
+      );
+      saveLocalTips(nextTips);
+      setSoloRaidTips((prev) => prev.map((tip) => (tip.id === payload.id ? { ...tip, content: trimmedContent } : tip)));
+      showToast("로컬 테스트 글 수정 완료");
+      return true;
+    }
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 수정 가능");
+      return false;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from(SOLO_RAID_TIPS_TABLE)
+        .update({
+          content: trimmedContent,
+        })
+        .eq("id", payload.id)
+        .eq("user_id", currentUserId)
+        .select("id,raid_key,content,author_name,user_id,created_at")
+        .single();
+
+      if (error) throw error;
+
+      const updated = mapSoloRaidTipRow(data as SoloRaidTipRow);
+      if (!updated) throw new Error("Invalid solo raid tip row");
+
+      setSoloRaidTips((prev) => prev.map((tip) => (tip.id === payload.id ? updated : tip)));
+      showToast("글 수정 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("글 수정 실패");
+      return false;
+    }
+  }
+
+  async function deleteSoloRaidTip(id: string) {
+    if (process.env.NODE_ENV !== "production" && !userId) {
+      const nextTips = loadLocalTips().filter((tip) => tip.id !== id);
+      saveLocalTips(nextTips);
+      setSoloRaidTips((prev) => prev.filter((tip) => tip.id !== id));
+      showToast("로컬 테스트 글 삭제 완료");
+      return true;
+    }
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 삭제 가능");
+      return false;
+    }
+
+    try {
+      const { error } = await supabase
+        .from(SOLO_RAID_TIPS_TABLE)
+        .delete()
+        .eq("id", id)
+        .eq("user_id", currentUserId);
+
+      if (error) throw error;
+
+      setSoloRaidTips((prev) => prev.filter((tip) => tip.id !== id));
+      showToast("글 삭제 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("글 삭제 실패");
       return false;
     }
   }
@@ -1928,11 +2291,20 @@ export default function Page() {
           <div className="mx-auto w-full lg:max-w-4xl">
             <RecommendTab
               raidLabel={activeRaidLabel}
+              raidKey={activeRaidKey ?? ""}
               deckTabs={savedDeckTabs}
               recommendDeckTab={activeRaidKey ?? ""}
               onRecommendDeckTabChange={(key) => setActiveRaidKey(key)}
               recommendedDecks={recommendedDecks}
               videoEmbedUrl={toYouTubeEmbedUrl(recommendedVideoUrl)}
+              tips={soloRaidTips}
+              loadingTips={loadingSoloRaidTips}
+              currentUserId={userId}
+              canWriteTips={Boolean(userId) || process.env.NODE_ENV !== "production"}
+              editorUserId={userId ?? (process.env.NODE_ENV !== "production" ? DEV_LOCAL_TIP_USER_ID : null)}
+              onSubmitTip={submitSoloRaidTip}
+              onUpdateTip={updateSoloRaidTip}
+              onDeleteTip={deleteSoloRaidTip}
               nikkeMap={nikkeMap}
               getPublicUrl={getPublicUrl}
               fmt={fmt}
