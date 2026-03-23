@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import ImageUploadField from "./ImageUploadField";
-import type { UsageEditorBlock } from "./types";
+import type { UsageEditorBlock, UsageTextFontSize } from "./types";
 
 type UsageBlockEditorProps = {
   block: UsageEditorBlock;
@@ -15,6 +15,12 @@ type UsageBlockEditorProps = {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
+};
+
+const textAreaClassBySize: Record<UsageTextFontSize, string> = {
+  sm: "text-sm leading-6",
+  md: "text-base leading-7",
+  lg: "text-lg leading-8",
 };
 
 export default function UsageBlockEditor({
@@ -43,7 +49,7 @@ export default function UsageBlockEditor({
         <div className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
           {block.type === "text" ? "Text Block" : "Image Block"} {index + 1}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={onInsertTextBelow}
@@ -88,15 +94,36 @@ export default function UsageBlockEditor({
       </div>
 
       {block.type === "text" ? (
-        <textarea
-          ref={textAreaRef}
-          value={block.content}
-          onChange={(event) => onChange({ ...block, content: event.target.value })}
-          placeholder="설명 문장을 입력해 주세요."
-          disabled={disabled}
-          rows={3}
-          className="w-full resize-none overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/70 px-4 py-3 text-sm leading-6 text-neutral-100 outline-none disabled:opacity-60"
-        />
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-xs text-neutral-500">폰트 크기</div>
+            {(["sm", "md", "lg"] as const).map((size) => (
+              <button
+                key={size}
+                type="button"
+                onClick={() => onChange({ ...block, fontSize: size })}
+                disabled={disabled}
+                className={`rounded-xl border px-3 py-2 text-xs disabled:opacity-40 ${
+                  block.fontSize === size
+                    ? "border-white bg-white text-black"
+                    : "border-neutral-700 text-neutral-200"
+                }`}
+              >
+                {size === "sm" ? "작게" : size === "md" ? "보통" : "크게"}
+              </button>
+            ))}
+          </div>
+
+          <textarea
+            ref={textAreaRef}
+            value={block.content}
+            onChange={(event) => onChange({ ...block, content: event.target.value })}
+            placeholder="설명 문장을 입력해 주세요."
+            disabled={disabled}
+            rows={3}
+            className={`w-full resize-none overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/70 px-4 py-3 text-neutral-100 outline-none disabled:opacity-60 ${textAreaClassBySize[block.fontSize]}`}
+          />
+        </div>
       ) : (
         <div className="space-y-3">
           <ImageUploadField
@@ -131,9 +158,7 @@ export default function UsageBlockEditor({
             className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/70 px-4 py-3 text-sm text-neutral-100 outline-none disabled:opacity-60"
           />
 
-          {block.isUploading ? (
-            <div className="text-xs text-neutral-500">이미지 업로드 중..</div>
-          ) : null}
+          {block.isUploading ? <div className="text-xs text-neutral-500">이미지 업로드 중..</div> : null}
         </div>
       )}
     </div>

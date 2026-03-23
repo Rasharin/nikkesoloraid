@@ -565,6 +565,7 @@ function mapUsageBlocks(value: unknown): UsageBlock[] {
         id,
         type: "text",
         content: candidate.content,
+        fontSize: candidate.fontSize === "sm" || candidate.fontSize === "lg" ? candidate.fontSize : "md",
       } satisfies TextBlock);
       continue;
     }
@@ -2659,6 +2660,7 @@ export default function Page() {
             id: block.id,
             type: "text",
             content: block.content,
+            fontSize: block.fontSize,
           });
           continue;
         }

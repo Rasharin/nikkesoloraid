@@ -7,10 +7,17 @@ type UsagePostViewerProps = {
   isMaster: boolean;
   deleting: boolean;
   getPublicUrl: (bucket: "nikke-images" | "boss-images" | "usage-board-images", path: string) => string;
+  onEdit: () => void;
   onDelete: () => void;
 };
 
-export default function UsagePostViewer({ post, isMaster, deleting, getPublicUrl, onDelete }: UsagePostViewerProps) {
+const textClassBySize = {
+  sm: "text-base leading-7",
+  md: "text-lg leading-8",
+  lg: "text-xl leading-9",
+} as const;
+
+export default function UsagePostViewer({ post, isMaster, deleting, getPublicUrl, onEdit, onDelete }: UsagePostViewerProps) {
   const dateText = new Intl.DateTimeFormat("ko-KR", {
     year: "numeric",
     month: "short",
@@ -26,14 +33,23 @@ export default function UsagePostViewer({ post, isMaster, deleting, getPublicUrl
           <div className="text-xs text-neutral-500">{dateText}</div>
 
           {isMaster ? (
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={deleting}
-              className="rounded-xl border border-red-800/70 px-3 py-2 text-xs text-red-300 disabled:opacity-50"
-            >
-              {deleting ? "삭제 중.." : "삭제"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onEdit}
+                className="rounded-xl border border-neutral-700 px-3 py-2 text-xs text-neutral-200"
+              >
+                수정
+              </button>
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={deleting}
+                className="rounded-xl border border-red-800/70 px-3 py-2 text-xs text-red-300 disabled:opacity-50"
+              >
+                {deleting ? "삭제 중.." : "삭제"}
+              </button>
+            </div>
           ) : null}
         </div>
       </div>
@@ -41,7 +57,7 @@ export default function UsagePostViewer({ post, isMaster, deleting, getPublicUrl
       <div className="space-y-5 px-4 py-5 sm:px-5">
         {post.blocks.map((block) =>
           block.type === "text" ? (
-            <div key={block.id} className="whitespace-pre-wrap text-sm leading-7 text-neutral-200">
+            <div key={block.id} className={`whitespace-pre-wrap text-neutral-200 ${textClassBySize[block.fontSize ?? "md"]}`}>
               {block.content}
             </div>
           ) : (

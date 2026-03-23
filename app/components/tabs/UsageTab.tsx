@@ -74,6 +74,7 @@ function createDefaultTextBlock(): UsageEditorBlock {
     id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type: "text",
     content: "",
+    fontSize: "md",
   };
 }
 
@@ -82,7 +83,7 @@ function toEditorBlocks(post: UsagePost | null, getPublicUrl: UsageTabProps["get
 
   return post.blocks.map((block) =>
     block.type === "text"
-      ? { ...block }
+      ? { ...block, fontSize: block.fontSize ?? "md" }
       : {
           ...block,
           file: null,
@@ -142,6 +143,11 @@ export default function UsageTab({
     setBlocks((prev) => prev.map((block) => (block.type === "image" ? { ...block, isUploading: false } : block)));
     if (!saved) return;
     setShowWriteForm(false);
+  }
+
+  function openEditor() {
+    setBlocks(toEditorBlocks(currentPost, getPublicUrl));
+    setShowWriteForm(true);
   }
 
   return (
@@ -218,6 +224,7 @@ export default function UsageTab({
             isMaster={isMaster}
             deleting={deletingPostId === currentPost.id}
             getPublicUrl={getPublicUrl}
+            onEdit={openEditor}
             onDelete={() => void onDeletePost(currentPost.id)}
           />
         )}

@@ -1,7 +1,10 @@
+export type UsageTextFontSize = "sm" | "md" | "lg";
+
 export type TextBlock = {
   id: string;
   type: "text";
   content: string;
+  fontSize: UsageTextFontSize;
 };
 
 export type ImageBlock = {
@@ -27,6 +30,7 @@ export type UsageEditorTextBlock = {
   id: string;
   type: "text";
   content: string;
+  fontSize: UsageTextFontSize;
 };
 
 export type UsageEditorImageBlock = {

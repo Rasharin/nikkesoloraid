@@ -18,6 +18,7 @@ function createTextBlock(): UsageEditorBlock {
     id: `text-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type: "text",
     content: "",
+    fontSize: "md",
   };
 }
 
