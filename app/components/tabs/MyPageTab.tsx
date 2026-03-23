@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayNames } from "../../../lib/nikke-display";
+import type { ScoreDisplayMode } from "../../../lib/score-format";
 
 type RecommendationDeck = {
   chars: string[];
@@ -68,6 +69,8 @@ type MyPageTabProps = {
   showInquirySection: boolean;
   onDeleteInquiry: (id: string) => Promise<boolean>;
   fmt: (value: number) => string;
+  scoreDisplayMode: ScoreDisplayMode;
+  onScoreDisplayModeChange: (mode: ScoreDisplayMode) => void;
 };
 
 function adminTabClass(active: boolean) {
@@ -96,6 +99,8 @@ export default function MyPageTab({
   showInquirySection,
   onDeleteInquiry,
   fmt,
+  scoreDisplayMode,
+  onScoreDisplayModeChange,
 }: MyPageTabProps) {
   const [openRaidKey, setOpenRaidKey] = useState<string>("");
   const [adminSection, setAdminSection] = useState<AdminSectionKey>("nikkes");
@@ -225,6 +230,39 @@ export default function MyPageTab({
 
   return (
     <div className="space-y-4">
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">설정</h2>
+            <div className="mt-1 text-sm text-neutral-400">점수 표기 방법을 전체 화면에 바로 적용합니다.</div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+          <div>
+            <div className="text-sm font-medium text-neutral-100">점수 표기 방법</div>
+            <div className="mt-1 text-xs text-neutral-400">기본값은 숫자 표기입니다.</div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onScoreDisplayModeChange("eok")}
+              className={adminTabClass(scoreDisplayMode === "eok")}
+            >
+              00억
+            </button>
+            <button
+              type="button"
+              onClick={() => onScoreDisplayModeChange("number")}
+              className={adminTabClass(scoreDisplayMode === "number")}
+            >
+              숫자 표기
+            </button>
+          </div>
+        </div>
+      </section>
+
       {showBossManagement ? (
         <section className="rounded-2xl border border-sky-500/30 bg-sky-500/5 p-4">
           <div className="flex items-center justify-between gap-3">

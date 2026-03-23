@@ -8,6 +8,7 @@ import SavedTab from "./components/tabs/SavedTab";
 import SettingsTab from "./components/tabs/SettingsTab";
 import ContactTab from "./components/tabs/ContactTab";
 import { supabase } from "../lib/supabase";
+import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
    ${selected
@@ -182,14 +183,12 @@ const LOCAL_TIPS_KEY = "soloraid_local_tips_v1";
 const DEV_LOCAL_TIP_USER_ID = "__dev_local_tip_user__";
 const CONTACT_INQUIRIES_TABLE = "contact_inquiries";
 const LOCAL_CONTACT_INQUIRIES_KEY = "soloraid_local_contact_inquiries_v1";
+const SCORE_DISPLAY_MODE_KEY = "soloraid_score_display_mode_v1";
 
 const MAX_SELECTED = 50;
 const MAX_DECK_CHARS = 5;
 
 // -------------------- Utils --------------------
-function fmt(n: number) {
-  return n.toLocaleString("en-US");
-}
 
 function createLocalTipId() {
   return `local-tip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -403,16 +402,16 @@ function parseSingleDeckLine(line: string): { chars: string[]; score: number } |
   if (arrow) {
     const [left, right] = trimmed.split(arrow).map((x) => x.trim());
     const chars = splitCharsFlexible(left);
-    const score = Number(right.replaceAll(",", "").replaceAll(" ", ""));
-    if (chars.length !== 5 || !Number.isFinite(score) || score <= 0) return null;
+    const score = parseScoreInput(right);
+    if (chars.length !== 5 || score === null || !Number.isFinite(score) || score <= 0) return null;
     return { chars, score };
   }
 
-  const m = trimmed.match(/(\d[\d,]*)\s*$/);
+  const m = trimmed.match(/((?:\d[\d,]*(?:\.\d+)?)\s*억|(?:\d[\d,]*(?:\.\d+)?))\s*$/);
   if (!m) return null;
 
-  const score = Number(m[1].replaceAll(",", ""));
-  if (!Number.isFinite(score) || score <= 0) return null;
+  const score = parseScoreInput(m[1]);
+  if (score === null || !Number.isFinite(score) || score <= 0) return null;
 
   const left = trimmed.slice(0, m.index).trim();
   const chars = splitCharsFlexible(left);
@@ -441,8 +440,8 @@ function parseBulk(text: string): Array<{ chars: string[]; score: number }> {
     if (a.includes("→") || a.includes("->")) continue;
 
     const chars = splitCharsFlexible(a);
-    const score = Number(b.replaceAll(",", "").replaceAll(" ", ""));
-    if (chars.length === 5 && Number.isFinite(score) && score > 0) {
+    const score = parseScoreInput(b);
+    if (chars.length === 5 && score !== null && Number.isFinite(score) && score > 0) {
       const key = `${score}|${chars.map(normToken).join("|")}`;
       const exists = out.some((x) => `${x.score}|${x.chars.map(normToken).join("|")}` === key);
       if (!exists) out.push({ chars, score });
@@ -856,6 +855,7 @@ export default function Page() {
   const [loadingSoloRaidTips, setLoadingSoloRaidTips] = useState(false);
   const [contactInquiries, setContactInquiries] = useState<ContactInquiry[]>([]);
   const [loadingContactInquiries, setLoadingContactInquiries] = useState(false);
+  const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>("number");
 
   async function fetchUserDecks(currentUserId: string) {
     const { data, error } = await supabase
@@ -965,6 +965,8 @@ export default function Page() {
     setSelectedElements(new Set());
     setSelectedRoles(new Set());
   };
+
+  const fmt = (n: number) => formatScore(n, scoreDisplayMode);
 
   // 로그인 유저 추적
   useEffect(() => {
@@ -1194,6 +1196,21 @@ export default function Page() {
       }
     } catch { }
   }, []);
+
+  useEffect(() => {
+    try {
+      const rawMode = localStorage.getItem(SCORE_DISPLAY_MODE_KEY);
+      if (rawMode === "number" || rawMode === "eok") {
+        setScoreDisplayMode(rawMode);
+      }
+    } catch { }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SCORE_DISPLAY_MODE_KEY, scoreDisplayMode);
+    } catch { }
+  }, [scoreDisplayMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1581,9 +1598,9 @@ export default function Page() {
   }
 
   async function updateDeckScore(id: string, scoreText: string) {
-    const sc = Number(scoreText.replaceAll(",", "").replaceAll(" ", "").trim());
-    if (!Number.isFinite(sc) || sc <= 0) {
-      showToast("점수는 숫자로 입력해줘.");
+    const sc = parseScoreInput(scoreText);
+    if (sc === null || !Number.isFinite(sc) || sc <= 0) {
+      showToast("점수는 숫자 또는 00.0억 형식으로 입력해줘.");
       return false;
     }
 
@@ -1782,9 +1799,9 @@ export default function Page() {
       return false;
     }
 
-    const sc = Number(scoreText.replaceAll(",", "").replaceAll(" ", "").trim());
-    if (!Number.isFinite(sc) || sc <= 0) {
-      showToast("점수는 숫자로 입력해줘.");
+    const sc = parseScoreInput(scoreText);
+    if (sc === null || !Number.isFinite(sc) || sc <= 0) {
+      showToast("점수는 숫자 또는 00.0억 형식으로 입력해줘.");
       return false;
     }
 
@@ -2622,6 +2639,8 @@ export default function Page() {
             showInquirySection={canManageBosses}
             onDeleteInquiry={deleteContactInquiry}
             fmt={fmt}
+            scoreDisplayMode={scoreDisplayMode}
+            onScoreDisplayModeChange={(mode) => setScoreDisplayMode(mode)}
           />
         )}
       </div>

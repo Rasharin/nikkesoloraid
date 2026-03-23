@@ -534,7 +534,7 @@ export default function HomeTab({
           {editingRecommendedDeckId === deck.id ? (
             <input
               autoFocus
-              inputMode="numeric"
+              inputMode="decimal"
               value={editingRecommendedScore}
               onChange={(event) => setEditingRecommendedScore(event.target.value)}
               onBlur={() => void saveRecommendedDeckScore(deck.id)}

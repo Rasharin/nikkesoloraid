@@ -148,7 +148,7 @@ export default function SavedTab({
                 {editingScoreId === deck.id ? (
                   <div className="mt-3 flex items-center gap-2">
                     <input
-                      inputMode="numeric"
+                      inputMode="decimal"
                       value={editingScoreText}
                       onChange={(event) => setEditingScoreText(event.target.value)}
                       onKeyDown={(event) => {

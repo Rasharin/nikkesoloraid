@@ -78,7 +78,7 @@ function DeckBuilderSectionComponent({
         <div className="mt-1">
           <input
             ref={scoreRef}
-            inputMode="numeric"
+            inputMode="decimal"
             value={score}
             onChange={(event) => onScoreChange(event.target.value)}
             onKeyDown={(event) => {
@@ -87,7 +87,7 @@ function DeckBuilderSectionComponent({
                 onSaveDeck();
               }
             }}
-            placeholder="점수입력 (예: 6510755443)"
+            placeholder="점수입력 (예: 6510755443 또는 23.3억)"
             className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-base outline-none transition focus:border-white/40"
           />
         </div>
