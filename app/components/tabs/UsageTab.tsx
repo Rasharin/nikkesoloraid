@@ -143,7 +143,7 @@ export default function UsageTab({
       <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-neutral-100">사용법 게시판</h2>
+            <h2 className="text-2xl font-semibold text-neutral-100">덱 도우미 웹 사용법</h2>
             <div className="mt-1 text-sm text-neutral-400">{activeLabel} 관련 사용법과 안내 이미지를 볼 수 있어요.</div>
           </div>
 
