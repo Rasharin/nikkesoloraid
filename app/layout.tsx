@@ -12,32 +12,36 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteName = "니케 솔로레이드 덱 도우미";
+const description = "니케 솔로레이드 덱 추천, 덱 조합 계산, 덱 만들기";
+const siteUrl = "https://nikkesoloraid.vercel.app";
+
 export const metadata: Metadata = {
-  title: "니케 솔로레이드 덱 도우미",
-  description: "내 솔로레이드 최적 덱 추천",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: siteName,
+    template: "%s | 니케 솔로레이드 덱 도우미",
+  },
+  description,
+  keywords: ["니케 솔레 덱 도우미", "니케 솔레", "니케 덱", "니케 솔로레이드", "니케 덱 추천"],
   openGraph: {
-    title: "니케 솔로레이드 덱 도우미",
-    description: "내 솔로레이드 최적 덱 추천",
-    url: "https://nikkesoloraid.vercel.app",
-    siteName: "니케 솔로레이드 덱 도우미",
+    title: siteName,
+    description,
+    url: siteUrl,
+    siteName,
+    locale: "ko_KR",
     type: "website",
   },
-  twitter: {
-    card: "summary",
-    title: "니케 솔로레이드 덱 도우미",
-    description: "내 솔로레이드 최적 덱 추천",
-  },
 };
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="ko">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
       </body>
     </html>
