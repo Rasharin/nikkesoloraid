@@ -39,6 +39,7 @@ type RecommendTabProps = {
   recommendDeckTab: string;
   onRecommendDeckTabChange: (key: string) => void;
   recommendedDecks: RecommendedDeck[];
+  loadingRecommendedDecks: boolean;
   videoEmbedUrl: string | null;
   tips: SoloRaidTip[];
   loadingTips: boolean;
@@ -61,6 +62,7 @@ export default function RecommendTab({
   recommendDeckTab,
   onRecommendDeckTabChange,
   recommendedDecks,
+  loadingRecommendedDecks,
   videoEmbedUrl,
   tips,
   loadingTips,
@@ -166,7 +168,7 @@ export default function RecommendTab({
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">추천 조합</h2>
-            <div className="text-sm text-neutral-400">{raidLabel} 기준 추천 조합입니다.</div>
+            <div className="text-sm text-neutral-400">{raidLabel} 전체 사용자 저장 덱 기준 추천 조합입니다.</div>
           </div>
           <div className="text-xs text-neutral-400">{recommendedDecks.length}개</div>
         </div>
@@ -189,7 +191,11 @@ export default function RecommendTab({
         </div>
 
         <div className="mt-4 grid gap-3">
-          {recommendedDecks.length === 0 ? (
+          {loadingRecommendedDecks ? (
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-300">
+              추천 조합을 불러오는 중입니다.
+            </div>
+          ) : recommendedDecks.length === 0 ? (
             <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-300">
               추천 조합이 없습니다.
             </div>

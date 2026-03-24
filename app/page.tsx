@@ -958,6 +958,8 @@ export default function Page() {
   const [recommendationHistory, setRecommendationHistory] = useState<Record<string, RecommendationRecord>>({});
   const [recommendationLoaded, setRecommendationLoaded] = useState(false);
   const [recommendedVideoUrl, setRecommendedVideoUrl] = useState<string>("");
+  const [communityRaidDecks, setCommunityRaidDecks] = useState<Deck[]>([]);
+  const [loadingCommunityRaidDecks, setLoadingCommunityRaidDecks] = useState(false);
   const [soloRaidTips, setSoloRaidTips] = useState<SoloRaidTip[]>([]);
   const [loadingSoloRaidTips, setLoadingSoloRaidTips] = useState(false);
   const [contactInquiries, setContactInquiries] = useState<ContactInquiry[]>([]);
@@ -973,6 +975,18 @@ export default function Page() {
       .from("decks")
       .select("id,user_id,raid_key,deck_key,chars,score,created_at")
       .eq("user_id", currentUserId)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
+  }
+
+  async function fetchCommunityRaidDecks(raidKey: string) {
+    const { data, error } = await supabase
+      .from("decks")
+      .select("id,user_id,raid_key,deck_key,chars,score,created_at")
+      .eq("raid_key", raidKey)
+      .not("user_id", "is", null)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -1497,6 +1511,42 @@ export default function Page() {
   }, [userId]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadCommunityRaidDecks() {
+      if (!activeRaidKey) {
+        setCommunityRaidDecks([]);
+        setLoadingCommunityRaidDecks(false);
+        return;
+      }
+
+      setLoadingCommunityRaidDecks(true);
+      try {
+        const nextDecks = await fetchCommunityRaidDecks(activeRaidKey);
+        if (!cancelled) {
+          setCommunityRaidDecks(nextDecks);
+        }
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setCommunityRaidDecks([]);
+          showToast("추천 덱 불러오기 실패");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingCommunityRaidDecks(false);
+        }
+      }
+    }
+
+    void loadCommunityRaidDecks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeRaidKey, decks]);
+
+  useEffect(() => {
     try {
       localStorage.setItem(SELECTED_KEY, JSON.stringify(selectedNames));
     } catch { }
@@ -1629,8 +1679,9 @@ export default function Page() {
   const recommendedDecks = useMemo(() => {
     const grouped = new Map<string, { chars: string[]; totalScore: number; usedCount: number }>();
 
-    for (const deck of activeRaidDecks) {
-      const key = deck.deckKey || buildDeckKey(deck.chars);
+    for (const deck of communityRaidDecks) {
+      const normalizedChars = [...deck.chars].map((char) => char.trim()).sort((a, b) => a.localeCompare(b));
+      const key = buildDeckKey(normalizedChars);
       const existing = grouped.get(key);
       if (existing) {
         existing.totalScore += deck.score;
@@ -1639,7 +1690,7 @@ export default function Page() {
       }
 
       grouped.set(key, {
-        chars: [...deck.chars],
+        chars: normalizedChars,
         totalScore: deck.score,
         usedCount: 1,
       });
@@ -1656,7 +1707,7 @@ export default function Page() {
         if (a.usedCount !== b.usedCount) return b.usedCount - a.usedCount;
         return b.avgScore - a.avgScore;
       });
-  }, [activeRaidDecks]);
+  }, [communityRaidDecks]);
   const best = useMemo(() => pickBest5(activeRaidDecks), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
   const activeRaidLabel = useMemo(
@@ -2932,6 +2983,7 @@ export default function Page() {
               recommendDeckTab={activeRaidKey ?? ""}
               onRecommendDeckTabChange={(key) => setActiveRaidKey(key)}
               recommendedDecks={recommendedDecks}
+              loadingRecommendedDecks={loadingCommunityRaidDecks}
               videoEmbedUrl={toYouTubeEmbedUrl(recommendedVideoUrl)}
               tips={soloRaidTips}
               loadingTips={loadingSoloRaidTips}
