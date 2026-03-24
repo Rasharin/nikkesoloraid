@@ -3067,10 +3067,10 @@ export default function Page() {
     <div className="min-h-screen bg-neutral-950 text-neutral-50">
       <div className="mx-auto max-w-xl px-4 pb-28 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
         {/* Header */}
-        <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3 backdrop-blur lg:-mx-8 lg:px-8">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3.5 backdrop-blur lg:-mx-8 lg:px-8 lg:py-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="니케 솔로레이드 덱 도우미" className="h-12 w-auto object-contain lg:h-14" />
+            <img src="/logo.png" alt="니케 솔로레이드 덱 도우미" className="h-16 w-auto object-contain lg:h-20" />
 
             <div className="flex flex-col items-end gap-2 lg:flex-row lg:items-center">
               <LoginButton onProfileClick={() => setTab("mypage")} />
