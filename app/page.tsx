@@ -3065,12 +3065,74 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-50">
-      <div className="mx-auto max-w-xl px-4 pb-28 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
+      <div className="mx-auto max-w-xl px-4 pb-10 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
         {/* Header */}
         <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3.5 backdrop-blur lg:-mx-8 lg:px-8 lg:py-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-6">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt="니케 솔로레이드 덱 도우미" className="h-16 w-auto object-contain lg:h-20" />
+
+            <div className="grid grid-cols-6 gap-1.5 px-1 lg:mx-auto lg:w-full lg:max-w-3xl">
+              <button
+                onClick={() => setTab("home")}
+                className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
+                  tab === "home" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                }`}
+              >
+                <HomeIcon active={tab === "home"} />
+                <div>홈</div>
+              </button>
+
+              <button
+                onClick={() => setTab("saved")}
+                className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
+                  tab === "saved" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                }`}
+              >
+                <SaveIcon active={tab === "saved"} />
+                <div>저장된 덱</div>
+              </button>
+
+              <button
+                onClick={() => setTab("recommend")}
+                className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
+                  tab === "recommend" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                }`}
+              >
+                <RecommendIcon active={tab === "recommend"} />
+                <div>추천</div>
+              </button>
+
+              <button
+                onClick={() => setTab("usage")}
+                className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
+                  tab === "usage" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                }`}
+              >
+                <UsageIcon active={tab === "usage"} />
+                <div>사용법</div>
+              </button>
+
+              <button
+                onClick={() => setTab("settings")}
+                className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
+                  tab === "settings" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                }`}
+              >
+                <GearIcon active={tab === "settings"} />
+                <div>설정</div>
+              </button>
+
+              <button
+                onClick={() => setTab("contact")}
+                className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
+                  tab === "contact" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                }`}
+              >
+                <ContactIcon active={tab === "contact"} />
+                <div>문의하기</div>
+              </button>
+            </div>
 
             <div className="flex flex-col items-end gap-2 lg:flex-row lg:items-center">
               <LoginButton onProfileClick={() => setTab("mypage")} />
@@ -3275,59 +3337,6 @@ export default function Page() {
             onScoreDisplayModeChange={(mode) => setScoreDisplayMode(mode)}
           />
         )}
-      </div>
-
-      {/* Bottom Tab Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-neutral-800 bg-neutral-950">
-        <div className="mx-auto flex max-w-2xl flex-row justify-around">
-          <button
-            onClick={() => setTab("home")}
-            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
-          >
-            <HomeIcon active={tab === "home"} />
-            <div className={tab === "home" ? "text-white" : "text-neutral-400"}>홈</div>
-          </button>
-
-          <button
-            onClick={() => setTab("saved")}
-            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
-          >
-            <SaveIcon active={tab === "saved"} />
-            <div className={tab === "saved" ? "text-white" : "text-neutral-400"}>저장된 덱</div>
-          </button>
-
-          <button
-            onClick={() => setTab("recommend")}
-            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
-          >
-            <RecommendIcon active={tab === "recommend"} />
-            <div className={tab === "recommend" ? "text-white" : "text-neutral-400"}>추천</div>
-          </button>
-
-          <button
-            onClick={() => setTab("usage")}
-            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
-          >
-            <UsageIcon active={tab === "usage"} />
-            <div className={tab === "usage" ? "text-white" : "text-neutral-400"}>사용법</div>
-          </button>
-
-          <button
-            onClick={() => setTab("settings")}
-            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
-          >
-            <GearIcon active={tab === "settings"} />
-            <div className={tab === "settings" ? "text-white" : "text-neutral-400"}>설정</div>
-          </button>
-
-          <button
-            onClick={() => setTab("contact")}
-            className="flex flex-1 flex-col items-center justify-center py-2 text-xs active:scale-[0.99]"
-          >
-            <ContactIcon active={tab === "contact"} />
-            <div className={tab === "contact" ? "text-white" : "text-neutral-400"}>문의하기</div>
-          </button>
-        </div>
       </div>
     </div>
   );
