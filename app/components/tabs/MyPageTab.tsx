@@ -62,6 +62,7 @@ type MyPageTabProps = {
     imageFile: File | null;
   }) => Promise<boolean>;
   onEndSoloRaid: () => Promise<boolean>;
+  onRestartSoloRaid: () => Promise<boolean>;
   recommendedVideoUrl: string;
   onSaveRecommendedVideo: (url: string) => Promise<boolean>;
   inquiries: ContactInquiry[];
@@ -92,6 +93,7 @@ export default function MyPageTab({
   roles,
   onAddSoloRaid,
   onEndSoloRaid,
+  onRestartSoloRaid,
   recommendedVideoUrl,
   onSaveRecommendedVideo,
   inquiries,
@@ -110,6 +112,7 @@ export default function MyPageTab({
   const [raidImageInputKey, setRaidImageInputKey] = useState(0);
   const [savingRaid, setSavingRaid] = useState(false);
   const [endingRaid, setEndingRaid] = useState(false);
+  const [restartingRaid, setRestartingRaid] = useState(false);
   const [videoUrlInput, setVideoUrlInput] = useState(recommendedVideoUrl);
   const [savingVideo, setSavingVideo] = useState(false);
   const [deletingInquiryId, setDeletingInquiryId] = useState<string | null>(null);
@@ -202,6 +205,16 @@ export default function MyPageTab({
       await onEndSoloRaid();
     } finally {
       setEndingRaid(false);
+    }
+  }
+
+  async function handleRestartSoloRaid() {
+    if (restartingRaid) return;
+    setRestartingRaid(true);
+    try {
+      await onRestartSoloRaid();
+    } finally {
+      setRestartingRaid(false);
     }
   }
 
@@ -444,14 +457,24 @@ export default function MyPageTab({
                       종료하면 현재 활성 레이드가 비활성화되고 기본 화면으로 돌아갑니다.
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleEndSoloRaid()}
-                    disabled={endingRaid || !soloRaidActive}
-                    className="rounded-2xl border border-red-800/60 px-4 py-3 text-sm text-red-300 active:scale-[0.99] disabled:opacity-50"
-                  >
-                    {endingRaid ? "종료 중..." : "레이드 종료"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleRestartSoloRaid()}
+                      disabled={restartingRaid || soloRaidActive}
+                      className="rounded-2xl border border-emerald-800/60 px-4 py-3 text-sm text-emerald-300 active:scale-[0.99] disabled:opacity-50"
+                    >
+                      {restartingRaid ? "재시작 중..." : "레이드 재시작"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleEndSoloRaid()}
+                      disabled={endingRaid || !soloRaidActive}
+                      className="rounded-2xl border border-red-800/60 px-4 py-3 text-sm text-red-300 active:scale-[0.99] disabled:opacity-50"
+                    >
+                      {endingRaid ? "종료 중..." : "레이드 종료"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
