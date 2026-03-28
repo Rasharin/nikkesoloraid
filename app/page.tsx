@@ -39,6 +39,12 @@ type RecommendedDeck = {
   usedCount: number;
   avgScore: number;
 };
+type RecommendedDeckSnapshot = {
+  raidKey: string;
+  raidLabel: string;
+  decks: RecommendedDeck[];
+  updatedAt: number;
+};
 type RecommendationDeck = {
   chars: string[];
   score: number;
@@ -202,6 +208,7 @@ const LOCAL_FAVORITES_KEY = "soloraid_favorite_nikkes_v1";
 const FAVORITES_TABLE = "favorite_nikkes";
 const SITE_SETTINGS_TABLE = "site_settings";
 const RECOMMENDED_VIDEO_KEY = "recommended_video_url";
+const RECOMMENDED_DECK_SNAPSHOT_KEY_PREFIX = "recommended_deck_snapshot_";
 const SOLO_RAID_TIPS_TABLE = "solo_raid_tips";
 const LOCAL_TIPS_KEY = "soloraid_local_tips_v1";
 const DEV_LOCAL_TIP_USER_ID = "__dev_local_tip_user__";
@@ -241,6 +248,10 @@ function normToken(s: string) {
 
 function buildDeckKey(chars: readonly string[]) {
   return [...chars].map((char) => char.trim()).sort((a, b) => a.localeCompare(b)).join("|");
+}
+
+function getRecommendedDeckSnapshotKey(raidKey: string) {
+  return `${RECOMMENDED_DECK_SNAPSHOT_KEY_PREFIX}${raidKey.trim()}`;
 }
 
 function extractYouTubeVideoId(input: string) {
@@ -873,6 +884,51 @@ function sameRecommendationRecord(a: RecommendationRecord | undefined, b: Recomm
   return true;
 }
 
+function mapRecommendedDeckSnapshot(row: SiteSettingRow): RecommendedDeckSnapshot | null {
+  if (typeof row.key !== "string" || !row.key.startsWith(RECOMMENDED_DECK_SNAPSHOT_KEY_PREFIX) || typeof row.value !== "string") {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(row.value) as Record<string, unknown>;
+    const raidKey = typeof parsed.raidKey === "string" ? parsed.raidKey.trim() : "";
+    const raidLabel = typeof parsed.raidLabel === "string" ? parsed.raidLabel.trim() : "";
+    const rawDecks = Array.isArray(parsed.decks) ? parsed.decks : [];
+    const decks: RecommendedDeck[] = [];
+
+    for (const item of rawDecks) {
+      if (!item || typeof item !== "object") continue;
+      const candidate = item as Record<string, unknown>;
+      const chars = Array.isArray(candidate.chars)
+        ? candidate.chars.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+        : [];
+      const usedCount = Number(candidate.usedCount);
+      const avgScore = Number(candidate.avgScore);
+
+      if (chars.length === 0 || !Number.isFinite(usedCount) || !Number.isFinite(avgScore)) continue;
+
+      decks.push({
+        deckKey: buildDeckKey(chars),
+        chars,
+        usedCount,
+        avgScore,
+      });
+    }
+
+    const updatedAt = typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.parse(row.updated_at ?? "");
+    if (!raidKey || !raidLabel) return null;
+
+    return {
+      raidKey,
+      raidLabel,
+      decks,
+      updatedAt: Number.isFinite(updatedAt) ? updatedAt : Date.now(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // -------------------- Icons --------------------
 function HomeIcon({ active }: { active: boolean }) {
   return (
@@ -1008,6 +1064,8 @@ export default function Page() {
   const [recommendedVideoUrl, setRecommendedVideoUrl] = useState<string>("");
   const [communityRaidDecks, setCommunityRaidDecks] = useState<Deck[]>([]);
   const [loadingCommunityRaidDecks, setLoadingCommunityRaidDecks] = useState(false);
+  const [recommendedDeckSnapshots, setRecommendedDeckSnapshots] = useState<Record<string, RecommendedDeckSnapshot>>({});
+  const [loadingRecommendedDeckSnapshots, setLoadingRecommendedDeckSnapshots] = useState(false);
   const [offSeasonDecks, setOffSeasonDecks] = useState<Deck[]>([]);
   const [offSeasonRaidKey, setOffSeasonRaidKey] = useState<string | null>(null);
   const [soloRaidTips, setSoloRaidTips] = useState<SoloRaidTip[]>([]);
@@ -1067,6 +1125,28 @@ export default function Page() {
 
     if (error) throw error;
     return ((data as SiteSettingRow | null)?.value ?? "").trim();
+  }
+
+  async function fetchRecommendedDeckSnapshots(raidKeys: readonly string[]) {
+    const normalizedKeys = Array.from(new Set(raidKeys.map((raidKey) => raidKey.trim()).filter((raidKey) => raidKey.length > 0)));
+
+    if (normalizedKeys.length === 0) return {};
+
+    const { data, error } = await supabase
+      .from(SITE_SETTINGS_TABLE)
+      .select("key,value,updated_at,updated_by")
+      .in("key", normalizedKeys.map(getRecommendedDeckSnapshotKey));
+
+    if (error) throw error;
+
+    const snapshots: Record<string, RecommendedDeckSnapshot> = {};
+    for (const row of (data ?? []) as SiteSettingRow[]) {
+      const mapped = mapRecommendedDeckSnapshot(row);
+      if (!mapped) continue;
+      snapshots[mapped.raidKey] = mapped;
+    }
+
+    return snapshots;
   }
 
   async function fetchSoloRaidTips(raidKey: string) {
@@ -1606,6 +1686,45 @@ export default function Page() {
   }, [activeRaidKey, decks]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadRecommendedDeckSnapshots() {
+      const targetRaidKeys = deckTabs
+        .map((tab) => tab.key)
+        .filter((raidKey) => raidKey.toLowerCase() !== "test");
+
+      if (targetRaidKeys.length === 0) {
+        setRecommendedDeckSnapshots({});
+        setLoadingRecommendedDeckSnapshots(false);
+        return;
+      }
+
+      setLoadingRecommendedDeckSnapshots(true);
+      try {
+        const nextSnapshots = await fetchRecommendedDeckSnapshots(targetRaidKeys);
+        if (!cancelled) {
+          setRecommendedDeckSnapshots(nextSnapshots);
+        }
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setRecommendedDeckSnapshots({});
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingRecommendedDeckSnapshots(false);
+        }
+      }
+    }
+
+    void loadRecommendedDeckSnapshots();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deckTabs]);
+
+  useEffect(() => {
     try {
       localStorage.setItem(SELECTED_KEY, JSON.stringify(selectedNames));
     } catch { }
@@ -1738,10 +1857,14 @@ export default function Page() {
     }
     return getNewestDeckTabKey(deckTabs) ?? DEFAULT_ACTIVE_RAID_KEY;
   }, [activeRaidKey, deckTabs, offSeasonRaidKey, soloRaidActive]);
+  const savedDeckSource = useMemo(() => {
+    if (soloRaidActive) return decks;
+    return userId ? decks : offSeasonDecks;
+  }, [decks, offSeasonDecks, soloRaidActive, userId]);
   const editableDecks = useMemo(() => (soloRaidActive ? decks : offSeasonDecks), [decks, offSeasonDecks, soloRaidActive]);
   const activeRaidDecks = useMemo(
-    () => (currentDeckRaidKey ? editableDecks.filter((deck) => deck.raidKey === currentDeckRaidKey) : []),
-    [currentDeckRaidKey, editableDecks]
+    () => (currentDeckRaidKey ? savedDeckSource.filter((deck) => deck.raidKey === currentDeckRaidKey) : []),
+    [currentDeckRaidKey, savedDeckSource]
   );
   const recommendedDecks = useMemo(() => {
     const grouped = new Map<string, { chars: string[]; totalScore: number; usedCount: number }>();
@@ -1775,6 +1898,11 @@ export default function Page() {
         return b.avgScore - a.avgScore;
       });
   }, [communityRaidDecks]);
+  const displayedRecommendedDecks = useMemo(() => {
+    if (soloRaidActive) return recommendedDecks;
+    if (!currentDeckRaidKey) return [];
+    return recommendedDeckSnapshots[currentDeckRaidKey]?.decks ?? [];
+  }, [currentDeckRaidKey, recommendedDeckSnapshots, recommendedDecks, soloRaidActive]);
   const best = useMemo(() => pickBest5(activeRaidDecks), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
   const activeRaidLabel = useMemo(
@@ -1783,11 +1911,11 @@ export default function Page() {
   );
   const sortedDecks = useMemo(
     () =>
-      editableDecks
+      savedDeckSource
         .filter((deck) => deck.raidKey === currentDeckRaidKey)
         .slice()
         .sort((a, b) => b.score - a.score),
-    [currentDeckRaidKey, editableDecks]
+    [currentDeckRaidKey, savedDeckSource]
   );
   const visibleSavedDecks = sortedDecks;
   const savedDeckTabs = useMemo(
@@ -1804,9 +1932,9 @@ export default function Page() {
   useEffect(() => {
     if (soloRaidActive) return;
     if (offSeasonRaidKey) return;
-    const fallbackRaidKey = offSeasonDecks[0]?.raidKey ?? getNewestDeckTabKey(deckTabs) ?? DEFAULT_ACTIVE_RAID_KEY;
+    const fallbackRaidKey = savedDeckSource[0]?.raidKey ?? getNewestDeckTabKey(deckTabs) ?? DEFAULT_ACTIVE_RAID_KEY;
     setOffSeasonRaidKey(fallbackRaidKey);
-  }, [deckTabs, offSeasonDecks, offSeasonRaidKey, soloRaidActive]);
+  }, [deckTabs, offSeasonRaidKey, savedDeckSource, soloRaidActive]);
 
   async function persistRecommendationRecord(currentUserId: string, record: RecommendationRecord) {
     const { error } = await supabase
@@ -1824,6 +1952,48 @@ export default function Page() {
       );
 
     if (error) throw error;
+  }
+
+  async function persistRecommendedDeckSnapshot(currentUserId: string, raidKey: string, raidLabel: string, decksToPersist: readonly RecommendedDeck[]) {
+    const snapshot: RecommendedDeckSnapshot = {
+      raidKey,
+      raidLabel,
+      decks: decksToPersist.map((deck) => ({
+        deckKey: deck.deckKey,
+        chars: [...deck.chars],
+        usedCount: deck.usedCount,
+        avgScore: deck.avgScore,
+      })),
+      updatedAt: Date.now(),
+    };
+
+    const { error } = await supabase
+      .from(SITE_SETTINGS_TABLE)
+      .upsert(
+        {
+          key: getRecommendedDeckSnapshotKey(raidKey),
+          value: JSON.stringify({
+            raidKey: snapshot.raidKey,
+            raidLabel: snapshot.raidLabel,
+            decks: snapshot.decks.map((deck) => ({
+              chars: deck.chars,
+              usedCount: deck.usedCount,
+              avgScore: deck.avgScore,
+            })),
+            updatedAt: snapshot.updatedAt,
+          }),
+          updated_by: currentUserId,
+          updated_at: new Date(snapshot.updatedAt).toISOString(),
+        },
+        { onConflict: "key" }
+      );
+
+    if (error) throw error;
+
+    setRecommendedDeckSnapshots((prev) => ({
+      ...prev,
+      [raidKey]: snapshot,
+    }));
   }
 
   useEffect(() => {
@@ -1881,6 +2051,11 @@ export default function Page() {
   }
 
   async function updateDeckScore(id: string, scoreText: string) {
+    if (!soloRaidActive) {
+      showToast("현재 진행 중인 솔로레이드가 없어");
+      return false;
+    }
+
     const sc = parseScoreInput(scoreText);
     if (sc === null || !Number.isFinite(sc) || sc <= 0) {
       showToast("점수는 숫자 또는 00.0억 형식으로 입력해줘.");
@@ -1935,6 +2110,11 @@ export default function Page() {
   }
 
   async function updateDeckChars(id: string, nextChars: string[]) {
+    if (!soloRaidActive) {
+      showToast("현재 진행 중인 솔로레이드가 없어");
+      return false;
+    }
+
     if (nextChars.length !== MAX_DECK_CHARS || new Set(nextChars).size !== MAX_DECK_CHARS) {
       showToast("니케 5명을 중복 없이 맞춰줘.");
       return false;
@@ -1990,6 +2170,11 @@ export default function Page() {
   }
 
   async function deleteDeck(id: string) {
+    if (!soloRaidActive) {
+      showToast("현재 진행 중인 솔로레이드가 없어");
+      return;
+    }
+
     if (!soloRaidActive || !userId) {
       const updateLocalDecks = (prev: Deck[]) => {
         const next = prev.filter((d) => d.id !== id);
@@ -2103,6 +2288,11 @@ export default function Page() {
   async function submitDeckFromHome(payload: { draft: string[]; scoreText: string; editingId: string | null }) {
     const { draft, scoreText, editingId } = payload;
 
+    if (!soloRaidActive) {
+      showToast("현재 진행 중인 솔로레이드가 없어");
+      return false;
+    }
+
     if (draft.length !== MAX_DECK_CHARS) {
       showToast("니케 5명을 먼저 골라줘.");
       return false;
@@ -2200,6 +2390,11 @@ export default function Page() {
   }
 
   async function submitBulkFromHome(text: string) {
+    if (!soloRaidActive) {
+      showToast("현재 진행 중인 솔로레이드가 없어");
+      return false;
+    }
+
     const parsed = parseBulk(text)
       .map((entry) => {
         const chars = resolveDeckChars(entry.chars, nikkeNameLookup);
@@ -2482,23 +2677,29 @@ export default function Page() {
         finalRaidKey
           ? cloneDecksForLocalStorage(decks.filter((deck) => deck.raidKey === finalRaidKey))
           : [];
+      const archivedOffSeasonDecks = finalRaidKey
+        ? [...finalLocalDecks, ...offSeasonDecks.filter((deck) => deck.raidKey !== finalRaidKey)]
+        : offSeasonDecks;
 
-      if (currentUserId && finalRaidKey && canRecommend) {
-        const finalRecord: RecommendationRecord = {
-          raidKey: finalRaidKey,
-          raidLabel: activeRaidLabel,
-          total: best.total,
-          decks: best.picked.map((deck) => ({
-            chars: [...deck.chars],
-            score: deck.score,
-          })),
-          updatedAt: Date.now(),
-        };
-        await persistRecommendationRecord(currentUserId, finalRecord);
-        setRecommendationHistory((prev) => ({
-          ...prev,
-          [finalRaidKey]: finalRecord,
-        }));
+      if (currentUserId && finalRaidKey) {
+        await persistRecommendedDeckSnapshot(currentUserId, finalRaidKey, activeRaidLabel, recommendedDecks);
+        if (canRecommend) {
+          const finalRecord: RecommendationRecord = {
+            raidKey: finalRaidKey,
+            raidLabel: activeRaidLabel,
+            total: best.total,
+            decks: best.picked.map((deck) => ({
+              chars: [...deck.chars],
+              score: deck.score,
+            })),
+            updatedAt: Date.now(),
+          };
+          await persistRecommendationRecord(currentUserId, finalRecord);
+          setRecommendationHistory((prev) => ({
+            ...prev,
+            [finalRaidKey]: finalRecord,
+          }));
+        }
       }
 
       const { data, error } = await supabase
@@ -2514,8 +2715,8 @@ export default function Page() {
       if (error) throw error;
       if (!data) throw new Error("app_config 업데이트 대상이 없어");
 
-      setOffSeasonDecks(finalLocalDecks);
-      saveLocalOffSeasonDecks(finalLocalDecks);
+      setOffSeasonDecks(archivedOffSeasonDecks);
+      saveLocalOffSeasonDecks(archivedOffSeasonDecks);
       setOffSeasonRaidKey(finalRaidKey);
       await refreshAppConfig();
       await refreshSupabase(false);
@@ -3185,7 +3386,7 @@ export default function Page() {
             boss={boss}
             bosses={bosses}
             decksCount={activeRaidDecks.length}
-            canRecommend={canRecommend}
+            canRecommend={soloRaidActive && canRecommend}
             best={best}
             fmt={fmt}
             getPublicUrl={getPublicUrl}
@@ -3210,6 +3411,7 @@ export default function Page() {
               visibleSavedDecks={visibleSavedDecks}
               deckTabs={savedDeckTabs}
               savedDeckTab={currentDeckRaidKey ?? ""}
+              readOnly={!soloRaidActive}
               onSavedDeckTabChange={(key) => {
                 if (soloRaidActive) {
                   setActiveRaidKey(key);
@@ -3268,8 +3470,8 @@ export default function Page() {
                   setOffSeasonRaidKey(key);
                 }
               }}
-              recommendedDecks={recommendedDecks}
-              loadingRecommendedDecks={loadingCommunityRaidDecks}
+              recommendedDecks={displayedRecommendedDecks}
+              loadingRecommendedDecks={soloRaidActive ? loadingCommunityRaidDecks : loadingRecommendedDeckSnapshots}
               videoEmbedUrl={toYouTubeEmbedUrl(recommendedVideoUrl)}
               tips={soloRaidTips}
               loadingTips={loadingSoloRaidTips}

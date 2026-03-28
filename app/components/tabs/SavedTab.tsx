@@ -30,6 +30,7 @@ type SavedTabProps = {
   visibleSavedDecks: Deck[];
   deckTabs: readonly SavedTabItem[];
   savedDeckTab: string;
+  readOnly: boolean;
   onSavedDeckTabChange: (key: string) => void;
   onUpdateDeckScore: (id: string, scoreText: string) => Promise<boolean>;
   onUpdateDeckChars: (id: string, nextChars: string[]) => Promise<boolean>;
@@ -44,6 +45,7 @@ export default function SavedTab({
   visibleSavedDecks,
   deckTabs,
   savedDeckTab,
+  readOnly,
   onSavedDeckTabChange,
   onUpdateDeckScore,
   onUpdateDeckChars,
@@ -60,7 +62,7 @@ export default function SavedTab({
   const sortedNikkeNames = useMemo(() => [...allNikkeNames].sort((a, b) => a.localeCompare(b)), [allNikkeNames]);
 
   async function saveDeckSlot(deck: Deck, slotIndex: number, nextName: string) {
-    if (savingSlot) return;
+    if (savingSlot || readOnly) return;
     const normalizedName = nextName.trim();
     if (!normalizedName || normalizedName === deck.chars[slotIndex]) return;
 
@@ -127,7 +129,7 @@ export default function SavedTab({
 
                         <select
                           value={name}
-                          disabled={savingSlot}
+                          disabled={savingSlot || readOnly}
                           onChange={(event) => {
                             void saveDeckSlot(deck, slotIndex, event.target.value);
                           }}
@@ -192,15 +194,18 @@ export default function SavedTab({
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={() => {
+                      if (readOnly) return;
                       setEditingScoreId(deck.id);
                       setEditingScoreText(String(deck.score));
                     }}
+                    disabled={readOnly}
                     className="flex-1 rounded-2xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
                   >
                     점수 수정
                   </button>
                   <button
                     onClick={() => onDeleteDeck(deck.id)}
+                    disabled={readOnly}
                     className="rounded-2xl border border-red-800/60 px-3 py-2 text-sm text-red-300 active:scale-[0.99]"
                   >
                     삭제
