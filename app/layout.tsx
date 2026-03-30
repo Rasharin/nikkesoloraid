@@ -13,7 +13,6 @@ const geistMono = Geist_Mono({
 });
 
 const siteName = "니케 솔로레이드 덱 도우미";
-const description = "니케 솔로레이드 덱 추천, 덱 조합 계산, 덱 만들기";
 const siteUrl = "https://nikkesoloraid.vercel.app";
 
 export const metadata: Metadata = {
@@ -22,11 +21,17 @@ export const metadata: Metadata = {
     default: siteName,
     template: "%s | 니케 솔로레이드 덱 도우미",
   },
-  description,
-  keywords: ["니케 솔레 덱 도우미", "니케 솔레", "니케 덱", "니케 솔로레이드", "니케 덱 추천"],
+  description: "니케 솔로레이드 덱 추천, 조합 계산, 점수 최적화 도우미",
+  keywords: [
+    "니케 솔레",
+    "니케 덱",
+    "니케 솔로레이드",
+    "니케 덱 추천",
+    "니케 조합",
+  ],
   openGraph: {
     title: siteName,
-    description,
+    description: "니케 덱 추천 최적화 사이트",
     url: siteUrl,
     siteName,
     locale: "ko_KR",

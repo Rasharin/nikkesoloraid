@@ -1,6 +1,7 @@
 ﻿"use client";
 import LoginButton from "./components/LoginButton";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import HomeTab from "./components/tabs/HomeTab";
 import MyPageTab from "./components/tabs/MyPageTab";
 import RecommendTab from "./components/tabs/RecommendTab";
@@ -189,6 +190,22 @@ const roles = [
 
 type TabKey = "home" | "saved" | "recommend" | "usage" | "settings" | "contact" | "mypage";
 type UsageBoardCategoryKey = "home" | "saved" | "recommend" | "settings";
+const TAB_ROUTE_MAP: Record<Exclude<TabKey, "mypage">, string> = {
+  home: "/",
+  saved: "/saved-deck",
+  recommend: "/deck-recommend",
+  usage: "/usage",
+  settings: "/deck-setting",
+  contact: "/faq",
+};
+const PATH_TAB_MAP: Record<string, Exclude<TabKey, "mypage">> = {
+  "/": "home",
+  "/saved-deck": "saved",
+  "/deck-recommend": "recommend",
+  "/usage": "usage",
+  "/deck-setting": "settings",
+  "/faq": "contact",
+};
 const DEFAULT_DECK_TABS: DeckTabItem[] = [];
 const DEFAULT_ACTIVE_RAID_KEY = null;
 const USAGE_BOARD_TABS: ReadonlyArray<{ key: UsageBoardCategoryKey; label: string }> = [
@@ -1023,6 +1040,8 @@ function UsageIcon({ active }: { active: boolean }) {
 
 // -------------------- Page --------------------
 export default function Page() {
+  const pathname = usePathname();
+  const router = useRouter();
   const [tab, setTab] = useState<TabKey>("home");
   const [usageBoardTab, setUsageBoardTab] = useState<UsageBoardCategoryKey>("home");
   const [deckTabs, setDeckTabs] = useState<DeckTabItem[]>(DEFAULT_DECK_TABS);
@@ -1077,6 +1096,11 @@ export default function Page() {
   const [savingUsagePost, setSavingUsagePost] = useState(false);
   const [deletingUsagePostId, setDeletingUsagePostId] = useState<string | null>(null);
   const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>("number");
+
+  useEffect(() => {
+    const nextTab = PATH_TAB_MAP[pathname] ?? "home";
+    setTab((current) => (current === nextTab ? current : nextTab));
+  }, [pathname]);
 
   async function fetchUserDecks(currentUserId: string) {
     const { data, error } = await supabase
@@ -2045,8 +2069,16 @@ export default function Page() {
     };
   }, [activeRaidLabel, best, canRecommend, currentDeckRaidKey, recommendationHistory, recommendationLoaded, soloRaidActive, userId]);
 
+  function navigateToTab(nextTab: Exclude<TabKey, "mypage">) {
+    const nextPath = TAB_ROUTE_MAP[nextTab];
+    setTab(nextTab);
+    if (pathname !== nextPath) {
+      router.push(nextPath);
+    }
+  }
+
   function startEditDeck(d: Deck) {
-    setTab("home");
+    navigateToTab("home");
     setHomeEditRequest(d);
   }
 
@@ -3273,12 +3305,18 @@ export default function Page() {
         {/* Header */}
         <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3.5 backdrop-blur lg:-mx-8 lg:px-8 lg:py-4">
           <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-6">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="니케 솔로레이드 덱 도우미" className="h-16 w-auto object-contain lg:h-20" />
+            <div className="flex flex-col items-start">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="니케 솔로레이드 덱 도우미" className="h-16 w-auto object-contain lg:h-20" />
+              <div className="mt-1.5 pl-1 text-xs leading-5 text-neutral-400 lg:text-sm">
+                <h1 className="font-medium text-neutral-300">니케 솔로레이드 덱 도우미 사이트</h1>
+                <p>니케 솔로레이드 덱을 자동으로 계산하고 최적 조합을 추천하는 도우미입니다.</p>
+              </div>
+            </div>
 
             <div className="grid grid-cols-6 gap-1.5 px-1 lg:mx-auto lg:w-full lg:max-w-3xl">
               <button
-                onClick={() => setTab("home")}
+                onClick={() => navigateToTab("home")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
                   tab === "home" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
                 }`}
@@ -3288,7 +3326,7 @@ export default function Page() {
               </button>
 
               <button
-                onClick={() => setTab("saved")}
+                onClick={() => navigateToTab("saved")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
                   tab === "saved" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
                 }`}
@@ -3298,7 +3336,7 @@ export default function Page() {
               </button>
 
               <button
-                onClick={() => setTab("recommend")}
+                onClick={() => navigateToTab("recommend")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
                   tab === "recommend" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
                 }`}
@@ -3308,7 +3346,7 @@ export default function Page() {
               </button>
 
               <button
-                onClick={() => setTab("usage")}
+                onClick={() => navigateToTab("usage")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
                   tab === "usage" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
                 }`}
@@ -3318,7 +3356,7 @@ export default function Page() {
               </button>
 
               <button
-                onClick={() => setTab("settings")}
+                onClick={() => navigateToTab("settings")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
                   tab === "settings" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
                 }`}
@@ -3328,7 +3366,7 @@ export default function Page() {
               </button>
 
               <button
-                onClick={() => setTab("contact")}
+                onClick={() => navigateToTab("contact")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
                   tab === "contact" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
                 }`}
@@ -3400,7 +3438,7 @@ export default function Page() {
             onEditRequestConsumed={() => setHomeEditRequest(null)}
             onResetSelected={resetSelected}
             onRemoveSelectedNikke={removeSelectedNikke}
-            onGoToSettings={() => setTab("settings")}
+            onGoToSettings={() => navigateToTab("settings")}
             onShowToast={showToast}
             onSubmitDeck={submitDeckFromHome}
             onSubmitBulk={submitBulkFromHome}
