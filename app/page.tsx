@@ -3013,9 +3013,8 @@ export default function Page() {
       return true;
     }
 
-    const currentUserId = await getCurrentUserId();
-
     try {
+      const currentUserId = userId ? await getCurrentUserId() : null;
       const { data, error } = await supabase
         .from(CONTACT_INQUIRIES_TABLE)
         .insert({
