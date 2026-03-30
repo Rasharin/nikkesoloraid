@@ -3015,22 +3015,26 @@ export default function Page() {
 
     try {
       const currentUserId = userId ? await getCurrentUserId() : null;
-      const { data, error } = await supabase
-        .from(CONTACT_INQUIRIES_TABLE)
-        .insert({
-          content: trimmedContent,
-          user_id: currentUserId,
-        })
-        .select("id,content,user_id,created_at")
-        .single();
-
-      if (error) throw error;
-
-      const inserted = mapContactInquiryRow(data as ContactInquiryRow);
-      if (!inserted) throw new Error("Invalid contact inquiry row");
+      const insertPayload = {
+        content: trimmedContent,
+        user_id: currentUserId,
+      };
 
       if (isMasterUser) {
+        const { data, error } = await supabase
+          .from(CONTACT_INQUIRIES_TABLE)
+          .insert(insertPayload)
+          .select("id,content,user_id,created_at")
+          .single();
+
+        if (error) throw error;
+
+        const inserted = mapContactInquiryRow(data as ContactInquiryRow);
+        if (!inserted) throw new Error("Invalid contact inquiry row");
         setContactInquiries((prev) => [inserted, ...prev]);
+      } else {
+        const { error } = await supabase.from(CONTACT_INQUIRIES_TABLE).insert(insertPayload);
+        if (error) throw error;
       }
 
       showToast("문의 전송 완료");
