@@ -1,4 +1,5 @@
 ﻿"use client";
+import Link from "next/link";
 import LoginButton from "./components/LoginButton";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -3306,8 +3307,10 @@ export default function Page() {
         <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3.5 backdrop-blur lg:-mx-8 lg:px-8 lg:py-4">
           <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-6">
             <div className="flex flex-col items-start">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="니케 솔로레이드 덱 도우미" className="h-16 w-auto object-contain lg:h-20" />
+              <Link href="/" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo.png" alt="니케 솔로레이드 덱 도우미" className="h-16 w-auto object-contain lg:h-20" />
+              </Link>
               <div className="mt-1.5 pl-1 text-xs leading-5 text-neutral-400 lg:text-sm">
                 <h1 className="font-medium text-neutral-300">니케 솔로레이드 덱 도우미 사이트</h1>
                 <p>니케 솔로레이드 덱을 자동으로 계산하고 최적 조합을 추천하는 도우미입니다.</p>
