@@ -1,32 +1,13 @@
 import type { MetadataRoute } from "next";
-
-const siteUrl = "https://nikkesoloraid.vercel.app";
+import { publicRoutes, siteUrl } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [
-    {
-      url: siteUrl,
-      lastModified: new Date(),
-    },
-    {
-      url: `${siteUrl}/deck-recommend`,
-      lastModified: new Date(),
-    },
-    {
-      url: `${siteUrl}/deck-setting`,
-      lastModified: new Date(),
-    },
-    {
-      url: `${siteUrl}/usage`,
-      lastModified: new Date(),
-    },
-    {
-      url: `${siteUrl}/saved-deck`,
-      lastModified: new Date(),
-    },
-    {
-      url: `${siteUrl}/faq`,
-      lastModified: new Date(),
-    },
-  ];
+  const lastModified = new Date();
+
+  return publicRoutes.map((route) => ({
+    url: route ? `${siteUrl}${route}` : siteUrl,
+    lastModified,
+    changeFrequency: route === "" ? "daily" : "weekly",
+    priority: route === "" ? 1 : 0.8,
+  }));
 }

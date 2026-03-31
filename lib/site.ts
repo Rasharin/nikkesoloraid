@@ -1,0 +1,12 @@
+export const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ??
+  "https://nikkesoloraid.vercel.app";
+
+export const publicRoutes = [
+  "",
+  "/deck-recommend",
+  "/deck-setting",
+  "/usage",
+  "/saved-deck",
+  "/faq",
+] as const;
