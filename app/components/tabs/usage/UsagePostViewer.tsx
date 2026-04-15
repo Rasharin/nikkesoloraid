@@ -27,7 +27,7 @@ export default function UsagePostViewer({ post, isMaster, deleting, getPublicUrl
   }).format(new Date(post.updatedAt || post.createdAt));
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900/40">
+    <article className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-800/60">
       <div className="border-b border-neutral-800 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="text-xs text-neutral-500">{dateText}</div>

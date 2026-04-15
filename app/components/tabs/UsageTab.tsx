@@ -152,7 +152,7 @@ export default function UsageTab({
 
   return (
     <div className="space-y-3">
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-800/60 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-2xl font-semibold text-neutral-100">니케 도우미 사용법</h2>
@@ -210,11 +210,11 @@ export default function UsageTab({
 
       <section className="space-y-3">
         {loadingPosts ? (
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400">
+          <div className="rounded-2xl border border-neutral-800 bg-neutral-800/60 p-4 text-sm text-neutral-400">
             게시글을 불러오는 중..
           </div>
         ) : !currentPost ? (
-          <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-400">
+          <div className="rounded-2xl border border-neutral-800 bg-neutral-800/60 p-4 text-sm text-neutral-400">
             아직 등록된 {activeLabel} 사용법이 없어요.
             {isMaster && !showWriteForm && !hasContent ? " 작성 버튼으로 첫 블록 글을 만들 수 있어요." : ""}
           </div>
