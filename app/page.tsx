@@ -3450,7 +3450,7 @@ export default function Page() {
         )}
 
         {tab === "saved" && (
-          <div className="mx-auto w-full lg:max-w-4xl">
+          <div className="mx-auto w-full lg:max-w-6xl">
             <SavedTab
               visibleSavedDecks={visibleSavedDecks}
               deckTabs={savedDeckTabs}
@@ -3501,7 +3501,7 @@ export default function Page() {
         )}
 
         {tab === "recommend" && (
-          <div className="mx-auto w-full lg:max-w-4xl">
+          <div className="mx-auto w-full lg:max-w-6xl">
             <RecommendTab
               raidLabel={activeRaidLabel}
               raidKey={currentDeckRaidKey ?? ""}
@@ -3534,7 +3534,7 @@ export default function Page() {
         )}
 
         {tab === "usage" && (
-          <div className="mx-auto w-full lg:max-w-4xl">
+          <div className="mx-auto w-full lg:max-w-6xl">
             <UsageTab
               tabs={USAGE_BOARD_TABS}
               activeTab={usageBoardTab}
@@ -3552,7 +3552,7 @@ export default function Page() {
         )}
 
         {tab === "contact" && (
-          <div className="mx-auto w-full lg:max-w-2xl">
+          <div className="mx-auto w-full lg:max-w-6xl">
             <ContactTab onSubmitInquiry={submitContactInquiry} />
           </div>
         )}
