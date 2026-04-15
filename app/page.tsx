@@ -1097,6 +1097,7 @@ export default function Page() {
   const [savingUsagePost, setSavingUsagePost] = useState(false);
   const [deletingUsagePostId, setDeletingUsagePostId] = useState<string | null>(null);
   const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>("number");
+  const showInitialDataLoading = loadingData && nikkes.length === 0 && bosses.length === 0;
 
   useEffect(() => {
     const nextTab = PATH_TAB_MAP[pathname] ?? "home";
@@ -1943,6 +1944,7 @@ export default function Page() {
     [currentDeckRaidKey, savedDeckSource]
   );
   const visibleSavedDecks = sortedDecks;
+  const showInitialDeckLoading = loadingDecks && savedDeckSource.length === 0;
   const savedDeckTabs = useMemo(
     () =>
       deckTabs
@@ -3401,12 +3403,12 @@ export default function Page() {
           </div>
         )}
 
-        {loadingData && (
+        {showInitialDataLoading && (
           <div className="mb-4 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 text-sm text-neutral-300">
             니케/보스 정보를 불러오는 중…
           </div>
         )}
-        {loadingDecks && (
+        {showInitialDeckLoading && (
           <div className="mb-4 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 text-sm text-neutral-300">
             저장된 덱을 불러오는 중…
           </div>
@@ -3416,12 +3418,6 @@ export default function Page() {
         {toast && (
           <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-2xl bg-neutral-800 px-4 py-2 text-sm shadow">
             {toast}
-          </div>
-        )}
-
-        {loadingData && (
-          <div className="mb-4 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3 text-sm text-neutral-300">
-            니케/보스 정보를 불러오는 중…
           </div>
         )}
 
