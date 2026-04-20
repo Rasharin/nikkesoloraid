@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { siteUrl } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,8 +14,6 @@ const geistMono = Geist_Mono({
 });
 
 const siteName = "니케 솔로레이드 덱 도우미";
-const siteUrl = "https://nikkesoloraid.vercel.app";
-
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {

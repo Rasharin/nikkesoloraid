@@ -10,6 +10,7 @@ import SavedTab from "./components/tabs/SavedTab";
 import SettingsTab from "./components/tabs/SettingsTab";
 import ContactTab from "./components/tabs/ContactTab";
 import UsageTab from "./components/tabs/UsageTab";
+import CalculatorTab from "./components/tabs/CalculatorTab";
 import type { ImageBlock, TextBlock, UsageBlock, UsageEditorBlock, UsagePost } from "./components/tabs/usage/types";
 import { supabase } from "../lib/supabase";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
@@ -189,12 +190,13 @@ const roles = [
   { v: "defender", label: "방어형" },
 ] as const;
 
-type TabKey = "home" | "saved" | "recommend" | "usage" | "settings" | "contact" | "mypage";
+type TabKey = "home" | "saved" | "recommend" | "calculator" | "usage" | "settings" | "contact" | "mypage";
 type UsageBoardCategoryKey = "home" | "saved" | "recommend" | "settings";
 const TAB_ROUTE_MAP: Record<Exclude<TabKey, "mypage">, string> = {
   home: "/",
   saved: "/saved-deck",
   recommend: "/deck-recommend",
+  calculator: "/calculator",
   usage: "/usage",
   settings: "/deck-setting",
   contact: "/faq",
@@ -203,6 +205,7 @@ const PATH_TAB_MAP: Record<string, Exclude<TabKey, "mypage">> = {
   "/": "home",
   "/saved-deck": "saved",
   "/deck-recommend": "recommend",
+  "/calculator": "calculator",
   "/usage": "usage",
   "/deck-setting": "settings",
   "/faq": "contact",
@@ -993,6 +996,16 @@ function RecommendIcon({ active }: { active: boolean }) {
   );
 }
 
+function CalculatorIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect x="5" y="3" width="14" height="18" rx="2" stroke={active ? "white" : "#a3a3a3"} strokeWidth="2" />
+      <path d="M8 7.5h8" stroke={active ? "white" : "#a3a3a3"} strokeWidth="2" strokeLinecap="round" />
+      <path d="M8 12h2M14 12h2M8 16h2M14 16h2" stroke={active ? "white" : "#a3a3a3"} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function GearIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -1098,11 +1111,19 @@ export default function Page() {
   const [deletingUsagePostId, setDeletingUsagePostId] = useState<string | null>(null);
   const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>("number");
   const showInitialDataLoading = loadingData && nikkes.length === 0 && bosses.length === 0;
+  const canAccessCalculator = isMasterUser || process.env.NODE_ENV !== "production";
 
   useEffect(() => {
-    const nextTab = PATH_TAB_MAP[pathname] ?? "home";
+    const pathTab = PATH_TAB_MAP[pathname] ?? "home";
+    const nextTab = pathTab === "calculator" && !canAccessCalculator ? "home" : pathTab;
     setTab((current) => (current === nextTab ? current : nextTab));
-  }, [pathname]);
+  }, [canAccessCalculator, pathname]);
+
+  useEffect(() => {
+    if (pathname !== "/calculator") return;
+    if (canAccessCalculator) return;
+    router.replace("/");
+  }, [canAccessCalculator, pathname, router]);
 
   async function fetchUserDecks(currentUserId: string) {
     const { data, error } = await supabase
@@ -1954,6 +1975,7 @@ export default function Page() {
     [deckTabs]
   );
   const isMaster = isMasterUser;
+  const shouldShowCalculator = canAccessCalculator;
   const canManageBosses = isMaster || process.env.NODE_ENV !== "production";
 
   useEffect(() => {
@@ -3319,7 +3341,7 @@ export default function Page() {
               </div>
             </div>
 
-            <div className="grid grid-cols-6 gap-1.5 px-1 lg:mx-auto lg:w-full lg:max-w-3xl">
+            <div className={`grid gap-1.5 px-1 lg:mx-auto lg:w-full ${shouldShowCalculator ? "grid-cols-7 lg:max-w-4xl" : "grid-cols-6 lg:max-w-3xl"}`}>
               <button
                 onClick={() => navigateToTab("home")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
@@ -3359,6 +3381,18 @@ export default function Page() {
                 <UsageIcon active={tab === "usage"} />
                 <div>사용법</div>
               </button>
+
+              {shouldShowCalculator && (
+                <button
+                  onClick={() => navigateToTab("calculator")}
+                  className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
+                    tab === "calculator" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                  }`}
+                >
+                  <CalculatorIcon active={tab === "calculator"} />
+                  <div>계산기</div>
+                </button>
+              )}
 
               <button
                 onClick={() => navigateToTab("settings")}
@@ -3544,6 +3578,12 @@ export default function Page() {
               onDeletePost={deleteUsagePost}
               getPublicUrl={getPublicUrl}
             />
+          </div>
+        )}
+
+        {tab === "calculator" && shouldShowCalculator && (
+          <div className="mx-auto w-full lg:max-w-6xl">
+            <CalculatorTab />
           </div>
         )}
 

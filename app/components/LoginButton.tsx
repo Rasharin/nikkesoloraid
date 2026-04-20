@@ -55,10 +55,15 @@ export default function LoginButton({ onProfileClick }: LoginButtonProps) {
       return;
     }
 
+    const redirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/auth/callback`
+        : `${process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ?? "https://nikesolo.com"}/auth/callback`;
+
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: "https://nikkesoloraid.vercel.app/auth/callback",
+        redirectTo,
       },
     });
   }
