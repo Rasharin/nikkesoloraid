@@ -1089,6 +1089,8 @@ export default function Page() {
   const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set())
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set())
   const [isMasterUser, setIsMasterUser] = useState(false);
+  const [authResolved, setAuthResolved] = useState(process.env.NODE_ENV !== "production");
+  const [masterUserChecked, setMasterUserChecked] = useState(process.env.NODE_ENV !== "production");
   const [activeRaidKey, setActiveRaidKey] = useState<string | null>(DEFAULT_ACTIVE_RAID_KEY);
   const [soloRaidActive, setSoloRaidActive] = useState(true);
   const [appConfigLoaded, setAppConfigLoaded] = useState(false);
@@ -1112,18 +1114,22 @@ export default function Page() {
   const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>("number");
   const showInitialDataLoading = loadingData && nikkes.length === 0 && bosses.length === 0;
   const canAccessCalculator = isMasterUser || process.env.NODE_ENV !== "production";
+  const calculatorAccessResolved =
+    process.env.NODE_ENV !== "production" || (authResolved && (!userId || masterUserChecked));
 
   useEffect(() => {
+    if (!calculatorAccessResolved) return;
     const pathTab = PATH_TAB_MAP[pathname] ?? "home";
     const nextTab = pathTab === "calculator" && !canAccessCalculator ? "home" : pathTab;
     setTab((current) => (current === nextTab ? current : nextTab));
-  }, [canAccessCalculator, pathname]);
+  }, [calculatorAccessResolved, canAccessCalculator, pathname]);
 
   useEffect(() => {
+    if (!calculatorAccessResolved) return;
     if (pathname !== "/calculator") return;
     if (canAccessCalculator) return;
     router.replace("/");
-  }, [canAccessCalculator, pathname, router]);
+  }, [calculatorAccessResolved, canAccessCalculator, pathname, router]);
 
   async function fetchUserDecks(currentUserId: string) {
     const { data, error } = await supabase
@@ -1289,10 +1295,12 @@ export default function Page() {
     supabase.auth.getUser().then(({ data }) => {
       if (!mounted) return;
       setUserId(data.user?.id ?? null);
+      setAuthResolved(true);
     });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserId(session?.user?.id ?? null);
+      setAuthResolved(true);
     });
 
     return () => {
@@ -1427,8 +1435,11 @@ export default function Page() {
   }, [activeRaidKey, userId]);
 
   useEffect(() => {
+    if (!authResolved) return;
+
     if (!userId) {
       setIsMasterUser(false);
+      setMasterUserChecked(true);
       return;
     }
 
@@ -1437,6 +1448,7 @@ export default function Page() {
     let cancelled = false;
 
     async function checkMasterUser() {
+      setMasterUserChecked(false);
       try {
         const normalizedUserId = currentUserId.trim();
         const { data, error } = await supabase
@@ -1455,6 +1467,10 @@ export default function Page() {
         if (!cancelled) {
           setIsMasterUser(false);
         }
+      } finally {
+        if (!cancelled) {
+          setMasterUserChecked(true);
+        }
       }
     }
 
@@ -1463,7 +1479,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [authResolved, userId]);
 
   useEffect(() => {
     let cancelled = false;
