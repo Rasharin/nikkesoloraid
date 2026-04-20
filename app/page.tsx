@@ -1723,42 +1723,6 @@ export default function Page() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadCommunityRaidDecks() {
-      if (!activeRaidKey) {
-        setCommunityRaidDecks([]);
-        setLoadingCommunityRaidDecks(false);
-        return;
-      }
-
-      setLoadingCommunityRaidDecks(true);
-      try {
-        const nextDecks = await fetchCommunityRaidDecks(activeRaidKey);
-        if (!cancelled) {
-          setCommunityRaidDecks(nextDecks);
-        }
-      } catch (error) {
-        console.error(error);
-        if (!cancelled) {
-          setCommunityRaidDecks([]);
-          showToast("추천 덱 불러오기 실패");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingCommunityRaidDecks(false);
-        }
-      }
-    }
-
-    void loadCommunityRaidDecks();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeRaidKey, decks]);
-
-  useEffect(() => {
-    let cancelled = false;
-
     async function loadRecommendedDeckSnapshots() {
       const targetRaidKeys = deckTabs
         .map((tab) => tab.key)
@@ -1953,6 +1917,41 @@ export default function Page() {
     () => (currentDeckRaidKey ? savedDeckSource.filter((deck) => deck.raidKey === currentDeckRaidKey) : []),
     [currentDeckRaidKey, savedDeckSource]
   );
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCommunityRaidDecks() {
+      if (!currentDeckRaidKey) {
+        setCommunityRaidDecks([]);
+        setLoadingCommunityRaidDecks(false);
+        return;
+      }
+
+      setLoadingCommunityRaidDecks(true);
+      try {
+        const nextDecks = await fetchCommunityRaidDecks(currentDeckRaidKey);
+        if (!cancelled) {
+          setCommunityRaidDecks(nextDecks);
+        }
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setCommunityRaidDecks([]);
+          showToast("추천 덱 불러오기 실패");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingCommunityRaidDecks(false);
+        }
+      }
+    }
+
+    void loadCommunityRaidDecks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentDeckRaidKey, decks]);
   const recommendedDecks = useMemo(() => {
     const grouped = new Map<string, { chars: string[]; totalScore: number; usedCount: number }>();
 
@@ -1986,10 +1985,10 @@ export default function Page() {
       });
   }, [communityRaidDecks]);
   const displayedRecommendedDecks = useMemo(() => {
-    if (soloRaidActive) return recommendedDecks;
     if (!currentDeckRaidKey) return [];
+    if (recommendedDecks.length > 0) return recommendedDecks;
     return recommendedDeckSnapshots[currentDeckRaidKey]?.decks ?? [];
-  }, [currentDeckRaidKey, recommendedDeckSnapshots, recommendedDecks, soloRaidActive]);
+  }, [currentDeckRaidKey, recommendedDeckSnapshots, recommendedDecks]);
   const best = useMemo(() => pickBest5(activeRaidDecks), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
   const activeRaidLabel = useMemo(
@@ -3593,7 +3592,7 @@ export default function Page() {
                 }
               }}
               recommendedDecks={displayedRecommendedDecks}
-              loadingRecommendedDecks={soloRaidActive ? loadingCommunityRaidDecks : loadingRecommendedDeckSnapshots}
+              loadingRecommendedDecks={loadingCommunityRaidDecks || (!soloRaidActive && loadingRecommendedDeckSnapshots)}
               videoEmbedUrl={toYouTubeEmbedUrl(recommendedVideoUrl)}
               tips={soloRaidTips}
               loadingTips={loadingSoloRaidTips}
