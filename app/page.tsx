@@ -1092,6 +1092,7 @@ export default function Page() {
   const [authResolved, setAuthResolved] = useState(process.env.NODE_ENV !== "production");
   const [masterUserChecked, setMasterUserChecked] = useState(process.env.NODE_ENV !== "production");
   const [activeRaidKey, setActiveRaidKey] = useState<string | null>(DEFAULT_ACTIVE_RAID_KEY);
+  const [configuredActiveRaidKey, setConfiguredActiveRaidKey] = useState<string | null>(DEFAULT_ACTIVE_RAID_KEY);
   const [soloRaidActive, setSoloRaidActive] = useState(true);
   const [appConfigLoaded, setAppConfigLoaded] = useState(false);
   const [recommendationHistory, setRecommendationHistory] = useState<Record<string, RecommendationRecord>>({});
@@ -1321,9 +1322,15 @@ export default function Page() {
     const config = data as AppConfigRow | null;
     const nextTabs = mapDeckTabs(config?.solo_raid_tabs);
     const resolvedTabs = nextTabs.length > 0 ? nextTabs : DEFAULT_DECK_TABS;
-    const nextActiveKey = config?.solo_raid_active === false ? null : (getNewestDeckTabKey(resolvedTabs) ?? DEFAULT_ACTIVE_RAID_KEY);
+    const validRaidKeys = new Set(resolvedTabs.map((tab) => tab.key));
+    const configActiveRaidKey =
+      typeof config?.active_raid_key === "string" && validRaidKeys.has(config.active_raid_key.trim())
+        ? config.active_raid_key.trim()
+        : null;
+    const nextActiveKey = configActiveRaidKey ?? getNewestDeckTabKey(resolvedTabs) ?? DEFAULT_ACTIVE_RAID_KEY;
 
     setDeckTabs(resolvedTabs);
+    setConfiguredActiveRaidKey(nextActiveKey);
     setActiveRaidKey(nextActiveKey);
     setSoloRaidActive(config?.solo_raid_active ?? true);
   }
@@ -1348,6 +1355,7 @@ export default function Page() {
         console.error(error);
         if (!cancelled) {
           setDeckTabs(DEFAULT_DECK_TABS);
+          setConfiguredActiveRaidKey(DEFAULT_ACTIVE_RAID_KEY);
           setActiveRaidKey(DEFAULT_ACTIVE_RAID_KEY);
           setSoloRaidActive(true);
         }
@@ -1794,15 +1802,28 @@ export default function Page() {
   }, [selectedNames]);
 
   useEffect(() => {
-    if (!soloRaidActive) {
+    const availableRaidKeys = new Set(deckTabs.map((tab) => tab.key));
+    if (availableRaidKeys.size === 0) {
       if (activeRaidKey !== null) setActiveRaidKey(null);
       return;
     }
 
-    const newestDeckTabKey = getNewestDeckTabKey(deckTabs) ?? DEFAULT_ACTIVE_RAID_KEY;
-    if (activeRaidKey === newestDeckTabKey) return;
-    setActiveRaidKey(newestDeckTabKey);
-  }, [activeRaidKey, deckTabs, soloRaidActive]);
+    if (soloRaidActive) {
+      if (activeRaidKey && availableRaidKeys.has(activeRaidKey)) return;
+      const preferredRaidKey =
+        (configuredActiveRaidKey && availableRaidKeys.has(configuredActiveRaidKey) ? configuredActiveRaidKey : null) ??
+        getNewestDeckTabKey(deckTabs) ??
+        DEFAULT_ACTIVE_RAID_KEY;
+      if (activeRaidKey !== preferredRaidKey) {
+        setActiveRaidKey(preferredRaidKey);
+      }
+      return;
+    }
+
+    if (activeRaidKey !== null && !availableRaidKeys.has(activeRaidKey)) {
+      setActiveRaidKey(null);
+    }
+  }, [activeRaidKey, configuredActiveRaidKey, deckTabs, soloRaidActive]);
 
   async function refreshSupabase(forceSoloRaidActive?: boolean) {
     setLoadingData(true);
@@ -1918,8 +1939,11 @@ export default function Page() {
     if (offSeasonRaidKey && deckTabs.some((tab) => tab.key === offSeasonRaidKey)) {
       return offSeasonRaidKey;
     }
+    if (configuredActiveRaidKey && deckTabs.some((tab) => tab.key === configuredActiveRaidKey)) {
+      return configuredActiveRaidKey;
+    }
     return getNewestDeckTabKey(deckTabs) ?? DEFAULT_ACTIVE_RAID_KEY;
-  }, [activeRaidKey, deckTabs, offSeasonRaidKey, soloRaidActive]);
+  }, [activeRaidKey, configuredActiveRaidKey, deckTabs, offSeasonRaidKey, soloRaidActive]);
   const savedDeckSource = useMemo(() => {
     if (soloRaidActive) return decks;
     return userId ? decks : offSeasonDecks;
@@ -1997,9 +2021,13 @@ export default function Page() {
   useEffect(() => {
     if (soloRaidActive) return;
     if (offSeasonRaidKey) return;
-    const fallbackRaidKey = savedDeckSource[0]?.raidKey ?? getNewestDeckTabKey(deckTabs) ?? DEFAULT_ACTIVE_RAID_KEY;
+    const fallbackRaidKey =
+      (configuredActiveRaidKey && deckTabs.some((tab) => tab.key === configuredActiveRaidKey) ? configuredActiveRaidKey : null) ??
+      savedDeckSource[0]?.raidKey ??
+      getNewestDeckTabKey(deckTabs) ??
+      DEFAULT_ACTIVE_RAID_KEY;
     setOffSeasonRaidKey(fallbackRaidKey);
-  }, [deckTabs, offSeasonRaidKey, savedDeckSource, soloRaidActive]);
+  }, [configuredActiveRaidKey, deckTabs, offSeasonRaidKey, savedDeckSource, soloRaidActive]);
 
   async function persistRecommendationRecord(currentUserId: string, record: RecommendationRecord) {
     const { error } = await supabase
@@ -2745,7 +2773,9 @@ export default function Page() {
     }
 
     try {
-      const finalRaidKey = activeRaidKey;
+      const finalRaidKey =
+        (configuredActiveRaidKey && deckTabs.some((tab) => tab.key === configuredActiveRaidKey) ? configuredActiveRaidKey : null) ??
+        activeRaidKey;
       const finalLocalDecks =
         finalRaidKey
           ? cloneDecksForLocalStorage(decks.filter((deck) => deck.raidKey === finalRaidKey))
@@ -2779,7 +2809,7 @@ export default function Page() {
         .from("app_config")
         .update({
           solo_raid_active: false,
-          active_raid_key: null,
+          active_raid_key: finalRaidKey,
         })
         .eq("master_user_id", currentUserId)
         .select("master_user_id")
@@ -2815,7 +2845,9 @@ export default function Page() {
       return false;
     }
 
-    const restartRaidKey = offSeasonRaidKey;
+    const restartRaidKey =
+      offSeasonRaidKey ??
+      (configuredActiveRaidKey && deckTabs.some((tab) => tab.key === configuredActiveRaidKey) ? configuredActiveRaidKey : null);
     if (!restartRaidKey) {
       showToast("재시작할 마지막 레이드가 없어");
       return false;
