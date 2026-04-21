@@ -3419,7 +3419,11 @@ export default function Page() {
         <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3.5 backdrop-blur lg:-mx-8 lg:px-8 lg:py-4">
           <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-6">
             <div className="flex flex-col items-start">
-              <Link href="/" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+              <Link
+                href="/"
+                onClick={() => navigateToTab("home")}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/logo.png" alt="니케 솔로레이드 덱 도우미" className="h-16 w-auto object-contain lg:h-20" />
               </Link>
