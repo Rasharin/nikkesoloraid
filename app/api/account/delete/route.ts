@@ -13,6 +13,10 @@ function normalizeCookieOptions(value: string, options: Record<string, unknown>)
   return next;
 }
 
+function isMissingRelationError(error: { code?: string } | null) {
+  return error?.code === "42P01" || error?.code === "PGRST205";
+}
+
 export async function POST() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -44,7 +48,7 @@ export async function POST() {
   const userId = data.user?.id;
 
   if (userError || !userId) {
-    return NextResponse.json({ error: "로그인 후 이용할 수 있습니다." }, { status: 401 });
+    return NextResponse.json({ error: "로그인 정보가 없습니다." }, { status: 401 });
   }
 
   const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -64,18 +68,33 @@ export async function POST() {
 
   for (const table of cleanupTables) {
     const { error } = await admin.from(table).delete().eq("user_id", userId);
-    if (error && error.code !== "42P01") {
+    if (error && !isMissingRelationError(error)) {
+      console.error(`[account/delete] ${table} cleanup failed`, error);
       return NextResponse.json({ error: `${table} 삭제 중 오류가 발생했습니다.` }, { status: 500 });
     }
   }
 
   const { error: contactError } = await admin.from("contact_inquiries").update({ user_id: null }).eq("user_id", userId);
-  if (contactError && contactError.code !== "42P01") {
+  if (contactError && !isMissingRelationError(contactError)) {
+    console.error("[account/delete] contact_inquiries cleanup failed", contactError);
     return NextResponse.json({ error: "문의 데이터 정리 중 오류가 발생했습니다." }, { status: 500 });
+  }
+
+  const { error: settingsError } = await admin.from("site_settings").update({ updated_by: null }).eq("updated_by", userId);
+  if (settingsError && !isMissingRelationError(settingsError)) {
+    console.error("[account/delete] site_settings cleanup failed", settingsError);
+    return NextResponse.json({ error: "설정 데이터 정리 중 오류가 발생했습니다." }, { status: 500 });
+  }
+
+  const { error: appConfigError } = await admin.from("app_config").update({ master_user_id: null }).eq("master_user_id", userId);
+  if (appConfigError && !isMissingRelationError(appConfigError)) {
+    console.error("[account/delete] app_config cleanup failed", appConfigError);
+    return NextResponse.json({ error: "관리자 설정 정리 중 오류가 발생했습니다." }, { status: 500 });
   }
 
   const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
   if (deleteError) {
+    console.error("[account/delete] auth user deletion failed", deleteError);
     return NextResponse.json({ error: "계정 삭제 중 오류가 발생했습니다." }, { status: 500 });
   }
 

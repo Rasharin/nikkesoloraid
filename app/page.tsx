@@ -3388,6 +3388,7 @@ export default function Page() {
     try {
       const response = await fetch("/api/account/delete", {
         method: "POST",
+        credentials: "same-origin",
       });
       const result = (await response.json().catch(() => null)) as { error?: string } | null;
 
