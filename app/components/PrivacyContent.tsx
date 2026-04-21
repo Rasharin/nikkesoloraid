@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 const privacyText = `개인정보처리방침
 
 1. 수집하는 개인정보 항목
@@ -48,15 +52,84 @@ const privacyText = `개인정보처리방침
 9. 개인정보처리방침 변경
 본 방침은 변경될 수 있으며, 변경 시 서비스 내 공지를 통해 안내합니다.`;
 
-export default function PrivacyContent() {
+type PrivacyContentProps = {
+  content?: string;
+  canEdit?: boolean;
+  saving?: boolean;
+  onSave?: (nextText: string) => Promise<boolean>;
+};
+
+export default function PrivacyContent({ content = "", canEdit = false, saving = false, onSave }: PrivacyContentProps) {
+  const displayText = content.trim() ? content : privacyText;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(displayText);
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft(displayText);
+    }
+  }, [displayText, editing]);
+
+  async function handleSave() {
+    if (!onSave) return;
+    const saved = await onSave(draft);
+    if (saved) {
+      setEditing(false);
+    }
+  }
+
   return (
     <section className="mx-auto w-full max-w-4xl rounded-2xl border border-neutral-800 bg-neutral-900/80 p-5 shadow-2xl sm:p-8">
-      <div className="mb-5 border-b border-neutral-700 pb-4">
+      <div className="mb-5 flex flex-col gap-3 border-b border-neutral-700 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold text-neutral-100">개인정보처리방침</h2>
+        {canEdit ? (
+          <div className="flex gap-2">
+            {editing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDraft(displayText);
+                    setEditing(false);
+                  }}
+                  disabled={saving}
+                  className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm text-neutral-200 disabled:opacity-50"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSave()}
+                  disabled={saving}
+                  className="rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-black disabled:opacity-50"
+                >
+                  {saving ? "저장 중..." : "저장"}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm text-neutral-200"
+              >
+                수정
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
-      <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7 text-neutral-300">
-        {privacyText}
-      </pre>
+
+      {editing ? (
+        <textarea
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          className="min-h-[60vh] w-full resize-y rounded-2xl border border-neutral-800 bg-neutral-950/70 px-4 py-3 font-sans text-sm leading-7 text-neutral-100 outline-none focus:border-neutral-500"
+        />
+      ) : (
+        <pre className="whitespace-pre-wrap break-words font-sans text-sm leading-7 text-neutral-300">
+          {displayText}
+        </pre>
+      )}
     </section>
   );
 }

@@ -232,6 +232,8 @@ const LOCAL_FAVORITES_KEY = "soloraid_favorite_nikkes_v1";
 const FAVORITES_TABLE = "favorite_nikkes";
 const SITE_SETTINGS_TABLE = "site_settings";
 const RECOMMENDED_VIDEO_KEY = "recommended_video_url";
+const TERMS_TEXT_KEY = "terms_text";
+const PRIVACY_TEXT_KEY = "privacy_text";
 const RECOMMENDED_DECK_SNAPSHOT_KEY_PREFIX = "recommended_deck_snapshot_";
 const SOLO_RAID_TIPS_TABLE = "solo_raid_tips";
 const LOCAL_TIPS_KEY = "soloraid_local_tips_v1";
@@ -1115,6 +1117,9 @@ export default function Page() {
   const [loadingUsagePosts, setLoadingUsagePosts] = useState(false);
   const [savingUsagePost, setSavingUsagePost] = useState(false);
   const [deletingUsagePostId, setDeletingUsagePostId] = useState<string | null>(null);
+  const [termsText, setTermsText] = useState("");
+  const [privacyText, setPrivacyText] = useState("");
+  const [savingLegalTextKey, setSavingLegalTextKey] = useState<string | null>(null);
   const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>("number");
   const isLicensePage = pathname === "/license";
   const isPrivacyPage = pathname === "/privacy";
@@ -1186,6 +1191,21 @@ export default function Page() {
 
     if (error) throw error;
     return ((data as SiteSettingRow | null)?.value ?? "").trim();
+  }
+
+  async function fetchLegalTexts() {
+    const { data, error } = await supabase
+      .from(SITE_SETTINGS_TABLE)
+      .select("key,value,updated_at,updated_by")
+      .in("key", [TERMS_TEXT_KEY, PRIVACY_TEXT_KEY]);
+
+    if (error) throw error;
+
+    const rows = (data ?? []) as SiteSettingRow[];
+    return {
+      terms: rows.find((row) => row.key === TERMS_TEXT_KEY)?.value ?? "",
+      privacy: rows.find((row) => row.key === PRIVACY_TEXT_KEY)?.value ?? "",
+    };
   }
 
   async function fetchRecommendedDeckSnapshots(raidKeys: readonly string[]) {
@@ -1398,6 +1418,30 @@ export default function Page() {
     }
 
     void loadRecommendedVideo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadLegalTexts() {
+      try {
+        const nextTexts = await fetchLegalTexts();
+        if (cancelled) return;
+        setTermsText(nextTexts.terms);
+        setPrivacyText(nextTexts.privacy);
+      } catch (error) {
+        console.error(error);
+        if (cancelled) return;
+        setTermsText("");
+        setPrivacyText("");
+      }
+    }
+
+    void loadLegalTexts();
 
     return () => {
       cancelled = true;
@@ -2932,6 +2976,55 @@ export default function Page() {
     }
   }
 
+  async function saveLegalText(key: typeof TERMS_TEXT_KEY | typeof PRIVACY_TEXT_KEY, nextText: string) {
+    if (!isMaster) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 가능");
+      return false;
+    }
+
+    const trimmed = nextText.trim();
+    if (!trimmed) {
+      showToast("내용을 입력해줘");
+      return false;
+    }
+
+    setSavingLegalTextKey(key);
+    try {
+      const { error } = await supabase
+        .from(SITE_SETTINGS_TABLE)
+        .upsert(
+          {
+            key,
+            value: trimmed,
+            updated_by: currentUserId,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "key" }
+        );
+
+      if (error) throw error;
+      if (key === TERMS_TEXT_KEY) {
+        setTermsText(trimmed);
+      } else {
+        setPrivacyText(trimmed);
+      }
+      showToast("문서 저장 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("문서 저장 실패");
+      return false;
+    } finally {
+      setSavingLegalTextKey(null);
+    }
+  }
+
   async function submitSoloRaidTip(payload: { content: string }) {
     const trimmedContent = payload.content.trim();
 
@@ -3514,7 +3607,23 @@ export default function Page() {
         )}
 
         {isLegalPage ? (
-          isTermsPage ? <TermsContent /> : isPrivacyPage ? <PrivacyContent /> : <LicenseContent />
+          isTermsPage ? (
+            <TermsContent
+              content={termsText}
+              canEdit={isMaster}
+              saving={savingLegalTextKey === TERMS_TEXT_KEY}
+              onSave={(nextText) => saveLegalText(TERMS_TEXT_KEY, nextText)}
+            />
+          ) : isPrivacyPage ? (
+            <PrivacyContent
+              content={privacyText}
+              canEdit={isMaster}
+              saving={savingLegalTextKey === PRIVACY_TEXT_KEY}
+              onSave={(nextText) => saveLegalText(PRIVACY_TEXT_KEY, nextText)}
+            />
+          ) : (
+            <LicenseContent />
+          )
         ) : (
           <>
             {tab === "home" && (
