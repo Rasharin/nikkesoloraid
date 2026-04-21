@@ -69,7 +69,6 @@ type MyPageTabProps = {
   loadingInquiries: boolean;
   showInquirySection: boolean;
   onDeleteInquiry: (id: string) => Promise<boolean>;
-  onDeleteAccount: () => Promise<boolean>;
   fmt: (value: number) => string;
   scoreDisplayMode: ScoreDisplayMode;
   onScoreDisplayModeChange: (mode: ScoreDisplayMode) => void;
@@ -101,7 +100,6 @@ export default function MyPageTab({
   loadingInquiries,
   showInquirySection,
   onDeleteInquiry,
-  onDeleteAccount,
   fmt,
   scoreDisplayMode,
   onScoreDisplayModeChange,
@@ -118,10 +116,6 @@ export default function MyPageTab({
   const [videoUrlInput, setVideoUrlInput] = useState(recommendedVideoUrl);
   const [savingVideo, setSavingVideo] = useState(false);
   const [deletingInquiryId, setDeletingInquiryId] = useState<string | null>(null);
-  const [accountDeleteOpen, setAccountDeleteOpen] = useState(false);
-  const [accountDeleteText, setAccountDeleteText] = useState("");
-  const [deletingAccount, setDeletingAccount] = useState(false);
-  const [accountDeleteError, setAccountDeleteError] = useState("");
   const inquiryDateFormatter = useMemo(
     () =>
       new Intl.DateTimeFormat("ko-KR", {
@@ -244,24 +238,6 @@ export default function MyPageTab({
       await onDeleteInquiry(id);
     } finally {
       setDeletingInquiryId(null);
-    }
-  }
-
-  async function handleDeleteAccount() {
-    if (deletingAccount || accountDeleteText !== "탈퇴하기") return;
-
-    setDeletingAccount(true);
-    setAccountDeleteError("");
-    try {
-      const deleted = await onDeleteAccount();
-      if (!deleted) {
-        setAccountDeleteError("탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
-        return;
-      }
-      setAccountDeleteOpen(false);
-      setAccountDeleteText("");
-    } finally {
-      setDeletingAccount(false);
     }
   }
 
@@ -632,74 +608,6 @@ export default function MyPageTab({
         </section>
       ) : null}
 
-      <section className="rounded-2xl border border-red-900/50 bg-red-950/20 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-red-200">계정</h2>
-            <div className="mt-1 text-sm leading-6 text-neutral-400">
-              계정을 탈퇴하면 저장된 계정 정보와 개인 덱 데이터가 삭제됩니다.
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setAccountDeleteOpen(true);
-              setAccountDeleteText("");
-              setAccountDeleteError("");
-            }}
-            className="rounded-2xl border border-red-700/70 px-4 py-3 text-sm font-medium text-red-200 transition hover:bg-red-950/60 active:scale-[0.99]"
-          >
-            탈퇴
-          </button>
-        </div>
-      </section>
-
-      {accountDeleteOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-md rounded-2xl border border-red-900/70 bg-neutral-950 p-5 shadow-2xl">
-            <h3 className="text-lg font-semibold text-red-200">계정 탈퇴</h3>
-            <div className="mt-3 space-y-2 text-sm leading-6 text-neutral-300">
-              <p>탈퇴하면 로그인 계정과 저장된 개인 데이터가 삭제됩니다.</p>
-              <p>
-                계속하려면 아래 입력창에 <span className="font-semibold text-red-200">탈퇴하기</span>를 입력해 주세요.
-              </p>
-            </div>
-
-            <input
-              value={accountDeleteText}
-              onChange={(event) => setAccountDeleteText(event.target.value)}
-              placeholder="탈퇴하기"
-              className="mt-4 w-full rounded-2xl border border-neutral-800 bg-neutral-900/70 px-4 py-3 text-sm text-neutral-100 outline-none transition focus:border-red-500"
-            />
-
-            {accountDeleteError ? <div className="mt-3 text-sm text-red-300">{accountDeleteError}</div> : null}
-
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (deletingAccount) return;
-                  setAccountDeleteOpen(false);
-                  setAccountDeleteText("");
-                  setAccountDeleteError("");
-                }}
-                disabled={deletingAccount}
-                className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm text-neutral-200 transition hover:border-neutral-500 disabled:opacity-50"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDeleteAccount()}
-                disabled={deletingAccount || accountDeleteText !== "탈퇴하기"}
-                className="rounded-2xl bg-red-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-400 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-red-900 disabled:text-red-300"
-              >
-                {deletingAccount ? "탈퇴 처리 중..." : "확인"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

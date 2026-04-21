@@ -3378,41 +3378,6 @@ export default function Page() {
     }
   }
 
-  async function deleteAccount() {
-    const currentUserId = await getCurrentUserId();
-    if (!currentUserId) {
-      showToast("로그인 후 가능");
-      return false;
-    }
-
-    try {
-      const response = await fetch("/api/account/delete", {
-        method: "POST",
-        credentials: "same-origin",
-      });
-      const result = (await response.json().catch(() => null)) as { error?: string } | null;
-
-      if (!response.ok) {
-        showToast(result?.error ?? "탈퇴 처리 실패");
-        return false;
-      }
-
-      await supabase.auth.signOut();
-      setUserId(null);
-      setDecks([]);
-      setFavoriteNames(new Set());
-      setRecommendationHistory({});
-      setTab("home");
-      router.push("/");
-      showToast("탈퇴 처리 완료");
-      return true;
-    } catch (error) {
-      console.error(error);
-      showToast("탈퇴 처리 실패");
-      return false;
-    }
-  }
-
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-50">
       <div className="mx-auto max-w-xl px-4 pb-10 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
@@ -3711,7 +3676,6 @@ export default function Page() {
             loadingInquiries={loadingContactInquiries}
             showInquirySection={canManageBosses}
             onDeleteInquiry={deleteContactInquiry}
-            onDeleteAccount={deleteAccount}
             fmt={fmt}
             scoreDisplayMode={scoreDisplayMode}
             onScoreDisplayModeChange={(mode) => setScoreDisplayMode(mode)}
