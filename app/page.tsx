@@ -11,6 +11,9 @@ import SettingsTab from "./components/tabs/SettingsTab";
 import ContactTab from "./components/tabs/ContactTab";
 import UsageTab from "./components/tabs/UsageTab";
 import CalculatorTab from "./components/tabs/CalculatorTab";
+import LicenseContent from "./components/LicenseContent";
+import PrivacyContent from "./components/PrivacyContent";
+import TermsContent from "./components/TermsContent";
 import type { ImageBlock, TextBlock, UsageBlock, UsageEditorBlock, UsagePost } from "./components/tabs/usage/types";
 import { supabase } from "../lib/supabase";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
@@ -1113,7 +1116,11 @@ export default function Page() {
   const [savingUsagePost, setSavingUsagePost] = useState(false);
   const [deletingUsagePostId, setDeletingUsagePostId] = useState<string | null>(null);
   const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>("number");
-  const showInitialDataLoading = loadingData && nikkes.length === 0 && bosses.length === 0;
+  const isLicensePage = pathname === "/license";
+  const isPrivacyPage = pathname === "/privacy";
+  const isTermsPage = pathname === "/terms";
+  const isLegalPage = isLicensePage || isPrivacyPage || isTermsPage;
+  const showInitialDataLoading = !isLegalPage && loadingData && nikkes.length === 0 && bosses.length === 0;
   const canAccessCalculator = isMasterUser || process.env.NODE_ENV !== "production";
   const calculatorAccessResolved =
     process.env.NODE_ENV !== "production" || (authResolved && (!userId || masterUserChecked));
@@ -2004,7 +2011,7 @@ export default function Page() {
     [currentDeckRaidKey, savedDeckSource]
   );
   const visibleSavedDecks = sortedDecks;
-  const showInitialDeckLoading = loadingDecks && savedDeckSource.length === 0;
+  const showInitialDeckLoading = !isLegalPage && loadingDecks && savedDeckSource.length === 0;
   const savedDeckTabs = useMemo(
     () =>
       deckTabs
@@ -3371,6 +3378,40 @@ export default function Page() {
     }
   }
 
+  async function deleteAccount() {
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 가능");
+      return false;
+    }
+
+    try {
+      const response = await fetch("/api/account/delete", {
+        method: "POST",
+      });
+      const result = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        showToast(result?.error ?? "탈퇴 처리 실패");
+        return false;
+      }
+
+      await supabase.auth.signOut();
+      setUserId(null);
+      setDecks([]);
+      setFavoriteNames(new Set());
+      setRecommendationHistory({});
+      setTab("home");
+      router.push("/");
+      showToast("탈퇴 처리 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("탈퇴 처리 실패");
+      return false;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-50">
       <div className="mx-auto max-w-xl px-4 pb-10 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
@@ -3502,29 +3543,33 @@ export default function Page() {
           </div>
         )}
 
-        {tab === "home" && (
-          <HomeTab
-            boss={boss}
-            bosses={bosses}
-            decksCount={activeRaidDecks.length}
-            canRecommend={soloRaidActive && canRecommend}
-            best={best}
-            fmt={fmt}
-            getPublicUrl={getPublicUrl}
-            selectedNikkes={selectednikkes}
-            maxSelected={MAX_SELECTED}
-            nikkeMap={nikkeMap}
-            editRequest={homeEditRequest}
-            onEditRequestConsumed={() => setHomeEditRequest(null)}
-            onResetSelected={resetSelected}
-            onRemoveSelectedNikke={removeSelectedNikke}
-            onGoToSettings={() => navigateToTab("settings")}
-            onShowToast={showToast}
-            onSubmitDeck={submitDeckFromHome}
-            onSubmitBulk={submitBulkFromHome}
-            onUpdateDeckScore={updateDeckScore}
-          />
-        )}
+        {isLegalPage ? (
+          isTermsPage ? <TermsContent /> : isPrivacyPage ? <PrivacyContent /> : <LicenseContent />
+        ) : (
+          <>
+            {tab === "home" && (
+              <HomeTab
+                boss={boss}
+                bosses={bosses}
+                decksCount={activeRaidDecks.length}
+                canRecommend={soloRaidActive && canRecommend}
+                best={best}
+                fmt={fmt}
+                getPublicUrl={getPublicUrl}
+                selectedNikkes={selectednikkes}
+                maxSelected={MAX_SELECTED}
+                nikkeMap={nikkeMap}
+                editRequest={homeEditRequest}
+                onEditRequestConsumed={() => setHomeEditRequest(null)}
+                onResetSelected={resetSelected}
+                onRemoveSelectedNikke={removeSelectedNikke}
+                onGoToSettings={() => navigateToTab("settings")}
+                onShowToast={showToast}
+                onSubmitDeck={submitDeckFromHome}
+                onSubmitBulk={submitBulkFromHome}
+                onUpdateDeckScore={updateDeckScore}
+              />
+            )}
 
         {tab === "saved" && (
           <div className="mx-auto w-full lg:max-w-6xl">
@@ -3661,12 +3706,38 @@ export default function Page() {
             loadingInquiries={loadingContactInquiries}
             showInquirySection={canManageBosses}
             onDeleteInquiry={deleteContactInquiry}
+            onDeleteAccount={deleteAccount}
             fmt={fmt}
             scoreDisplayMode={scoreDisplayMode}
             onScoreDisplayModeChange={(mode) => setScoreDisplayMode(mode)}
           />
         )}
+          </>
+        )}
       </div>
+      <footer className="border-t border-neutral-800 bg-neutral-900/80 px-4 py-6 text-center text-xs leading-6 text-neutral-500">
+        <div className="mx-auto max-w-4xl space-y-3">
+          <p>© 2025 Nikkesolo. All rights reserved.</p>
+          <p>
+            본 사이트는 &apos;승리의 여신: 니케&apos;의 비공식 팬 사이트이며, Shift Up Corp. 및 Level
+            Infinite와 무관합니다.
+          </p>
+          <p>
+            사이트 내 모든 게임 리소스의 저작권은 원작자에게 있으며, 영리 목적으로 사용되지 않습니다.
+          </p>
+          <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-neutral-400">
+            <Link href="/terms" className="transition hover:text-neutral-200">
+              이용약관
+            </Link>
+            <Link href="/privacy" className="transition hover:text-neutral-200">
+              개인정보처리방침
+            </Link>
+            <Link href="/license" className="transition hover:text-neutral-200">
+              라이센스
+            </Link>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 }
