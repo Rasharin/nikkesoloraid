@@ -1059,7 +1059,7 @@ function UsageIcon({ active }: { active: boolean }) {
 export default function Page() {
   const pathname = usePathname();
   const router = useRouter();
-  const [tab, setTab] = useState<TabKey>("home");
+  const [tab, setTab] = useState<TabKey>(() => PATH_TAB_MAP[pathname] ?? "home");
   const [usageBoardTab, setUsageBoardTab] = useState<UsageBoardCategoryKey>("home");
   const [deckTabs, setDeckTabs] = useState<DeckTabItem[]>(DEFAULT_DECK_TABS);
 
