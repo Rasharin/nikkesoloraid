@@ -64,7 +64,7 @@ alter table public.usage_posts
 
 alter table public.usage_posts
   add constraint usage_posts_category_key_check
-  check (category_key in ('home', 'saved', 'recommend', 'settings'));
+  check (category_key in ('home', 'saved', 'recommend', 'deck-building', 'settings'));
 
 create unique index if not exists usage_posts_category_key_unique_idx
   on public.usage_posts (category_key);
