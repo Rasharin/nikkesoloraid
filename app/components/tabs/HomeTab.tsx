@@ -20,9 +20,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
 import DeckBuilderSection, {
-  getDroppedSlotIndex,
-  getHoveredSlotIndex,
-  moveDraftSlot,
+  getDroppedDeckSlotTarget,
+  getHoveredDeckSlotTarget,
   renderDragOverlayCard,
 } from "../home/DeckBuilderSection";
 import DraggableNikkeCard from "../home/DraggableNikkeCard";
@@ -53,6 +52,11 @@ type RecommendedDropTarget = {
   slotIndex: number;
 };
 
+type DeckSlotTarget = {
+  deckIndex: number;
+  slotIndex: number;
+};
+
 type HomeTabProps = {
   boss: BossRow | null;
   bosses: BossRow[];
@@ -64,6 +68,7 @@ type HomeTabProps = {
   };
   fmt: (value: number) => string;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
+  selectedNames: string[];
   selectedNikkes: NikkeRow[];
   maxSelected: number;
   nikkeMap: Map<string, NikkeRow>;
@@ -142,6 +147,14 @@ function RecommendedDeckSlot({ deckId, slotIndex, name, imageUrl, highlighted, c
 const HOME_DRAFT_STORAGE_KEY = "soloraid_home_draft_v1";
 const HOME_MEMO_STORAGE_KEY = "soloraid_home_memo_v1";
 
+function swapDraftSlots(draft: DraftSlot[], fromIndex: number, toIndex: number): DraftSlot[] {
+  const next = [...draft];
+  const fromValue = next[fromIndex] ?? null;
+  next[fromIndex] = next[toIndex] ?? null;
+  next[toIndex] = fromValue;
+  return next;
+}
+
 export default function HomeTab({
   boss,
   bosses,
@@ -150,6 +163,7 @@ export default function HomeTab({
   best,
   fmt,
   getPublicUrl,
+  selectedNames,
   selectedNikkes,
   maxSelected,
   nikkeMap,
@@ -168,7 +182,7 @@ export default function HomeTab({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [bulkText, setBulkText] = useState("");
   const [activeDrag, setActiveDrag] = useState<DragItemData | null>(null);
-  const [hoveredSlotIndex, setHoveredSlotIndex] = useState<number | null>(null);
+  const [hoveredSlotTarget, setHoveredSlotTarget] = useState<DeckSlotTarget | null>(null);
   const [hoveredRecommendedTarget, setHoveredRecommendedTarget] = useState<RecommendedDropTarget | null>(null);
   const [overlayWidth, setOverlayWidth] = useState<number | null>(null);
   const [editingRecommendedDeckId, setEditingRecommendedDeckId] = useState<string | null>(null);
@@ -217,25 +231,35 @@ export default function HomeTab({
       }
 
       const parsed = JSON.parse(raw) as {
+        deckDrafts?: Array<{
+          draft?: DraftSlot[];
+          score?: string;
+          editingId?: string | null;
+        }>;
         draft?: DraftSlot[];
         score?: string;
         editingId?: string | null;
       };
 
-      if (Array.isArray(parsed.draft)) {
+      if (Array.isArray(parsed.deckDrafts)) {
+        const saved = parsed.deckDrafts[0];
+        const restoredDraft = createEmptyDraft();
+        if (Array.isArray(saved?.draft)) {
+          saved.draft.slice(0, restoredDraft.length).forEach((value, slotIndex) => {
+            restoredDraft[slotIndex] = typeof value === "string" ? value : null;
+          });
+        }
+        setDraft(restoredDraft);
+        setScore(typeof saved?.score === "string" ? saved.score : "");
+        setEditingId(typeof saved?.editingId === "string" ? saved.editingId : null);
+      } else if (Array.isArray(parsed.draft)) {
         const restoredDraft = createEmptyDraft();
         parsed.draft.slice(0, restoredDraft.length).forEach((value, index) => {
           restoredDraft[index] = typeof value === "string" ? value : null;
         });
         setDraft(restoredDraft);
-      }
-
-      if (typeof parsed.score === "string") {
-        setScore(parsed.score);
-      }
-
-      if (typeof parsed.editingId === "string" || parsed.editingId === null) {
-        setEditingId(parsed.editingId ?? null);
+        setScore(typeof parsed.score === "string" ? parsed.score : "");
+        setEditingId(typeof parsed.editingId === "string" ? parsed.editingId : null);
       }
     } catch { }
 
@@ -267,9 +291,9 @@ export default function HomeTab({
   useEffect(() => {
     if (!editRequest) return;
 
-    setEditingId(editRequest.id);
     setDraft(buildDraftFromChars(editRequest.chars));
     setScore(String(editRequest.score));
+    setEditingId(editRequest.id);
     requestAnimationFrame(() => scoreRef.current?.focus());
     onShowToast("수정 모드: 니케 변경 후 점수 저장");
     onEditRequestConsumed();
@@ -308,10 +332,8 @@ export default function HomeTab({
   function addToDraft(name: string) {
     setDraft((prev) => {
       if (prev.includes(name)) return prev;
-
       const emptyIndex = prev.findIndex((slot) => slot === null);
       if (emptyIndex === -1) return prev;
-
       const next = [...prev];
       next[emptyIndex] = name;
       if (next.every((slot) => slot !== null)) {
@@ -321,15 +343,13 @@ export default function HomeTab({
     });
   }
 
-  function removeFromDraft(index: number) {
-    setDraft((prev) => prev.map((value, currentIndex) => (currentIndex === index ? null : value)));
+  function removeFromDraft(_deckIndex: number, slotIndex: number) {
+    setDraft((prev) => prev.map((value, currentIndex) => (currentIndex === slotIndex ? null : value)));
   }
 
   async function handleSaveDeck() {
     const completeDraft = draft.filter((value): value is string => value !== null);
-    const saved = await onSubmitDeck({ draft: completeDraft, scoreText: score, editingId });
-    if (!saved) return;
-    clearDraft();
+    await onSubmitDeck({ draft: completeDraft, scoreText: score, editingId });
   }
 
   async function handleAddBulk() {
@@ -339,7 +359,7 @@ export default function HomeTab({
   }
 
   function handleDragStart(event: DragStartEvent) {
-    const { source, nikkeName, slotIndex, recommendedDeckId } = (event.active.data.current ?? {}) as Partial<DragItemData>;
+    const { source, nikkeName, deckIndex, slotIndex, recommendedDeckId } = (event.active.data.current ?? {}) as Partial<DragItemData>;
     const initialRect = event.active.rect.current.initial;
 
     if (!nikkeName || (source !== "selected" && source !== "deck" && source !== "recommended")) {
@@ -351,6 +371,7 @@ export default function HomeTab({
     setActiveDrag({
       source,
       nikkeName,
+      deckIndex,
       slotIndex,
       recommendedDeckId,
     });
@@ -358,24 +379,24 @@ export default function HomeTab({
   }
 
   function handleDragOver(event: DragOverEvent) {
-    setHoveredSlotIndex(getHoveredSlotIndex(event));
+    setHoveredSlotTarget(getHoveredDeckSlotTarget(event));
     setHoveredRecommendedTarget(parseRecommendedDropTarget(event.over?.id));
   }
 
   function handleDragCancel() {
     setActiveDrag(null);
-    setHoveredSlotIndex(null);
+    setHoveredSlotTarget(null);
     setHoveredRecommendedTarget(null);
     setOverlayWidth(null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
-    const droppedSlotIndex = getDroppedSlotIndex(event);
+    const droppedSlotTarget = getDroppedDeckSlotTarget(event);
     const recommendedTarget = parseRecommendedDropTarget(event.over?.id);
     const dragItem = (event.active.data.current ?? activeDrag) as DragItemData | null;
 
     setActiveDrag(null);
-    setHoveredSlotIndex(null);
+    setHoveredSlotTarget(null);
     setHoveredRecommendedTarget(null);
     setOverlayWidth(null);
 
@@ -400,37 +421,74 @@ export default function HomeTab({
     }
 
     if (dragItem.source === "selected") {
-      if (droppedSlotIndex === null) return;
+      if (!droppedSlotTarget) return;
+      if (droppedSlotTarget.deckIndex !== 0) return;
       setDraft((prev) => {
-        if (prev[droppedSlotIndex] !== null) return prev;
         if (prev.includes(dragItem.nikkeName)) return prev;
-
-        const next = [...prev];
-        next[droppedSlotIndex] = dragItem.nikkeName;
-        if (next.every((slot) => slot !== null)) {
+        const nextDraft = [...prev];
+        nextDraft[droppedSlotTarget.slotIndex] = dragItem.nikkeName;
+        if (nextDraft.every((slot) => slot !== null)) {
           requestAnimationFrame(() => scoreRef.current?.focus());
         }
-        return next;
+        return nextDraft;
       });
       return;
     }
 
     if (typeof dragItem.slotIndex !== "number") return;
+    if (typeof dragItem.deckIndex === "number" && dragItem.deckIndex !== 0) return;
     if (isDroppedOutsideDeckSection(event, deckSectionRef.current)) {
-      removeFromDraft(dragItem.slotIndex);
+      removeFromDraft(0, dragItem.slotIndex);
       return;
     }
-    if (droppedSlotIndex === null) {
-      removeFromDraft(dragItem.slotIndex);
+    if (!droppedSlotTarget) {
+      removeFromDraft(0, dragItem.slotIndex);
       return;
     }
-    if (dragItem.slotIndex === droppedSlotIndex) return;
-    setDraft((prev) => moveDraftSlot(prev, dragItem.slotIndex as number, droppedSlotIndex));
+    if (droppedSlotTarget.deckIndex !== 0) return;
+    if (dragItem.slotIndex === droppedSlotTarget.slotIndex) return;
+    setDraft((prev) => swapDraftSlots(prev, dragItem.slotIndex as number, droppedSlotTarget.slotIndex));
   }
 
-  const title = useMemo(() => (editingId ? "덱 수정" : "덱 만들기"), [editingId]);
-  const overlayNikke = activeDrag?.nikkeName ? nikkeMap.get(activeDrag.nikkeName) : undefined;
+  const title = "덱 만들기";
+  const effectiveNikkeMap = useMemo(() => {
+    const next = new Map(nikkeMap);
+    selectedNames.forEach((name) => {
+      if (!next.has(name)) {
+        next.set(name, {
+          id: `selected-fallback-${name}`,
+          name,
+          image_path: null,
+          burst: null,
+        });
+      }
+    });
+    return next;
+  }, [nikkeMap, selectedNames]);
+  const effectiveSelectedNikkes = useMemo(() => {
+    const byName = new Map(selectedNikkes.map((nikke) => [nikke.name, nikke]));
+    return selectedNames.map((name) => byName.get(name) ?? effectiveNikkeMap.get(name)).filter((nikke): nikke is NikkeRow => Boolean(nikke));
+  }, [effectiveNikkeMap, selectedNames, selectedNikkes]);
+  const overlayNikke = activeDrag?.nikkeName ? effectiveNikkeMap.get(activeDrag.nikkeName) : undefined;
   const overlayUrl = overlayNikke?.image_path ? getPublicUrl("nikke-images", overlayNikke.image_path) : "";
+  const selectedNikkesByBurst = useMemo(() => {
+    const groups = [
+      { key: "burst-1", label: "버스트 I", nikkes: [] as NikkeRow[] },
+      { key: "burst-2", label: "버스트 II", nikkes: [] as NikkeRow[] },
+      { key: "burst-3", label: "버스트 III", nikkes: [] as NikkeRow[] },
+      { key: "burst-etc", label: "기타", nikkes: [] as NikkeRow[] },
+    ];
+
+    effectiveSelectedNikkes.forEach((nikke) => {
+      const burst = nikke.burst;
+      if (burst === 1) groups[0].nikkes.push(nikke);
+      else if (burst === 2) groups[1].nikkes.push(nikke);
+      else if (burst === 3) groups[2].nikkes.push(nikke);
+      else groups[3].nikkes.push(nikke);
+    });
+
+    return groups;
+  }, [effectiveSelectedNikkes]);
 
   async function saveRecommendedDeckScore(deckId: string) {
     const saved = await onUpdateDeckScore(deckId, editingRecommendedScore);
@@ -511,7 +569,7 @@ export default function HomeTab({
         <div className="flex items-end justify-between gap-3">
           <div className={`flex items-start ${compact ? "gap-1.5" : "gap-2"}`}>
             {deck.chars.map((name, slotIndex) => {
-              const nikke = nikkeMap.get(name);
+              const nikke = effectiveNikkeMap.get(name);
               const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
               const isHighlighted =
                 hoveredRecommendedTarget?.deckId === deck.id && hoveredRecommendedTarget.slotIndex === slotIndex;
@@ -655,6 +713,102 @@ export default function HomeTab({
             <div className="mt-4 text-sm text-neutral-300">보스 데이터가 없어.</div>
           )
         ) : null}
+      </section>
+    );
+  }
+
+  function renderSelectedNikkeGroups(compact = false) {
+    const gridClass = compact
+      ? "grid grid-cols-5 gap-2"
+      : "grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-x-2 gap-y-3 xl:grid-cols-[repeat(auto-fill,minmax(80px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(88px,1fr))]";
+
+    return (
+      <div className={compact ? "visible-scrollbar mt-3 max-h-[34vh] space-y-4 overflow-y-auto pr-1 overscroll-contain" : "visible-scrollbar mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 overscroll-contain"}>
+        {selectedNikkesByBurst.map((group) =>
+          group.nikkes.length > 0 ? (
+            <div key={group.key}>
+              <div className="mb-2 border-b border-neutral-800 pb-1 text-xs text-neutral-400">
+                <span className="font-medium text-neutral-200">{group.label}</span>
+              </div>
+              <div className={gridClass}>
+                {group.nikkes.map((nikke) => {
+                  const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+
+                  return (
+                    <DraggableNikkeCard
+                      key={nikke.id}
+                      nikke={nikke}
+                      imageUrl={imageUrl}
+                      onAdd={addToDraft}
+                      onRemove={onRemoveSelectedNikke}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ) : null
+        )}
+      </div>
+    );
+  }
+
+  function renderDeckBuilders(className?: string) {
+    return (
+      <section ref={deckSectionRef} className={`rounded-3xl border border-neutral-800 bg-neutral-900/50 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.24)] ${className ?? ""}`}>
+        <h2 className="text-lg font-semibold">{title}</h2>
+
+        <div className="mt-4 grid gap-3">
+          <DeckBuilderSection
+            deckIndex={0}
+            draft={draft}
+            nikkeMap={effectiveNikkeMap}
+            getPublicUrl={getPublicUrl}
+            score={score}
+            scoreRef={scoreRef}
+            editingId={editingId}
+            activeDrag={activeDrag}
+            hoveredSlotIndex={hoveredSlotTarget?.deckIndex === 0 ? hoveredSlotTarget.slotIndex : null}
+            onScoreChange={setScore}
+            onRemoveFromDraft={(slotIndex) => removeFromDraft(0, slotIndex)}
+            onSaveDeck={() => void handleSaveDeck()}
+            onClearDraft={clearDraft}
+            className="border-neutral-800 bg-neutral-950/30 p-2.5 shadow-none"
+          />
+        </div>
+      </section>
+    );
+  }
+
+  function renderBulkSection(className?: string) {
+    return (
+      <section className={`rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)] ${className ?? ""}`}>
+        <h2 className="text-lg font-semibold">텍스트로 덱 추가</h2>
+        <div className="mt-1 text-sm text-neutral-400">여러 덱을 한 번에 붙여넣어 저장할 수 있어요.</div>
+
+        <textarea
+          value={bulkText}
+          onChange={(event) => setBulkText(event.target.value)}
+          placeholder={`예) 세이렌 이브 라피 크라운 프리바티 6510755443
+리타 / 앵커 / 리버렐리오 / 마스트 / 레이븐
+3896714666
+리타, 앵커, 리버렐리오, 마스트, 레이븐
+383838883`}
+          className="mt-4 h-[160px] w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 p-3 text-sm outline-none xl:h-[180px]"
+        />
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={() => void handleAddBulk()}
+            className="flex-1 rounded-2xl bg-neutral-100 px-4 py-3 text-base font-semibold text-neutral-900 active:scale-[0.99]"
+          >
+            텍스트 추가
+          </button>
+          <button
+            onClick={() => setBulkText("")}
+            className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
+          >
+            비우기
+          </button>
+        </div>
       </section>
     );
   }
@@ -909,7 +1063,7 @@ export default function HomeTab({
                   </div>
                 </div>
 
-                {selectedNikkes.length === 0 ? (
+                {effectiveSelectedNikkes.length === 0 ? (
                   <div className="mt-4 text-sm text-neutral-300">
                     <span className="text-neutral-200">설정 탭</span>에서 최대 {maxSelected}개 선택 가능.
                   </div>
@@ -917,28 +1071,12 @@ export default function HomeTab({
                   <>
                     <div className="mt-4 flex items-center justify-between gap-3 text-sm text-neutral-400">
                       <div>
-                        선택됨: <span className="text-neutral-200">{selectedNikkes.length}</span> / {maxSelected}
+                        선택됨: <span className="text-neutral-200">{effectiveSelectedNikkes.length}</span> / {maxSelected}
                       </div>
                       <div>니케를 드래그 하거나 클릭하여 덱에 추가 가능</div>
                     </div>
 
-                    <div className="visible-scrollbar mt-4 min-h-0 flex-1 overflow-y-auto pr-1 overscroll-contain">
-                      <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-x-2 gap-y-3 xl:grid-cols-[repeat(auto-fill,minmax(80px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(88px,1fr))]">
-                        {selectedNikkes.map((nikke) => {
-                          const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
-
-                          return (
-                            <DraggableNikkeCard
-                              key={nikke.id}
-                              nikke={nikke}
-                              imageUrl={imageUrl}
-                              onAdd={addToDraft}
-                              onRemove={onRemoveSelectedNikke}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
+                    {renderSelectedNikkeGroups()}
                   </>
                 )}
               </section>
@@ -949,53 +1087,9 @@ export default function HomeTab({
 
               {renderMemoSection()}
 
-              <section className="rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
-                <h2 className="text-lg font-semibold">텍스트로 덱 추가</h2>
-                <div className="mt-1 text-sm text-neutral-400">여러 덱을 한 번에 붙여넣어 저장할 수 있어요.</div>
+              {renderDeckBuilders()}
 
-                <textarea
-                  value={bulkText}
-                  onChange={(event) => setBulkText(event.target.value)}
-                  placeholder={`예) 세이렌 이브 라피 크라운 프리바티 6510755443
-리타 / 앵커 / 리버렐리오 / 마스트 / 레이븐
-3896714666
-리타, 앵커, 리버렐리오, 마스트, 레이븐
-383838883`}
-                  className="mt-4 h-[160px] w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 p-3 text-sm outline-none xl:h-[180px]"
-                />
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => void handleAddBulk()}
-                    className="flex-1 rounded-2xl bg-neutral-100 px-4 py-3 text-base font-semibold text-neutral-900 active:scale-[0.99]"
-                  >
-                    텍스트 추가
-                  </button>
-                  <button
-                    onClick={() => setBulkText("")}
-                    className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
-                  >
-                    비우기
-                  </button>
-                </div>
-              </section>
-
-              <DeckBuilderSection
-                title={title}
-                draft={draft}
-                nikkeMap={nikkeMap}
-                getPublicUrl={getPublicUrl}
-                score={score}
-                scoreRef={scoreRef}
-                sectionRef={deckSectionRef}
-                editingId={editingId}
-                activeDrag={activeDrag}
-                hoveredSlotIndex={hoveredSlotIndex}
-                onScoreChange={setScore}
-                onRemoveFromDraft={removeFromDraft}
-                onSaveDeck={() => void handleSaveDeck()}
-                onClearDraft={clearDraft}
-                className="w-full min-w-0 rounded-3xl bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]"
-              />
+              {renderBulkSection()}
             </div>
           </div>
         ) : (
@@ -1021,7 +1115,7 @@ export default function HomeTab({
                 </div>
               </div>
 
-              {selectedNikkes.length === 0 ? (
+              {effectiveSelectedNikkes.length === 0 ? (
                 <div className="mt-3 text-sm text-neutral-300">
                   <span className="text-neutral-200">설정 탭</span>에서 최대 {maxSelected}개 선택 가능.
                 </div>
@@ -1029,49 +1123,17 @@ export default function HomeTab({
                 <>
                   <div className="mt-2 flex items-center justify-between gap-3 text-xs text-neutral-400">
                     <div>
-                      선택됨: <span className="text-neutral-200">{selectedNikkes.length}</span> / {maxSelected}
+                      선택됨: <span className="text-neutral-200">{effectiveSelectedNikkes.length}</span> / {maxSelected}
                     </div>
                     <div>니케를 드래그 하거나 클릭하여 덱에 추가 가능</div>
                   </div>
 
-                  <div className="visible-scrollbar mt-3 max-h-[30vh] overflow-y-auto pr-1 overscroll-contain">
-                    <div className="grid grid-cols-5 gap-2">
-                      {selectedNikkes.map((nikke) => {
-                        const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
-
-                        return (
-                          <DraggableNikkeCard
-                            key={nikke.id}
-                            nikke={nikke}
-                            imageUrl={imageUrl}
-                            onAdd={addToDraft}
-                            onRemove={onRemoveSelectedNikke}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
+                  {renderSelectedNikkeGroups(true)}
                 </>
               )}
             </section>
 
-            <DeckBuilderSection
-              title={title}
-              draft={draft}
-              nikkeMap={nikkeMap}
-              getPublicUrl={getPublicUrl}
-              score={score}
-              scoreRef={scoreRef}
-              sectionRef={deckSectionRef}
-              editingId={editingId}
-              activeDrag={activeDrag}
-              hoveredSlotIndex={hoveredSlotIndex}
-              onScoreChange={setScore}
-              onRemoveFromDraft={removeFromDraft}
-              onSaveDeck={() => void handleSaveDeck()}
-              onClearDraft={clearDraft}
-              className="mb-5"
-            />
+            {renderDeckBuilders("mb-5")}
           </>
         )}
 
@@ -1080,34 +1142,7 @@ export default function HomeTab({
         </DragOverlay>
       </DndContext>
 
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 lg:hidden">
-        <h2 className="text-base font-semibold">덱 일괄입력</h2>
-
-        <textarea
-          value={bulkText}
-          onChange={(event) => setBulkText(event.target.value)}
-          placeholder={`예) 세이렌 이브 라피 크라운 프리바티 6510755443
-리타 / 앵커 / 리버렐리오 / 마스트 / 레이븐
-3896714666
-리타, 앵커, 리버렐리오, 마스트, 레이븐
-383838883`}
-          className="mt-3 h-32 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 p-3 text-sm outline-none"
-        />
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={() => void handleAddBulk()}
-            className="flex-1 rounded-2xl bg-neutral-100 px-4 py-3 text-base font-semibold text-neutral-900 active:scale-[0.99]"
-          >
-            텍스트 추가
-          </button>
-          <button
-            onClick={() => setBulkText("")}
-            className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
-          >
-            비우기
-          </button>
-        </div>
-      </section>
+      {renderBulkSection("lg:hidden")}
     </>
   );
 }

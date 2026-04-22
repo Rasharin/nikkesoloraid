@@ -11,7 +11,9 @@ import SettingsTab from "./components/tabs/SettingsTab";
 import ContactTab from "./components/tabs/ContactTab";
 import UsageTab from "./components/tabs/UsageTab";
 import CalculatorTab from "./components/tabs/CalculatorTab";
+import ImaginarySoloRaidTab from "./components/tabs/ImaginarySoloRaidTab";
 import LicenseContent from "./components/LicenseContent";
+import NoticeContent, { type NoticePost } from "./components/NoticeContent";
 import PrivacyContent from "./components/PrivacyContent";
 import TermsContent from "./components/TermsContent";
 import type { ImageBlock, TextBlock, UsageBlock, UsageEditorBlock, UsagePost } from "./components/tabs/usage/types";
@@ -118,6 +120,14 @@ type UsagePostRow = {
   created_at: string;
   updated_at: string;
 };
+type NoticePostRow = {
+  id: string;
+  title: string | null;
+  content: string | null;
+  user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
 type AppConfigRow = {
   master_user_id: string | null;
   active_raid_key: string | null;
@@ -193,12 +203,13 @@ const roles = [
   { v: "defender", label: "방어형" },
 ] as const;
 
-type TabKey = "home" | "saved" | "recommend" | "calculator" | "usage" | "settings" | "contact" | "mypage";
+type TabKey = "home" | "saved" | "recommend" | "imaginary" | "calculator" | "usage" | "settings" | "contact" | "mypage";
 type UsageBoardCategoryKey = "home" | "saved" | "recommend" | "settings";
 const TAB_ROUTE_MAP: Record<Exclude<TabKey, "mypage">, string> = {
   home: "/",
   saved: "/saved-deck",
   recommend: "/deck-recommend",
+  imaginary: "/imaginary-solo-raid",
   calculator: "/calculator",
   usage: "/usage",
   settings: "/deck-setting",
@@ -208,6 +219,7 @@ const PATH_TAB_MAP: Record<string, Exclude<TabKey, "mypage">> = {
   "/": "home",
   "/saved-deck": "saved",
   "/deck-recommend": "recommend",
+  "/imaginary-solo-raid": "imaginary",
   "/calculator": "calculator",
   "/usage": "usage",
   "/deck-setting": "settings",
@@ -242,8 +254,9 @@ const CONTACT_INQUIRIES_TABLE = "contact_inquiries";
 const LOCAL_CONTACT_INQUIRIES_KEY = "soloraid_local_contact_inquiries_v1";
 const SCORE_DISPLAY_MODE_KEY = "soloraid_score_display_mode_v1";
 const USAGE_POSTS_TABLE = "usage_posts";
+const NOTICE_POSTS_TABLE = "notice_posts";
 
-const MAX_SELECTED = 50;
+const MAX_SELECTED = 100;
 const MAX_DECK_CHARS = 5;
 
 // -------------------- Utils --------------------
@@ -640,6 +653,21 @@ function mapUsagePostRow(row: UsagePostRow): UsagePost | null {
   };
 }
 
+function mapNoticePostRow(row: NoticePostRow): NoticePost | null {
+  if (!row?.id || !row.title?.trim() || !row.content?.trim() || !row.created_at) return null;
+  const createdAt = Date.parse(row.created_at);
+  const updatedAt = Date.parse(row.updated_at);
+
+  return {
+    id: row.id,
+    title: row.title.trim(),
+    content: row.content,
+    userId: row.user_id ?? null,
+    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+    updatedAt: Number.isFinite(updatedAt) ? updatedAt : (Number.isFinite(createdAt) ? createdAt : Date.now()),
+  };
+}
+
 function getUsageImagePaths(blocks: readonly UsageBlock[]) {
   return blocks.filter((block): block is ImageBlock => block.type === "image").map((block) => block.imagePath);
 }
@@ -1001,6 +1029,25 @@ function RecommendIcon({ active }: { active: boolean }) {
   );
 }
 
+function ImaginaryIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M12 3.5c2.8 2.2 4.2 4.6 4.2 7.2A4.2 4.2 0 0 1 12 15a4.2 4.2 0 0 1-4.2-4.3C7.8 8.1 9.2 5.7 12 3.5Z"
+        stroke={active ? "white" : "#a3a3a3"}
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 20c1.3-2 3.3-3 6-3s4.7 1 6 3"
+        stroke={active ? "white" : "#a3a3a3"}
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function CalculatorIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -1077,8 +1124,9 @@ export default function Page() {
   const [selectedBossId, setSelectedBossId] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
-  // selected nikkes (max 50) - localStorage
+  // selected nikkes (max 100) - localStorage
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
+  const [selectedNamesReady, setSelectedNamesReady] = useState(false);
   const [favoriteNames, setFavoriteNames] = useState<Set<string>>(new Set());
 
   const [homeEditRequest, setHomeEditRequest] = useState<Deck | null>(null);
@@ -1117,14 +1165,19 @@ export default function Page() {
   const [loadingUsagePosts, setLoadingUsagePosts] = useState(false);
   const [savingUsagePost, setSavingUsagePost] = useState(false);
   const [deletingUsagePostId, setDeletingUsagePostId] = useState<string | null>(null);
+  const [noticePosts, setNoticePosts] = useState<NoticePost[]>([]);
+  const [loadingNoticePosts, setLoadingNoticePosts] = useState(false);
+  const [savingNoticePost, setSavingNoticePost] = useState(false);
+  const [deletingNoticePostId, setDeletingNoticePostId] = useState<string | null>(null);
   const [termsText, setTermsText] = useState("");
   const [privacyText, setPrivacyText] = useState("");
   const [savingLegalTextKey, setSavingLegalTextKey] = useState<string | null>(null);
   const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>("number");
   const isLicensePage = pathname === "/license";
+  const isNoticePage = pathname === "/notice";
   const isPrivacyPage = pathname === "/privacy";
   const isTermsPage = pathname === "/terms";
-  const isLegalPage = isLicensePage || isPrivacyPage || isTermsPage;
+  const isLegalPage = isLicensePage || isNoticePage || isPrivacyPage || isTermsPage;
   const showInitialDataLoading = !isLegalPage && loadingData && nikkes.length === 0 && bosses.length === 0;
   const canAccessCalculator = isMasterUser || process.env.NODE_ENV !== "production";
   const calculatorAccessResolved =
@@ -1265,6 +1318,16 @@ export default function Page() {
     return ((data ?? []) as UsagePostRow[]).map(mapUsagePostRow).filter((post): post is UsagePost => post !== null);
   }
 
+  async function fetchNoticePosts() {
+    const { data, error } = await supabase
+      .from(NOTICE_POSTS_TABLE)
+      .select("id,title,content,user_id,created_at,updated_at")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return ((data ?? []) as NoticePostRow[]).map(mapNoticePostRow).filter((post): post is NoticePost => post !== null);
+  }
+
   async function syncLocalDecksToAccount(currentUserId: string) {
     const localDecks = loadLocalDecks();
     if (localDecks.length === 0) return 0;
@@ -1301,7 +1364,7 @@ export default function Page() {
     toastTimer.current = window.setTimeout(() => setToast(null), 1700);
   }
 
-  // ✅ 선택 리스트 초기화(50개) + 로컬스토리지도 같이
+  // 선택 리스트 초기화 + 로컬스토리지도 같이
   const resetSelected = () => {
     setSelectedNames([]);
     localStorage.removeItem(SELECTED_KEY);
@@ -1614,6 +1677,38 @@ export default function Page() {
     };
   }, [usageBoardTab]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadNoticePosts() {
+      if (pathname !== "/notice") return;
+
+      setLoadingNoticePosts(true);
+      try {
+        const posts = await fetchNoticePosts();
+        if (!cancelled) {
+          setNoticePosts(posts);
+        }
+      } catch (error) {
+        console.warn("공지사항 불러오기 실패", error);
+        if (!cancelled) {
+          setNoticePosts([]);
+          showToast("공지사항 불러오기 실패");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingNoticePosts(false);
+        }
+      }
+    }
+
+    void loadNoticePosts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // selected 목록만 localStorage 사용
   useEffect(() => {
     try {
@@ -1623,6 +1718,7 @@ export default function Page() {
         if (Array.isArray(parsed)) setSelectedNames(parsed.slice(0, MAX_SELECTED));
       }
     } catch { }
+    setSelectedNamesReady(true);
   }, []);
 
   useEffect(() => {
@@ -1811,10 +1907,11 @@ export default function Page() {
   }, [deckTabs]);
 
   useEffect(() => {
+    if (!selectedNamesReady) return;
     try {
       localStorage.setItem(SELECTED_KEY, JSON.stringify(selectedNames));
     } catch { }
-  }, [selectedNames]);
+  }, [selectedNames, selectedNamesReady]);
 
   useEffect(() => {
     const availableRaidKeys = new Set(deckTabs.map((tab) => tab.key));
@@ -1946,8 +2043,16 @@ export default function Page() {
   }, [nikkes]);
 
   const selectednikkes = useMemo(() => {
-    return selectedNames.map((name) => nikkeMap.get(name)).filter(Boolean) as NikkeRow[];
-  }, [selectedNames, nikkeMap]);
+    return selectedNames
+      .map((name) => {
+        const directMatch = nikkeMap.get(name);
+        if (directMatch) return directMatch;
+
+        const canonicalName = nikkeNameLookup.get(normToken(name));
+        return canonicalName ? nikkeMap.get(canonicalName) ?? null : null;
+      })
+      .filter((nikke): nikke is NikkeRow => nikke !== null);
+  }, [selectedNames, nikkeMap, nikkeNameLookup]);
 
   const currentDeckRaidKey = useMemo(() => {
     if (soloRaidActive) return activeRaidKey;
@@ -2364,7 +2469,7 @@ export default function Page() {
     setSelectedNames((prev) => {
       if (prev.includes(name)) return prev.filter((x) => x !== name);
       if (prev.length >= MAX_SELECTED) {
-        showToast("최대 50개 선택가능.");
+        showToast("최대 100개 선택가능.");
         return prev;
       }
       return [...prev, name];
@@ -3471,6 +3576,89 @@ export default function Page() {
     }
   }
 
+  async function submitNoticePost(payload: { id?: string; title: string; content: string }) {
+    if (!isMasterUser) {
+      showToast("마스터 계정만 작성 가능");
+      return false;
+    }
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 작성 가능");
+      return false;
+    }
+
+    const title = payload.title.trim();
+    const content = payload.content.trim();
+    if (!title || !content) {
+      showToast("제목과 내용을 입력해줘");
+      return false;
+    }
+
+    setSavingNoticePost(true);
+    try {
+      const values = {
+        title,
+        content,
+        user_id: currentUserId,
+        updated_at: new Date().toISOString(),
+      };
+
+      const response = payload.id
+        ? await supabase
+            .from(NOTICE_POSTS_TABLE)
+            .update(values)
+            .eq("id", payload.id)
+            .select("id,title,content,user_id,created_at,updated_at")
+            .maybeSingle()
+        : await supabase
+            .from(NOTICE_POSTS_TABLE)
+            .insert(values)
+            .select("id,title,content,user_id,created_at,updated_at")
+            .maybeSingle();
+
+      if (response.error) throw response.error;
+      const saved = response.data ? mapNoticePostRow(response.data as NoticePostRow) : null;
+      if (!saved) throw new Error("공지 저장 결과를 읽을 수 없습니다.");
+
+      setNoticePosts((prev) => {
+        const withoutSaved = prev.filter((post) => post.id !== saved.id);
+        return [saved, ...withoutSaved].sort((a, b) => b.createdAt - a.createdAt);
+      });
+      showToast(payload.id ? "공지 수정 완료" : "공지 등록 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast(payload.id ? "공지 수정 실패" : "공지 등록 실패");
+      return false;
+    } finally {
+      setSavingNoticePost(false);
+    }
+  }
+
+  async function deleteNoticePost(id: string) {
+    if (!isMasterUser) {
+      showToast("마스터 계정만 삭제 가능");
+      return false;
+    }
+
+    setDeletingNoticePostId(id);
+    try {
+      const { error } = await supabase.from(NOTICE_POSTS_TABLE).delete().eq("id", id);
+      if (error) throw error;
+
+      setNoticePosts((prev) => prev.filter((post) => post.id !== id));
+      showToast("공지 삭제 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("공지 삭제 실패");
+      return false;
+    } finally {
+      setDeletingNoticePostId(null);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-50">
       <div className="mx-auto max-w-xl px-4 pb-10 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
@@ -3492,7 +3680,7 @@ export default function Page() {
               </div>
             </div>
 
-            <div className={`grid gap-1.5 px-1 lg:mx-auto lg:w-full ${shouldShowCalculator ? "grid-cols-7 lg:max-w-4xl" : "grid-cols-6 lg:max-w-3xl"}`}>
+            <div className={`grid gap-1.5 px-1 lg:mx-auto lg:w-full ${shouldShowCalculator ? "grid-cols-8 lg:max-w-5xl" : "grid-cols-7 lg:max-w-4xl"}`}>
               <button
                 onClick={() => navigateToTab("home")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
@@ -3521,6 +3709,16 @@ export default function Page() {
               >
                 <RecommendIcon active={tab === "recommend"} />
                 <div>추천</div>
+              </button>
+
+              <button
+                onClick={() => navigateToTab("imaginary")}
+                className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
+                  tab === "imaginary" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                }`}
+              >
+                <ImaginaryIcon active={tab === "imaginary"} />
+                <div>덱 빌딩</div>
               </button>
 
               <button
@@ -3607,7 +3805,17 @@ export default function Page() {
         )}
 
         {isLegalPage ? (
-          isTermsPage ? (
+          isNoticePage ? (
+            <NoticeContent
+              posts={noticePosts}
+              loading={loadingNoticePosts}
+              isMaster={isMaster}
+              saving={savingNoticePost}
+              deletingId={deletingNoticePostId}
+              onSubmit={submitNoticePost}
+              onDelete={deleteNoticePost}
+            />
+          ) : isTermsPage ? (
             <TermsContent
               content={termsText}
               canEdit={isMaster}
@@ -3635,6 +3843,7 @@ export default function Page() {
                 best={best}
                 fmt={fmt}
                 getPublicUrl={getPublicUrl}
+                selectedNames={selectedNames}
                 selectedNikkes={selectednikkes}
                 maxSelected={MAX_SELECTED}
                 nikkeMap={nikkeMap}
@@ -3734,6 +3943,23 @@ export default function Page() {
           </div>
         )}
 
+        {tab === "imaginary" && (
+          <div className="mx-auto w-full lg:max-w-6xl">
+            <ImaginarySoloRaidTab
+              selectedNames={selectedNames}
+              selectedNikkes={selectednikkes}
+              maxSelected={MAX_SELECTED}
+              nikkeMap={nikkeMap}
+              getPublicUrl={getPublicUrl}
+              onResetSelected={resetSelected}
+              onRemoveSelectedNikke={removeSelectedNikke}
+              onGoToSettings={() => navigateToTab("settings")}
+              onShowToast={showToast}
+              onSubmitDeck={submitDeckFromHome}
+            />
+          </div>
+        )}
+
         {tab === "usage" && (
           <div className="mx-auto w-full lg:max-w-6xl">
             <UsageTab
@@ -3812,6 +4038,9 @@ export default function Page() {
             </Link>
             <Link href="/license" className="transition hover:text-neutral-200">
               라이센스
+            </Link>
+            <Link href="/notice" className="transition hover:text-neutral-200">
+              공지사항
             </Link>
           </nav>
         </div>

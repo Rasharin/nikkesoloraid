@@ -9,4 +9,8 @@ export const publicRoutes = [
   "/usage",
   "/saved-deck",
   "/faq",
+  "/notice",
+  "/terms",
+  "/privacy",
+  "/license",
 ] as const;

@@ -6,6 +6,7 @@ import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { getDeckSlotId, type DragItemData, type NikkeRow } from "./deckBuilderTypes";
 
 type DeckSlotProps = {
+  deckIndex: number;
   index: number;
   name: string | null;
   nikke: NikkeRow | undefined;
@@ -17,6 +18,7 @@ type DeckSlotProps = {
 };
 
 export default function DeckSlot({
+  deckIndex,
   index,
   name,
   nikke,
@@ -27,10 +29,11 @@ export default function DeckSlot({
   onRemove,
 }: DeckSlotProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({
-    id: getDeckSlotId(index),
+    id: getDeckSlotId(index, deckIndex),
     animateLayoutChanges: () => false,
     data: {
       source: "deck",
+      deckIndex,
       slotIndex: index,
       nikkeName: name ?? undefined,
     },
@@ -67,16 +70,18 @@ export default function DeckSlot({
             {...listeners}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt={displayName} draggable={false} className="h-full w-full object-cover pointer-events-none" />
+            <img src={imageUrl} alt={displayName} draggable={false} className="pointer-events-none h-full w-full object-cover" />
           </button>
         ) : (
           <div className="grid h-full w-full place-items-center text-lg text-neutral-600">+</div>
         )}
       </div>
 
-      <div className="mt-1 min-h-[2.5rem] text-center text-xs leading-tight text-neutral-200">
-        {name ? formatNikkeDisplayName(name) : ""}
-      </div>
+      {name ? (
+        <div className="mt-0.5 min-h-[1.05rem] text-center text-[11px] leading-tight text-neutral-200">
+          {formatNikkeDisplayName(name)}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,20 +1,21 @@
 ﻿"use client";
 
 import type { DragEndEvent, DragOverEvent } from "@dnd-kit/core";
-import { memo, useMemo, type RefObject } from "react";
+import { memo, useMemo, type Ref } from "react";
 import { rectSortingStrategy, SortableContext, arrayMove } from "@dnd-kit/sortable";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import DeckSlot from "./DeckSlot";
-import { getDeckSlotId, parseDeckSlotIndex, type DraftSlot, type DragItemData, type NikkeRow } from "./deckBuilderTypes";
+import { getDeckSlotId, parseDeckSlotTarget, type DraftSlot, type DragItemData, type NikkeRow } from "./deckBuilderTypes";
 
 type DeckBuilderSectionProps = {
-  title: string;
+  deckIndex?: number;
+  title?: string;
   draft: DraftSlot[];
   nikkeMap: Map<string, NikkeRow>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   score: string;
-  scoreRef: RefObject<HTMLInputElement | null>;
-  sectionRef: RefObject<HTMLElement | null>;
+  scoreRef: Ref<HTMLInputElement>;
+  sectionRef?: Ref<HTMLElement>;
   editingId: string | null;
   activeDrag: DragItemData | null;
   hoveredSlotIndex: number | null;
@@ -22,10 +23,13 @@ type DeckBuilderSectionProps = {
   onRemoveFromDraft: (index: number) => void;
   onSaveDeck: () => void;
   onClearDraft: () => void;
+  onSaveAllDecks?: () => void;
+  showSaveAll?: boolean;
   className?: string;
 };
 
 function DeckBuilderSectionComponent({
+  deckIndex = 0,
   title,
   draft,
   nikkeMap,
@@ -40,18 +44,15 @@ function DeckBuilderSectionComponent({
   onRemoveFromDraft,
   onSaveDeck,
   onClearDraft,
+  onSaveAllDecks,
+  showSaveAll,
   className,
 }: DeckBuilderSectionProps) {
-  const slotIds = useMemo(() => draft.map((_, index) => getDeckSlotId(index)), [draft]);
+  const slotIds = useMemo(() => draft.map((_, index) => getDeckSlotId(index, deckIndex)), [deckIndex, draft]);
 
   return (
     <section ref={sectionRef} className={`rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 ${className ?? ""}`}>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold">{title}</h2>
-        <div className="text-xs text-neutral-500">드래그 또는 클릭으로 구성</div>
-      </div>
-
-      <div className="mt-3">
+      <div>
         <SortableContext items={slotIds} strategy={rectSortingStrategy}>
           <div className="grid grid-cols-5 gap-2">
             {draft.map((name, index) => {
@@ -60,14 +61,15 @@ function DeckBuilderSectionComponent({
 
               return (
                 <DeckSlot
-                  key={getDeckSlotId(index)}
+                  key={getDeckSlotId(index, deckIndex)}
+                  deckIndex={deckIndex}
                   index={index}
                   name={name}
                   nikke={nikke}
                   imageUrl={imageUrl}
                   activeDrag={activeDrag}
                   hovered={hoveredSlotIndex === index}
-                  canDrop={getSlotDropAvailability(index, draft, activeDrag)}
+                  canDrop={getSlotDropAvailability(index, deckIndex, draft, activeDrag)}
                   onRemove={onRemoveFromDraft}
                 />
               );
@@ -75,7 +77,7 @@ function DeckBuilderSectionComponent({
           </div>
         </SortableContext>
 
-        <div className="mt-1">
+        <div className="mt-2">
           <input
             ref={scoreRef}
             inputMode="decimal"
@@ -106,16 +108,23 @@ function DeckBuilderSectionComponent({
             비우기
           </button>
         </div>
+        {showSaveAll && onSaveAllDecks ? (
+          <button
+            onClick={onSaveAllDecks}
+            className="mt-2 w-full rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-3 text-base font-semibold text-cyan-100 active:scale-[0.99]"
+          >
+            작성된 덱 모두 저장
+          </button>
+        ) : null}
       </div>
     </section>
   );
 }
 
-function getSlotDropAvailability(index: number, draft: DraftSlot[], activeDrag: DragItemData | null): boolean {
+function getSlotDropAvailability(index: number, deckIndex: number, draft: DraftSlot[], activeDrag: DragItemData | null): boolean {
   if (!activeDrag) return false;
 
-  if (activeDrag.source === "selected") {
-    if (draft[index] !== null) return false;
+  if (activeDrag.source === "selected" || activeDrag.source === "spare") {
     return !draft.includes(activeDrag.nikkeName);
   }
 
@@ -123,11 +132,15 @@ function getSlotDropAvailability(index: number, draft: DraftSlot[], activeDrag: 
     return false;
   }
 
-  if (typeof activeDrag.slotIndex !== "number" || activeDrag.slotIndex === index) {
+  if (typeof activeDrag.slotIndex !== "number") {
     return false;
   }
 
-  return true;
+  if (activeDrag.deckIndex === deckIndex && activeDrag.slotIndex === index) {
+    return false;
+  }
+
+  return activeDrag.nikkeName ? !draft.includes(activeDrag.nikkeName) || draft[index] === activeDrag.nikkeName : true;
 }
 
 export function moveDraftSlot(draft: DraftSlot[], fromIndex: number, toIndex: number): DraftSlot[] {
@@ -135,11 +148,19 @@ export function moveDraftSlot(draft: DraftSlot[], fromIndex: number, toIndex: nu
 }
 
 export function getHoveredSlotIndex(event: DragOverEvent): number | null {
-  return parseDeckSlotIndex(event.over?.id);
+  return parseDeckSlotTarget(event.over?.id)?.slotIndex ?? null;
 }
 
 export function getDroppedSlotIndex(event: DragEndEvent): number | null {
-  return parseDeckSlotIndex(event.over?.id);
+  return parseDeckSlotTarget(event.over?.id)?.slotIndex ?? null;
+}
+
+export function getHoveredDeckSlotTarget(event: DragOverEvent) {
+  return parseDeckSlotTarget(event.over?.id);
+}
+
+export function getDroppedDeckSlotTarget(event: DragEndEvent) {
+  return parseDeckSlotTarget(event.over?.id);
 }
 
 export function renderDragOverlayCard(nikke: NikkeRow | undefined, imageUrl: string, width?: number | null) {
