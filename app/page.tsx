@@ -204,7 +204,7 @@ const roles = [
 ] as const;
 
 type TabKey = "home" | "saved" | "recommend" | "imaginary" | "calculator" | "usage" | "settings" | "contact" | "mypage";
-type UsageBoardCategoryKey = "home" | "saved" | "recommend" | "settings";
+type UsageBoardCategoryKey = "home" | "saved" | "recommend" | "deck-building" | "settings";
 const TAB_ROUTE_MAP: Record<Exclude<TabKey, "mypage">, string> = {
   home: "/",
   saved: "/saved-deck",
@@ -231,6 +231,7 @@ const USAGE_BOARD_TABS: ReadonlyArray<{ key: UsageBoardCategoryKey; label: strin
   { key: "home", label: "홈" },
   { key: "saved", label: "저장된 덱" },
   { key: "recommend", label: "추천" },
+  { key: "deck-building", label: "덱 빌딩" },
   { key: "settings", label: "설정" },
 ];
 

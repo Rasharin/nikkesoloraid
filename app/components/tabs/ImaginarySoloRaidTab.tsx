@@ -62,6 +62,7 @@ type DeckBuildingTabProps = {
 
 const STORAGE_KEY = "soloraid_deck_building_plan_v1";
 const LEGACY_STORAGE_KEY = "soloraid_imaginary_plan_v1";
+const DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
 const DECK_DRAFT_COUNT = 5;
 const SPARE_SLOT_COUNT = 10;
 const ELEMENTS = ["철갑", "작열", "풍압", "수냉", "전격"];
@@ -127,6 +128,34 @@ function createEmptyDeckDrafts(): DeckDraftState[] {
 
 function createEmptySpareSlots(): DraftSlot[] {
   return Array.from({ length: SPARE_SLOT_COUNT }, () => null);
+}
+
+function normalizeDraftSlots(value: unknown, length: number): DraftSlot[] {
+  const next = Array.from({ length }, () => null) as DraftSlot[];
+  if (!Array.isArray(value)) return next;
+
+  value.slice(0, length).forEach((slot, index) => {
+    next[index] = typeof slot === "string" ? slot : null;
+  });
+
+  return next;
+}
+
+function normalizeSavedDeckDrafts(value: unknown): DeckDraftState[] {
+  const empty = createEmptyDeckDrafts();
+  if (!Array.isArray(value)) return empty;
+
+  return empty.map((deck, index) => {
+    const saved = value[index] as Partial<DeckDraftState> | undefined;
+    if (!saved || typeof saved !== "object") return deck;
+
+    return {
+      id: deck.id,
+      draft: normalizeDraftSlots(saved.draft, deck.draft.length),
+      score: typeof saved.score === "string" ? saved.score : "",
+      editingId: typeof saved.editingId === "string" ? saved.editingId : null,
+    };
+  });
 }
 
 function swapDraftSlots(draft: DraftSlot[], fromIndex: number, toIndex: number): DraftSlot[] {
@@ -245,6 +274,7 @@ export default function ImaginarySoloRaidTab({
   onResetSelected,
   onRemoveSelectedNikke,
   onGoToSettings,
+  onShowToast,
   onSubmitDeck,
 }: DeckBuildingTabProps) {
   const [plan, setPlan] = useState<SavedPlan>(() => createDefaultPlan());
@@ -283,6 +313,16 @@ export default function ImaginarySoloRaidTab({
       const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
       if (raw) {
         setPlan(normalizePlan(JSON.parse(raw)));
+      }
+
+      const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (rawDraft) {
+        const parsed = JSON.parse(rawDraft) as {
+          deckDrafts?: unknown;
+          spareSlots?: unknown;
+        };
+        setDeckDrafts(normalizeSavedDeckDrafts(parsed.deckDrafts));
+        setSpareSlots(normalizeDraftSlots(parsed.spareSlots, SPARE_SLOT_COUNT));
       }
     } catch {}
 
@@ -394,6 +434,23 @@ export default function ImaginarySoloRaidTab({
 
   function removeFromSpareSlots(slotIndex: number) {
     setSpareSlots((prev) => prev.map((value, currentIndex) => (currentIndex === slotIndex ? null : value)));
+  }
+
+  function saveDraftToLocal() {
+    try {
+      localStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          deckDrafts,
+          spareSlots,
+          savedAt: Date.now(),
+        })
+      );
+    } catch {
+      onShowToast("임시저장 실패");
+      return;
+    }
+    onShowToast("임시저장 완료");
   }
 
   function renderSpareSlots() {
@@ -695,7 +752,7 @@ export default function ImaginarySoloRaidTab({
           <div className="flex items-center gap-3">
             <div className="min-w-0">
               <h2 className="text-lg font-semibold">덱 만들기</h2>
-              <div className="mt-1 text-sm text-neutral-400">5개 덱을 작성할 수 있어요.</div>
+              <div className="mt-1 text-sm text-neutral-400"> 임시 저장을 눌러야 기기에 정보가 저장됩니다.</div>
             </div>
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -713,7 +770,16 @@ export default function ImaginarySoloRaidTab({
                   onClick={() => void handleSaveAllDecks()}
                   className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 active:scale-[0.99]"
                 >
-                  작성된 덱 모두 저장
+                  점수 반영
+                </button>
+              ) : null}
+              {deckOpen ? (
+                <button
+                  type="button"
+                  onClick={saveDraftToLocal}
+                  className="rounded-2xl border border-amber-300/70 bg-amber-300 px-4 py-2 text-sm font-semibold text-neutral-950 shadow-[0_0_18px_rgba(252,211,77,0.22)] active:scale-[0.99]"
+                >
+                  임시저장
                 </button>
               ) : null}
             </div>

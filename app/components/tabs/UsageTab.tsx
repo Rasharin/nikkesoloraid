@@ -38,6 +38,14 @@ function UsageBoardTabIcon({ tabKey, active }: { tabKey: string; active: boolean
     );
   }
 
+  if (tabKey === "deck-building") {
+    return (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M4 5h6v6H4V5ZM14 5h6v6h-6V5ZM4 15h6v4H4v-4ZM14 15h6v4h-6v-4Z" stroke={stroke} strokeWidth="2" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
   if (tabKey === "settings") {
     return (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -175,7 +183,7 @@ export default function UsageTab({
           ) : null}
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {tabs.map((tab) => (
             <button
               key={tab.key}

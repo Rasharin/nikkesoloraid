@@ -52,7 +52,7 @@ function DraggableNikkeCardComponent({ nikke, imageUrl, onAdd, onRemove }: Dragg
           onRemove(nikke.name);
         }}
         aria-label={`${nikke.name} 제거`}
-        className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-red-400 transition hover:bg-black/90 hover:text-red-300 active:scale-[0.95]"
+        className="absolute right-1.5 top-1.5 z-[1] flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-red-400 transition hover:bg-black/90 hover:text-red-300 active:scale-[0.95]"
       >
         <svg
           width="11"
