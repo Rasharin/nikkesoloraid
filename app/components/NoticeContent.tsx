@@ -27,6 +27,7 @@ export default function NoticeContent({ posts, loading, isMaster, saving, deleti
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState(emptyDraft);
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const editingPost = editingId && editingId !== "new" ? posts.find((post) => post.id === editingId) ?? null : null;
 
   const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
     year: "numeric",
@@ -73,6 +74,12 @@ export default function NoticeContent({ posts, loading, isMaster, saving, deleti
     cancelEdit();
   }
 
+  async function handleDelete(id: string) {
+    const confirmed = window.confirm("이 공지사항을 삭제할까요?");
+    if (!confirmed) return;
+    await onDelete(id);
+  }
+
   function toggleOpen(id: string) {
     setOpenIds((current) => {
       const next = new Set(current);
@@ -102,6 +109,10 @@ export default function NoticeContent({ posts, loading, isMaster, saving, deleti
 
         {isMaster && editingId ? (
           <div className="mt-5 space-y-3 rounded-2xl border border-neutral-800 bg-neutral-950/50 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-sm text-neutral-400">{editingPost ? "공지 수정 중" : "새 공지 작성 중"}</div>
+              {editingPost ? <div className="text-xs text-neutral-500">현재 글: {editingPost.title}</div> : null}
+            </div>
             <input
               value={draft.title}
               onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))}
@@ -174,8 +185,8 @@ export default function NoticeContent({ posts, loading, isMaster, saving, deleti
                         </button>
                         <button
                           type="button"
-                          onClick={() => void onDelete(post.id)}
-                          disabled={deletingId === post.id}
+                          onClick={() => void handleDelete(post.id)}
+                          disabled={Boolean(deletingId)}
                           className="rounded-2xl border border-red-800/70 px-4 py-2 text-sm text-red-300 disabled:opacity-50"
                         >
                           {deletingId === post.id ? "삭제 중..." : "삭제"}
