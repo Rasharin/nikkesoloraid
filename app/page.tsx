@@ -1329,6 +1329,21 @@ export default function Page() {
     return ((data ?? []) as NoticePostRow[]).map(mapNoticePostRow).filter((post): post is NoticePost => post !== null);
   }
 
+  function shouldIgnoreNoticeLoadError(error: unknown) {
+    if (!error || typeof error !== "object") return false;
+
+    const candidate = error as { code?: unknown; message?: unknown };
+    const code = typeof candidate.code === "string" ? candidate.code : "";
+    const message = typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
+
+    return (
+      code === "PGRST116" ||
+      code === "42P01" ||
+      message.includes("no rows") ||
+      message.includes("relation") && message.includes("notice_posts") && message.includes("does not exist")
+    );
+  }
+
   async function syncLocalDecksToAccount(currentUserId: string) {
     const localDecks = loadLocalDecks();
     if (localDecks.length === 0) return 0;
@@ -1694,7 +1709,9 @@ export default function Page() {
         console.warn("공지사항 불러오기 실패", error);
         if (!cancelled) {
           setNoticePosts([]);
-          showToast("공지사항 불러오기 실패");
+          if (!shouldIgnoreNoticeLoadError(error)) {
+            showToast("공지사항 불러오기 실패");
+          }
         }
       } finally {
         if (!cancelled) {
@@ -3641,7 +3658,12 @@ export default function Page() {
       return true;
     } catch (error) {
       console.error(error);
-      const detail = error instanceof Error ? error.message : "";
+      const detail =
+        error instanceof Error
+          ? error.message
+          : error && typeof error === "object" && "message" in error && typeof error.message === "string"
+            ? error.message
+            : "";
       showToast(
         detail
           ? `${payload.id ? "공지 수정 실패" : "공지 등록 실패"}: ${detail}`
@@ -3671,7 +3693,13 @@ export default function Page() {
       return true;
     } catch (error) {
       console.error(error);
-      showToast("공지 삭제 실패");
+      const detail =
+        error instanceof Error
+          ? error.message
+          : error && typeof error === "object" && "message" in error && typeof error.message === "string"
+            ? error.message
+            : "";
+      showToast(detail ? `공지 삭제 실패: ${detail}` : "공지 삭제 실패");
       return false;
     } finally {
       setDeletingNoticePostId(null);
