@@ -3598,28 +3598,39 @@ export default function Page() {
 
     setSavingNoticePost(true);
     try {
-      const values = {
-        title,
-        content,
-        user_id: currentUserId,
-        updated_at: new Date().toISOString(),
-      };
+      let data: NoticePostRow | null = null;
 
-      const response = payload.id
-        ? await supabase
-            .from(NOTICE_POSTS_TABLE)
-            .update(values)
-            .eq("id", payload.id)
-            .select("id,title,content,user_id,created_at,updated_at")
-            .maybeSingle()
-        : await supabase
-            .from(NOTICE_POSTS_TABLE)
-            .insert(values)
-            .select("id,title,content,user_id,created_at,updated_at")
-            .maybeSingle();
+      if (payload.id) {
+        const response = await supabase
+          .from(NOTICE_POSTS_TABLE)
+          .update({
+            title,
+            content,
+            user_id: currentUserId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", payload.id)
+          .select("id,title,content,user_id,created_at,updated_at")
+          .single();
 
-      if (response.error) throw response.error;
-      const saved = response.data ? mapNoticePostRow(response.data as NoticePostRow) : null;
+        if (response.error) throw response.error;
+        data = response.data as NoticePostRow;
+      } else {
+        const response = await supabase
+          .from(NOTICE_POSTS_TABLE)
+          .insert({
+            title,
+            content,
+            user_id: currentUserId,
+          })
+          .select("id,title,content,user_id,created_at,updated_at")
+          .single();
+
+        if (response.error) throw response.error;
+        data = response.data as NoticePostRow;
+      }
+
+      const saved = data ? mapNoticePostRow(data) : null;
       if (!saved) throw new Error("공지 저장 결과를 읽을 수 없습니다.");
 
       setNoticePosts((prev) => {
@@ -3630,7 +3641,14 @@ export default function Page() {
       return true;
     } catch (error) {
       console.error(error);
-      showToast(payload.id ? "공지 수정 실패" : "공지 등록 실패");
+      const detail = error instanceof Error ? error.message : "";
+      showToast(
+        detail
+          ? `${payload.id ? "공지 수정 실패" : "공지 등록 실패"}: ${detail}`
+          : payload.id
+            ? "공지 수정 실패"
+            : "공지 등록 실패"
+      );
       return false;
     } finally {
       setSavingNoticePost(false);
