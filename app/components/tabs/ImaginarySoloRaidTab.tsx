@@ -265,6 +265,7 @@ export default function ImaginarySoloRaidTab({
 }: DeckBuildingTabProps) {
   const [deckOpen, setDeckOpen] = useState(true);
   const [nikkeOpen, setNikkeOpen] = useState(true);
+  const [draftStorageReady, setDraftStorageReady] = useState(false);
   const [deckDrafts, setDeckDrafts] = useState<DeckDraftState[]>(() => createEmptyDeckDrafts());
   const [spareSlots, setSpareSlots] = useState<DraftSlot[]>(() => createEmptySpareSlots());
   const [activeDrag, setActiveDrag] = useState<DragItemData | null>(null);
@@ -303,7 +304,24 @@ export default function ImaginarySoloRaidTab({
         setSpareSlots(normalizeDraftSlots(parsed.spareSlots, SPARE_SLOT_COUNT));
       }
     } catch {}
+
+    setDraftStorageReady(true);
   }, []);
+
+  useEffect(() => {
+    if (!draftStorageReady) return;
+
+    try {
+      localStorage.setItem(
+        DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          deckDrafts,
+          spareSlots,
+          savedAt: Date.now(),
+        })
+      );
+    } catch {}
+  }, [deckDrafts, draftStorageReady, spareSlots]);
 
   const effectiveNikkeMap = useMemo(() => {
     const next = new Map(nikkeMap);
@@ -634,7 +652,7 @@ export default function ImaginarySoloRaidTab({
           <div className="flex items-center gap-3">
             <div className="min-w-0">
               <h2 className="text-lg font-semibold">덱 만들기</h2>
-              <div className="mt-1 text-sm text-neutral-400"> 임시 저장을 눌러야 기기에 정보가 저장됩니다.</div>
+              <div className="mt-1 text-sm text-neutral-400">아래 덱은 기기에 저장됩니다 점수 반영을 누르면 서버에 반영됩니다.</div>
             </div>
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
