@@ -27,6 +27,7 @@ type SettingsTabProps = {
   setSelectedNames: React.Dispatch<React.SetStateAction<string[]>>;
   favoriteNames: Set<string>;
   onToggleFavorite: (name: string) => void | Promise<void>;
+  recommendedNames: string[];
   selectedBursts: Set<number>;
   setSelectedBursts: React.Dispatch<React.SetStateAction<Set<number>>>;
   selectedElements: Set<string>;
@@ -183,6 +184,7 @@ export default function SettingsTab({
   setSelectedNames,
   favoriteNames,
   onToggleFavorite,
+  recommendedNames,
   selectedBursts,
   setSelectedBursts,
   selectedElements,
@@ -199,6 +201,7 @@ export default function SettingsTab({
 }: SettingsTabProps) {
   const [q, setQ] = useState("");
   const [favoriteOpen, setFavoriteOpen] = useState(true);
+  const [recommendedOpen, setRecommendedOpen] = useState(true);
   const [allNikkesOpen, setAllNikkesOpen] = useState(true);
 
   const filteredNikkes = useMemo(() => {
@@ -231,6 +234,11 @@ export default function SettingsTab({
   const favoriteFilteredNikkes = useMemo(
     () => filteredNikkes.filter((nikke) => favoriteNames.has(nikke.name)),
     [favoriteNames, filteredNikkes]
+  );
+  const recommendedNameSet = useMemo(() => new Set(recommendedNames), [recommendedNames]);
+  const recommendedFilteredNikkes = useMemo(
+    () => filteredNikkes.filter((nikke) => recommendedNameSet.has(nikke.name)),
+    [filteredNikkes, recommendedNameSet]
   );
 
   function renderNikkeGrid(list: NikkeRow[], emptyMessage: string) {
@@ -282,6 +290,15 @@ export default function SettingsTab({
               q || selectedBursts.size || selectedElements.size || selectedRoles.size
                 ? "조건에 맞는 즐겨찾기 니케가 없습니다."
                 : "즐겨찾기한 니케가 없습니다."
+            )}
+          </NikkeSection>
+
+          <NikkeSection title="추천 니케" open={recommendedOpen} onToggle={() => setRecommendedOpen((prev) => !prev)}>
+            {renderNikkeGrid(
+              recommendedFilteredNikkes,
+              q || selectedBursts.size || selectedElements.size || selectedRoles.size
+                ? "조건에 맞는 추천 니케가 없습니다."
+                : "등록된 추천 니케가 없습니다."
             )}
           </NikkeSection>
 

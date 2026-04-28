@@ -245,6 +245,7 @@ const LOCAL_FAVORITES_KEY = "soloraid_favorite_nikkes_v1";
 const FAVORITES_TABLE = "favorite_nikkes";
 const SITE_SETTINGS_TABLE = "site_settings";
 const RECOMMENDED_VIDEO_KEY = "recommended_video_url";
+const RECOMMENDED_NIKKES_KEY = "recommended_nikkes";
 const TERMS_TEXT_KEY = "terms_text";
 const PRIVACY_TEXT_KEY = "privacy_text";
 const RECOMMENDED_DECK_SNAPSHOT_KEY_PREFIX = "recommended_deck_snapshot_";
@@ -984,6 +985,14 @@ function mapRecommendedDeckSnapshot(row: SiteSettingRow): RecommendedDeckSnapsho
   }
 }
 
+function normalizeRecommendedNikkeNames(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(value.map((name) => (typeof name === "string" ? name.trim() : "")).filter((name) => name.length > 0))
+  );
+}
+
 // -------------------- Icons --------------------
 function HomeIcon({ active }: { active: boolean }) {
   return (
@@ -1152,6 +1161,7 @@ export default function Page() {
   const [recommendationHistory, setRecommendationHistory] = useState<Record<string, RecommendationRecord>>({});
   const [recommendationLoaded, setRecommendationLoaded] = useState(false);
   const [recommendedVideoUrl, setRecommendedVideoUrl] = useState<string>("");
+  const [recommendedNikkeNames, setRecommendedNikkeNames] = useState<string[]>([]);
   const [communityRaidDecks, setCommunityRaidDecks] = useState<Deck[]>([]);
   const [loadingCommunityRaidDecks, setLoadingCommunityRaidDecks] = useState(false);
   const [recommendedDeckSnapshots, setRecommendedDeckSnapshots] = useState<Record<string, RecommendedDeckSnapshot>>({});
@@ -1245,6 +1255,26 @@ export default function Page() {
 
     if (error) throw error;
     return ((data as SiteSettingRow | null)?.value ?? "").trim();
+  }
+
+  async function fetchRecommendedNikkeNames() {
+    const { data, error } = await supabase
+      .from(SITE_SETTINGS_TABLE)
+      .select("key,value,updated_at,updated_by")
+      .eq("key", RECOMMENDED_NIKKES_KEY)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    const rawValue = (data as SiteSettingRow | null)?.value;
+    if (!rawValue) return [];
+
+    try {
+      return normalizeRecommendedNikkeNames(JSON.parse(rawValue));
+    } catch {
+      return [];
+    }
   }
 
   async function fetchLegalTexts() {
@@ -1497,6 +1527,30 @@ export default function Page() {
     }
 
     void loadRecommendedVideo();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRecommendedNikkes() {
+      try {
+        const nextNames = await fetchRecommendedNikkeNames();
+        if (!cancelled) {
+          setRecommendedNikkeNames(nextNames);
+        }
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setRecommendedNikkeNames([]);
+        }
+      }
+    }
+
+    void loadRecommendedNikkes();
 
     return () => {
       cancelled = true;
@@ -3099,6 +3153,45 @@ export default function Page() {
     }
   }
 
+  async function saveRecommendedNikkes(nextNames: string[]) {
+    if (!isMaster) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 가능");
+      return false;
+    }
+
+    const availableNames = new Set(nikkes.map((nikke) => nikke.name));
+    const normalizedNames = normalizeRecommendedNikkeNames(nextNames).filter((name) => availableNames.has(name));
+
+    try {
+      const { error } = await supabase
+        .from(SITE_SETTINGS_TABLE)
+        .upsert(
+          {
+            key: RECOMMENDED_NIKKES_KEY,
+            value: JSON.stringify(normalizedNames),
+            updated_by: currentUserId,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "key" }
+        );
+
+      if (error) throw error;
+      setRecommendedNikkeNames(normalizedNames);
+      showToast("추천 니케 저장 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("추천 니케 저장 실패");
+      return false;
+    }
+  }
+
   async function saveLegalText(key: typeof TERMS_TEXT_KEY | typeof PRIVACY_TEXT_KEY, nextText: string) {
     if (!isMaster) {
       showToast("마스터 계정만 가능");
@@ -3940,6 +4033,7 @@ export default function Page() {
               setSelectedNames={setSelectedNames}
               favoriteNames={favoriteNames}
               onToggleFavorite={toggleFavorite}
+              recommendedNames={recommendedNikkeNames}
               selectedBursts={selectedBursts}
               setSelectedBursts={setSelectedBursts}
               selectedElements={selectedElements}
@@ -4047,8 +4141,12 @@ export default function Page() {
             onSyncNikkes={onSyncBucket}
             syncingNikkes={syncing}
             onAddNikke={addNikke}
+            nikkes={nikkes}
+            recommendedNikkeNames={recommendedNikkeNames}
+            onSaveRecommendedNikkes={saveRecommendedNikkes}
             elements={elements}
             roles={roles}
+            getPublicUrl={getPublicUrl}
             onAddSoloRaid={addSoloRaid}
             onEndSoloRaid={endSoloRaid}
             onRestartSoloRaid={restartSoloRaid}

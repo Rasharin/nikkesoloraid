@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { formatNikkeDisplayNames } from "../../../lib/nikke-display";
+import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
 import type { ScoreDisplayMode } from "../../../lib/score-format";
 
 type RecommendationDeck = {
@@ -33,10 +33,19 @@ type ContactInquiry = {
   createdAt: number;
   source: "remote" | "local";
 };
+type NikkeRow = {
+  id: string;
+  name: string;
+  image_path: string | null;
+  burst: number | null;
+  element: string | null;
+  role: string | null;
+  aliases: string[];
+};
 
 type NikkeElementValue = "iron" | "fire" | "wind" | "water" | "electric" | null;
 type NikkeRoleValue = "attacker" | "supporter" | "defender" | null;
-type AdminSectionKey = "nikkes" | "bosses" | "video";
+type AdminSectionKey = "nikkes" | "recommended" | "bosses" | "video";
 
 type MyPageTabProps = {
   deckTabs: readonly DeckTabItem[];
@@ -54,8 +63,12 @@ type MyPageTabProps = {
     aliases: string[];
     imageFile: File | null;
   }) => Promise<boolean>;
+  nikkes: NikkeRow[];
+  recommendedNikkeNames: string[];
+  onSaveRecommendedNikkes: (names: string[]) => Promise<boolean>;
   elements: readonly FilterOption[];
   roles: readonly FilterOption[];
+  getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   onAddSoloRaid: (payload: {
     title: string;
     description: string;
@@ -89,8 +102,12 @@ export default function MyPageTab({
   onSyncNikkes,
   syncingNikkes,
   onAddNikke,
+  nikkes,
+  recommendedNikkeNames,
+  onSaveRecommendedNikkes,
   elements,
   roles,
+  getPublicUrl,
   onAddSoloRaid,
   onEndSoloRaid,
   onRestartSoloRaid,
@@ -115,6 +132,8 @@ export default function MyPageTab({
   const [restartingRaid, setRestartingRaid] = useState(false);
   const [videoUrlInput, setVideoUrlInput] = useState(recommendedVideoUrl);
   const [savingVideo, setSavingVideo] = useState(false);
+  const [selectedRecommendedCandidates, setSelectedRecommendedCandidates] = useState<Set<string>>(new Set());
+  const [savingRecommendedNikkes, setSavingRecommendedNikkes] = useState(false);
   const [deletingInquiryId, setDeletingInquiryId] = useState<string | null>(null);
   const inquiryDateFormatter = useMemo(
     () =>
@@ -136,6 +155,11 @@ export default function MyPageTab({
   const [nikkeImageFile, setNikkeImageFile] = useState<File | null>(null);
   const [nikkeImageInputKey, setNikkeImageInputKey] = useState(0);
   const [savingNikke, setSavingNikke] = useState(false);
+  const recommendedNameSet = useMemo(() => new Set(recommendedNikkeNames), [recommendedNikkeNames]);
+  const recommendedNikkes = useMemo(
+    () => nikkes.filter((nikke) => recommendedNameSet.has(nikke.name)),
+    [nikkes, recommendedNameSet]
+  );
 
   useEffect(() => {
     if (!deckTabs.some((tab) => tab.key === openRaidKey)) {
@@ -230,6 +254,94 @@ export default function MyPageTab({
     }
   }
 
+  async function handleAddRecommendedNikke() {
+    if (savingRecommendedNikkes) return;
+    const names = Array.from(selectedRecommendedCandidates).filter((name) => !recommendedNikkeNames.includes(name));
+    if (names.length === 0) return;
+
+    setSavingRecommendedNikkes(true);
+    try {
+      const saved = await onSaveRecommendedNikkes([...recommendedNikkeNames, ...names]);
+      if (saved) {
+        setSelectedRecommendedCandidates(new Set());
+      }
+    } finally {
+      setSavingRecommendedNikkes(false);
+    }
+  }
+
+  function toggleRecommendedCandidate(name: string) {
+    setSelectedRecommendedCandidates((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  }
+
+  async function handleRemoveRecommendedNikke(name: string) {
+    if (savingRecommendedNikkes) return;
+
+    setSavingRecommendedNikkes(true);
+    try {
+      await onSaveRecommendedNikkes(recommendedNikkeNames.filter((candidate) => candidate !== name));
+    } finally {
+      setSavingRecommendedNikkes(false);
+    }
+  }
+
+  function renderAdminNikkeTile(nikke: NikkeRow, options?: { selected?: boolean; removable?: boolean; onClick?: () => void; onRemove?: () => void }) {
+    const url = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+    const displayName = formatNikkeDisplayName(nikke.name);
+
+    return (
+      <div
+        key={nikke.id}
+        role={options?.onClick ? "button" : undefined}
+        tabIndex={options?.onClick ? 0 : undefined}
+        onClick={options?.onClick}
+        onKeyDown={(event) => {
+          if (!options?.onClick) return;
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            options.onClick();
+          }
+        }}
+        className={`relative isolate min-w-0 overflow-hidden rounded-2xl border p-1 text-left active:scale-[0.99] ${
+          options?.selected ? "border-sky-300 bg-sky-500/10" : "border-neutral-800 bg-neutral-950/40"
+        }`}
+      >
+        {options?.removable ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              options.onRemove?.();
+            }}
+            disabled={savingRecommendedNikkes}
+            aria-label={`${displayName} 추천 니케 제거`}
+            className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full border border-neutral-700 bg-neutral-950/85 text-sm font-semibold text-neutral-200 transition hover:border-red-400 hover:text-red-300 disabled:opacity-50"
+          >
+            X
+          </button>
+        ) : null}
+
+        <div className="aspect-square w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
+          {url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={url} alt={displayName} className="h-full w-full object-cover" />
+          ) : (
+            <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
+          )}
+        </div>
+        <div className="mt-1 h-[2.4em] overflow-hidden break-words text-xs font-medium leading-tight">{displayName}</div>
+      </div>
+    );
+  }
+
   async function handleDeleteInquiry(id: string) {
     if (deletingInquiryId) return;
 
@@ -294,6 +406,9 @@ export default function MyPageTab({
           <div className="mt-4 flex flex-wrap gap-2">
             <button type="button" onClick={() => setAdminSection("nikkes")} className={adminTabClass(adminSection === "nikkes")}>
               니케 관리
+            </button>
+            <button type="button" onClick={() => setAdminSection("recommended")} className={adminTabClass(adminSection === "recommended")}>
+              추천 니케
             </button>
             <button type="button" onClick={() => setAdminSection("bosses")} className={adminTabClass(adminSection === "bosses")}>
               보스 관리
@@ -405,6 +520,73 @@ export default function MyPageTab({
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          ) : null}
+
+          {adminSection === "recommended" ? (
+            <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium text-neutral-100">추천 니케</div>
+                  <div className="mt-1 text-xs text-neutral-400">설정 탭의 전체 니케 목록에서 사용하는 데이터와 연동됩니다.</div>
+                </div>
+                <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
+                  {recommendedNikkes.length}개
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                <section className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
+                  <div className="mb-2 text-sm font-semibold text-neutral-100">추천 니케</div>
+                  <div className="max-h-[520px] overflow-y-auto pr-1">
+                    {recommendedNikkes.length === 0 ? (
+                      <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
+                        추천 니케가 없습니다.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-5">
+                        {recommendedNikkes.map((nikke) =>
+                          renderAdminNikkeTile(nikke, {
+                            removable: true,
+                            onRemove: () => void handleRemoveRecommendedNikke(nikke.name),
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
+                  <div className="mb-2 text-sm font-semibold text-neutral-100">전체 니케 목록</div>
+                  <div className="max-h-[520px] overflow-y-auto pr-1">
+                    {nikkes.length === 0 ? (
+                      <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
+                        표시할 니케가 없습니다.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-5">
+                        {nikkes.map((nikke) =>
+                          renderAdminNikkeTile(nikke, {
+                            selected: selectedRecommendedCandidates.has(nikke.name),
+                            onClick: () => toggleRecommendedCandidate(nikke.name),
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleAddRecommendedNikke()}
+                    disabled={
+                      Array.from(selectedRecommendedCandidates).every((name) => recommendedNameSet.has(name)) || savingRecommendedNikkes
+                    }
+                    className="mt-3 w-full rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-sm font-semibold text-sky-100 active:scale-[0.99] disabled:opacity-50"
+                  >
+                    추천니케 추가{selectedRecommendedCandidates.size > 0 ? ` (${selectedRecommendedCandidates.size})` : ""}
+                  </button>
+                </section>
               </div>
             </div>
           ) : null}
