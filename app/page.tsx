@@ -189,6 +189,19 @@ type BossRow = {
   created_at: string;
 };
 
+type SupabaseDataCache = {
+  nikkes: NikkeRow[];
+  bosses: BossRow[];
+  bossSource: "bosses" | "boss_default";
+  cachedAt: number;
+};
+
+type UserDecksCache = {
+  userId: string;
+  decks: Deck[];
+  cachedAt: number;
+};
+
 const elements = [
   { v: "iron", label: "철갑" },
   { v: "fire", label: "작열" },
@@ -257,6 +270,10 @@ const LOCAL_CONTACT_INQUIRIES_KEY = "soloraid_local_contact_inquiries_v1";
 const SCORE_DISPLAY_MODE_KEY = "soloraid_score_display_mode_v1";
 const USAGE_POSTS_TABLE = "usage_posts";
 const NOTICE_POSTS_TABLE = "notice_posts";
+const SUPABASE_DATA_CACHE_KEY = "soloraid_supabase_data_cache_v1";
+const SUPABASE_DATA_CACHE_TTL = 1000 * 60 * 10;
+const USER_DECKS_CACHE_KEY = "soloraid_user_decks_cache_v1";
+const USER_DECKS_CACHE_TTL = 1000 * 60 * 5;
 
 const MAX_SELECTED = 100;
 const MAX_DECK_CHARS = 5;
@@ -347,6 +364,46 @@ function normalizeAliases(value: unknown): string[] {
     .filter((item): item is string => typeof item === "string")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function normalizeNikkeRows(value: unknown): NikkeRow[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Omit<NikkeRow, "aliases"> & { aliases?: unknown } => Boolean(item) && typeof item === "object")
+    .map((nikke) => ({
+      ...nikke,
+      aliases: normalizeAliases(nikke.aliases),
+    }));
+}
+
+function readCachedSupabaseData(): SupabaseDataCache | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = sessionStorage.getItem(SUPABASE_DATA_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<SupabaseDataCache>;
+    if (!parsed.cachedAt || Date.now() - parsed.cachedAt > SUPABASE_DATA_CACHE_TTL) return null;
+    if (parsed.bossSource !== "bosses" && parsed.bossSource !== "boss_default") return null;
+
+    return {
+      nikkes: normalizeNikkeRows(parsed.nikkes),
+      bosses: Array.isArray(parsed.bosses) ? (parsed.bosses as BossRow[]) : [],
+      bossSource: parsed.bossSource,
+      cachedAt: parsed.cachedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedSupabaseData(cache: SupabaseDataCache) {
+  if (typeof window === "undefined") return;
+
+  try {
+    sessionStorage.setItem(SUPABASE_DATA_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
 }
 
 function resolveDeckChars(chars: string[], nikkeNameLookup: Map<string, string>): string[] | null {
@@ -779,6 +836,39 @@ function saveLocalDecks(nextDecks: Deck[]) {
   } catch { }
 }
 
+function readCachedUserDecks(userId: string): Deck[] | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = sessionStorage.getItem(USER_DECKS_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<UserDecksCache>;
+    if (parsed.userId !== userId) return null;
+    if (!parsed.cachedAt || Date.now() - parsed.cachedAt > USER_DECKS_CACHE_TTL) return null;
+    if (!Array.isArray(parsed.decks)) return null;
+
+    return parsed.decks.map(mapLocalDeck).filter((deck): deck is Deck => deck !== null);
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedUserDecks(userId: string, decks: Deck[]) {
+  if (typeof window === "undefined") return;
+
+  try {
+    sessionStorage.setItem(
+      USER_DECKS_CACHE_KEY,
+      JSON.stringify({
+        userId,
+        decks,
+        cachedAt: Date.now(),
+      })
+    );
+  } catch {}
+}
+
 function loadLocalOffSeasonDecks(): Deck[] {
   try {
     const raw = localStorage.getItem(LOCAL_OFFSEASON_DECKS_KEY);
@@ -1118,6 +1208,7 @@ function UsageIcon({ active }: { active: boolean }) {
 export default function Page() {
   const pathname = usePathname();
   const router = useRouter();
+  const cachedSupabaseData = useMemo(() => readCachedSupabaseData(), []);
   const [tab, setTab] = useState<TabKey>(() => PATH_TAB_MAP[pathname] ?? "home");
   const [usageBoardTab, setUsageBoardTab] = useState<UsageBoardCategoryKey>("home");
   const [deckTabs, setDeckTabs] = useState<DeckTabItem[]>(DEFAULT_DECK_TABS);
@@ -1128,11 +1219,11 @@ export default function Page() {
   const [loadingDecks, setLoadingDecks] = useState(false);
 
   // supabase data
-  const [nikkes, setnikkes] = useState<NikkeRow[]>([]);
-  const [boss, setBoss] = useState<BossRow | null>(null);
-  const [bosses, setBosses] = useState<BossRow[]>([]);
+  const [nikkes, setnikkes] = useState<NikkeRow[]>(() => cachedSupabaseData?.nikkes ?? []);
+  const [boss, setBoss] = useState<BossRow | null>(() => cachedSupabaseData?.bosses[0] ?? null);
+  const [bosses, setBosses] = useState<BossRow[]>(() => cachedSupabaseData?.bosses ?? []);
   const [selectedBossId, setSelectedBossId] = useState<string | null>(null);
-  const [loadingData, setLoadingData] = useState(true);
+  const [loadingData, setLoadingData] = useState(() => !cachedSupabaseData);
 
   // selected nikkes (max 100) - localStorage
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
@@ -1903,19 +1994,25 @@ export default function Page() {
     if (!userId) {
       setDecks(loadLocalDecks());
       setHomeEditRequest(null);
+      setLoadingDecks(false);
       return;
     }
 
     const currentUserId = userId;
+    const cachedDecks = readCachedUserDecks(currentUserId);
+    if (cachedDecks) {
+      setDecks(cachedDecks);
+    }
     let cancelled = false;
 
     async function syncAndRefreshDecks() {
-      setLoadingDecks(true);
+      setLoadingDecks(!cachedDecks);
       try {
         const syncedCount = await syncLocalDecksToAccount(currentUserId);
         const nextDecks = await fetchUserDecks(currentUserId);
         if (cancelled) return;
         setDecks(nextDecks);
+        writeCachedUserDecks(currentUserId, nextDecks);
         if (syncedCount > 0) {
           showToast(`로컬 덱 ${syncedCount}개 동기화 완료`);
         }
@@ -2010,9 +2107,14 @@ export default function Page() {
   }, [activeRaidKey, configuredActiveRaidKey, deckTabs, soloRaidActive]);
 
   async function refreshSupabase(forceSoloRaidActive?: boolean) {
-    setLoadingData(true);
+    const hadData = nikkes.length > 0 || bosses.length > 0;
+    setLoadingData(!hadData);
 
     try {
+      let nextNikkes = nikkes;
+      let nextBosses = bosses;
+      const bossSource = (forceSoloRaidActive ?? soloRaidActive) ? "bosses" : "boss_default";
+
       const { data: nikkeData, error: nikkeErr } = await supabase
         .from("nikkes")
         .select("id,name,image_path,created_at,burst,element,role,aliases")
@@ -2022,15 +2124,10 @@ export default function Page() {
         console.error(nikkeErr);
         showToast("니케 목록 불러오기 실패");
       } else {
-        setnikkes(
-          ((nikkeData ?? []) as Array<Omit<NikkeRow, "aliases"> & { aliases?: unknown }>).map((nikke) => ({
-            ...nikke,
-            aliases: normalizeAliases(nikke.aliases),
-          }))
-        );
+        nextNikkes = normalizeNikkeRows(nikkeData);
+        setnikkes(nextNikkes);
       }
 
-      const bossSource = (forceSoloRaidActive ?? soloRaidActive) ? "bosses" : "boss_default";
       const { data: bossData, error: bossErr } = await supabase
         .from(bossSource)
         .select("id,title,description,image_path,starts_at,ends_at,created_at")
@@ -2041,7 +2138,7 @@ export default function Page() {
         console.error(bossErr);
         showToast("보스 정보 불러오기 실패");
       } else {
-        const nextBosses = (bossData ?? []) as BossRow[];
+        nextBosses = (bossData ?? []) as BossRow[];
         setBosses(nextBosses);
         setBoss((currentBoss) => {
           if (selectedBossId) {
@@ -2049,6 +2146,15 @@ export default function Page() {
             if (selectedBoss) return selectedBoss;
           }
           return nextBosses[0] ?? null;
+        });
+      }
+
+      if (!nikkeErr && !bossErr) {
+        writeCachedSupabaseData({
+          nikkes: nextNikkes,
+          bosses: nextBosses,
+          bossSource,
+          cachedAt: Date.now(),
         });
       }
     } catch (e) {
