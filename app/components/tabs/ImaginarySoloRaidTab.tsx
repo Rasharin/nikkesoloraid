@@ -25,15 +25,7 @@ import DeckBuilderSection, {
   renderDragOverlayCard,
 } from "../home/DeckBuilderSection";
 import DraggableNikkeCard from "../home/DraggableNikkeCard";
-import { createEmptyDraft, type DragItemData, type DraftSlot, type NikkeRow } from "../home/deckBuilderTypes";
-
-type SavedPlan = {
-  bossName: string;
-  seasonName: string;
-  weakElement: string;
-  targetScore: string;
-  gimmicks: string;
-};
+import { createEmptyDraft, MAX_DECK_CHARS, type DragItemData, type DraftSlot, type NikkeRow } from "../home/deckBuilderTypes";
 
 type DeckSlotTarget = {
   deckIndex: number;
@@ -60,12 +52,9 @@ type DeckBuildingTabProps = {
   onSubmitDeck: (payload: { draft: string[]; scoreText: string; editingId: string | null }) => Promise<boolean>;
 };
 
-const STORAGE_KEY = "soloraid_deck_building_plan_v1";
-const LEGACY_STORAGE_KEY = "soloraid_imaginary_plan_v1";
 const DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
 const DECK_DRAFT_COUNT = 5;
 const SPARE_SLOT_COUNT = 10;
-const ELEMENTS = ["철갑", "작열", "풍압", "수냉", "전격"];
 
 function getSpareSlotId(index: number): string {
   return `deck-building-spare-slot-${index}`;
@@ -94,29 +83,6 @@ function CollapseIcon({ open }: { open: boolean }) {
   );
 }
 
-function createDefaultPlan(): SavedPlan {
-  return {
-    bossName: "",
-    seasonName: "",
-    weakElement: "철갑",
-    targetScore: "",
-    gimmicks: "",
-  };
-}
-
-function normalizePlan(value: unknown): SavedPlan {
-  if (!value || typeof value !== "object") return createDefaultPlan();
-
-  const candidate = value as Partial<SavedPlan>;
-  return {
-    bossName: typeof candidate.bossName === "string" ? candidate.bossName : "",
-    seasonName: typeof candidate.seasonName === "string" ? candidate.seasonName : "",
-    weakElement: typeof candidate.weakElement === "string" && ELEMENTS.includes(candidate.weakElement) ? candidate.weakElement : "철갑",
-    targetScore: typeof candidate.targetScore === "string" ? candidate.targetScore : "",
-    gimmicks: typeof candidate.gimmicks === "string" ? candidate.gimmicks : "",
-  };
-}
-
 function createEmptyDeckDrafts(): DeckDraftState[] {
   return Array.from({ length: DECK_DRAFT_COUNT }, (_, index) => ({
     id: index + 1,
@@ -142,20 +108,40 @@ function normalizeDraftSlots(value: unknown, length: number): DraftSlot[] {
 }
 
 function normalizeSavedDeckDrafts(value: unknown): DeckDraftState[] {
-  const empty = createEmptyDeckDrafts();
-  if (!Array.isArray(value)) return empty;
+  if (!Array.isArray(value)) return createEmptyDeckDrafts();
 
-  return empty.map((deck, index) => {
-    const saved = value[index] as Partial<DeckDraftState> | undefined;
-    if (!saved || typeof saved !== "object") return deck;
+  const normalized = value
+    .map((candidate, index) => {
+      if (!candidate || typeof candidate !== "object") {
+        return {
+          id: index + 1,
+          draft: createEmptyDraft(),
+          score: "",
+          editingId: null,
+        } satisfies DeckDraftState;
+      }
 
-    return {
-      id: deck.id,
-      draft: normalizeDraftSlots(saved.draft, deck.draft.length),
-      score: typeof saved.score === "string" ? saved.score : "",
-      editingId: typeof saved.editingId === "string" ? saved.editingId : null,
-    };
-  });
+      const saved = candidate as Partial<DeckDraftState>;
+      return {
+        id: typeof saved.id === "number" && Number.isFinite(saved.id) ? saved.id : index + 1,
+        draft: normalizeDraftSlots(saved.draft, MAX_DECK_CHARS),
+        score: typeof saved.score === "string" ? saved.score : "",
+        editingId: typeof saved.editingId === "string" ? saved.editingId : null,
+      } satisfies DeckDraftState;
+    })
+    .filter((deck): deck is DeckDraftState => Boolean(deck));
+
+  if (normalized.length >= DECK_DRAFT_COUNT) return normalized;
+
+  return [
+    ...normalized,
+    ...Array.from({ length: DECK_DRAFT_COUNT - normalized.length }, (_, index) => ({
+      id: normalized.length + index + 1,
+      draft: createEmptyDraft(),
+      score: "",
+      editingId: null,
+    })),
+  ];
 }
 
 function swapDraftSlots(draft: DraftSlot[], fromIndex: number, toIndex: number): DraftSlot[] {
@@ -277,9 +263,6 @@ export default function ImaginarySoloRaidTab({
   onShowToast,
   onSubmitDeck,
 }: DeckBuildingTabProps) {
-  const [plan, setPlan] = useState<SavedPlan>(() => createDefaultPlan());
-  const [storageReady, setStorageReady] = useState(false);
-  const [planOpen, setPlanOpen] = useState(true);
   const [deckOpen, setDeckOpen] = useState(true);
   const [nikkeOpen, setNikkeOpen] = useState(true);
   const [deckDrafts, setDeckDrafts] = useState<DeckDraftState[]>(() => createEmptyDeckDrafts());
@@ -310,11 +293,6 @@ export default function ImaginarySoloRaidTab({
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (raw) {
-        setPlan(normalizePlan(JSON.parse(raw)));
-      }
-
       const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
       if (rawDraft) {
         const parsed = JSON.parse(rawDraft) as {
@@ -325,16 +303,7 @@ export default function ImaginarySoloRaidTab({
         setSpareSlots(normalizeDraftSlots(parsed.spareSlots, SPARE_SLOT_COUNT));
       }
     } catch {}
-
-    setStorageReady(true);
   }, []);
-
-  useEffect(() => {
-    if (!storageReady) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
-    } catch {}
-  }, [plan, storageReady]);
 
   const effectiveNikkeMap = useMemo(() => {
     const next = new Map(nikkeMap);
@@ -379,18 +348,6 @@ export default function ImaginarySoloRaidTab({
   const overlayNikke = activeDrag?.nikkeName ? effectiveNikkeMap.get(activeDrag.nikkeName) : undefined;
   const overlayUrl = overlayNikke?.image_path ? getPublicUrl("nikke-images", overlayNikke.image_path) : "";
 
-  function updatePlan<K extends keyof SavedPlan>(key: K, value: SavedPlan[K]) {
-    setPlan((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function resetPlan() {
-    setPlan(createDefaultPlan());
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
-    } catch {}
-  }
-
   function updateDeckScore(deckIndex: number, scoreText: string) {
     setDeckDrafts((prev) => prev.map((deck, index) => (index === deckIndex ? { ...deck, score: scoreText } : deck)));
   }
@@ -400,6 +357,26 @@ export default function ImaginarySoloRaidTab({
       prev.map((deck, index) => (index === deckIndex ? { ...deck, draft: createEmptyDraft(), score: "", editingId: null } : deck))
     );
     requestAnimationFrame(() => scoreRefs.current[deckIndex]?.focus());
+  }
+
+  function addDeckDraft() {
+    setDeckDrafts((prev) => {
+      const nextId = prev.reduce((maxId, deck) => Math.max(maxId, deck.id), 0) + 1;
+      return [
+        ...prev,
+        {
+          id: nextId,
+          draft: createEmptyDraft(),
+          score: "",
+          editingId: null,
+        },
+      ];
+    });
+  }
+
+  function removeDeckDraft(deckIndex: number) {
+    setDeckDrafts((prev) => prev.filter((_, index) => index !== deckIndex));
+    scoreRefs.current.splice(deckIndex, 1);
   }
 
   function addToDraft(name: string) {
@@ -653,101 +630,6 @@ export default function ImaginarySoloRaidTab({
       onDragCancel={handleDragCancel}
     >
       <div className="flex flex-col gap-5">
-        <section className="rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
-          <div className="flex items-start gap-4">
-            <div className="min-w-0">
-              <div className="inline-flex rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-1 text-xs font-medium text-fuchsia-200">
-                덱 빌딩
-              </div>
-              <h2 className="mt-4 text-2xl font-semibold text-white">덱 빌딩</h2>
-              <p className="mt-2 text-sm leading-6 text-neutral-300">
-                보스 조건과 목표 점수를 가정하고 덱 구성에 필요한 정보를 정리해두는 탭입니다.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setPlanOpen((prev) => !prev)}
-              className="ml-auto shrink-0 rounded-2xl border border-neutral-700 p-2 transition hover:border-neutral-500 active:scale-[0.99]"
-              aria-label={planOpen ? "덱 빌딩 정보 접기" : "덱 빌딩 정보 펼치기"}
-            >
-              <CollapseIcon open={planOpen} />
-            </button>
-          </div>
-
-          {planOpen ? (
-            <>
-              <div className="mt-5 flex justify-end">
-                <button
-                  type="button"
-                  onClick={resetPlan}
-                  className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm text-neutral-200 transition hover:border-neutral-500 active:scale-[0.99]"
-                >
-                  초기화
-                </button>
-              </div>
-
-              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <label className="block">
-                  <div className="mb-2 text-xs font-medium text-neutral-400">시즌 이름</div>
-                  <input
-                    value={plan.seasonName}
-                    onChange={(event) => updatePlan("seasonName", event.target.value)}
-                    placeholder="예) 2026 봄 솔로레이드"
-                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none transition placeholder:text-neutral-600 focus:border-fuchsia-400"
-                  />
-                </label>
-
-                <label className="block">
-                  <div className="mb-2 text-xs font-medium text-neutral-400">보스 이름</div>
-                  <input
-                    value={plan.bossName}
-                    onChange={(event) => updatePlan("bossName", event.target.value)}
-                    placeholder="보스 이름"
-                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none transition placeholder:text-neutral-600 focus:border-fuchsia-400"
-                  />
-                </label>
-
-                <label className="block">
-                  <div className="mb-2 text-xs font-medium text-neutral-400">약점 코드</div>
-                  <select
-                    value={plan.weakElement}
-                    onChange={(event) => updatePlan("weakElement", event.target.value)}
-                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none transition focus:border-fuchsia-400"
-                  >
-                    {ELEMENTS.map((element) => (
-                      <option key={element} value={element}>
-                        {element}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <div className="mb-2 text-xs font-medium text-neutral-400">목표 총점</div>
-                  <input
-                    value={plan.targetScore}
-                    onChange={(event) => updatePlan("targetScore", event.target.value)}
-                    inputMode="decimal"
-                    placeholder="예) 250억"
-                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none transition placeholder:text-neutral-600 focus:border-fuchsia-400"
-                  />
-                </label>
-              </div>
-
-              <label className="mt-4 block">
-                <div className="mb-2 text-xs font-medium text-neutral-400">보스 기믹 / 운영 메모</div>
-                <textarea
-                  value={plan.gimmicks}
-                  onChange={(event) => updatePlan("gimmicks", event.target.value)}
-                  placeholder="예) 파츠 2개, 엄폐물 압박, 전격 접대 예상..."
-                  className="h-28 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-neutral-600 focus:border-fuchsia-400"
-                />
-              </label>
-            </>
-          ) : null}
-        </section>
-
         <section ref={deckSectionRef} className="order-3 rounded-3xl border border-neutral-800 bg-neutral-900/50 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
           <div className="flex items-center gap-3">
             <div className="min-w-0">
@@ -771,6 +653,15 @@ export default function ImaginarySoloRaidTab({
                   className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 active:scale-[0.99]"
                 >
                   점수 반영
+                </button>
+              ) : null}
+              {deckOpen ? (
+                <button
+                  type="button"
+                  onClick={addDeckDraft}
+                  className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm font-semibold text-neutral-100 active:scale-[0.99]"
+                >
+                  덱 추가
                 </button>
               ) : null}
               {deckOpen ? (
@@ -805,6 +696,7 @@ export default function ImaginarySoloRaidTab({
                   onRemoveFromDraft={(slotIndex) => removeFromDraft(deckIndex, slotIndex)}
                   onSaveDeck={() => void handleSaveDeck(deckIndex)}
                   onClearDraft={() => clearDraft(deckIndex)}
+                  onDeleteDeck={() => removeDeckDraft(deckIndex)}
                   className="border-neutral-800 bg-neutral-950/30 p-2.5 shadow-none"
                 />
               ))}

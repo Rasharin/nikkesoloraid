@@ -22,14 +22,14 @@ export type DragItemData = {
   recommendedDeckId?: string;
 };
 
-export function createEmptyDraft(): DraftSlot[] {
-  return Array.from({ length: MAX_DECK_CHARS }, () => null);
+export function createEmptyDraft(length = MAX_DECK_CHARS): DraftSlot[] {
+  return Array.from({ length }, () => null);
 }
 
-export function buildDraftFromChars(chars: string[]): DraftSlot[] {
-  const next = createEmptyDraft();
+export function buildDraftFromChars(chars: string[], length = MAX_DECK_CHARS): DraftSlot[] {
+  const next = createEmptyDraft(length);
 
-  chars.slice(0, MAX_DECK_CHARS).forEach((name, index) => {
+  chars.slice(0, length).forEach((name, index) => {
     next[index] = name;
   });
 

@@ -23,6 +23,7 @@ type DeckBuilderSectionProps = {
   onRemoveFromDraft: (index: number) => void;
   onSaveDeck: () => void;
   onClearDraft: () => void;
+  onDeleteDeck?: () => void;
   onSaveAllDecks?: () => void;
   showSaveAll?: boolean;
   className?: string;
@@ -44,6 +45,7 @@ function DeckBuilderSectionComponent({
   onRemoveFromDraft,
   onSaveDeck,
   onClearDraft,
+  onDeleteDeck,
   onSaveAllDecks,
   showSaveAll,
   className,
@@ -96,20 +98,32 @@ function DeckBuilderSectionComponent({
 
         <div className="mt-3 flex gap-2">
           <button
+            type="button"
             onClick={onSaveDeck}
             className="flex-1 rounded-2xl bg-white px-4 py-3 text-base font-semibold text-neutral-900 active:scale-[0.99]"
           >
             {editingId ? "수정 저장" : "덱 저장"}
           </button>
           <button
+            type="button"
             onClick={onClearDraft}
             className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
           >
             비우기
           </button>
+          {onDeleteDeck ? (
+            <button
+              type="button"
+              onClick={onDeleteDeck}
+              className="rounded-2xl border border-red-500/40 px-4 py-3 text-base text-red-200 active:scale-[0.99]"
+            >
+              삭제
+            </button>
+          ) : null}
         </div>
         {showSaveAll && onSaveAllDecks ? (
           <button
+            type="button"
             onClick={onSaveAllDecks}
             className="mt-2 w-full rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-3 text-base font-semibold text-cyan-100 active:scale-[0.99]"
           >
