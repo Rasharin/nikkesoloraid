@@ -431,23 +431,6 @@ export default function ImaginarySoloRaidTab({
     setSpareSlots((prev) => prev.map((value, currentIndex) => (currentIndex === slotIndex ? null : value)));
   }
 
-  function saveDraftToLocal() {
-    try {
-      localStorage.setItem(
-        DRAFT_STORAGE_KEY,
-        JSON.stringify({
-          deckDrafts,
-          spareSlots,
-          savedAt: Date.now(),
-        })
-      );
-    } catch {
-      onShowToast("임시저장 실패");
-      return;
-    }
-    onShowToast("임시저장 완료");
-  }
-
   function renderSpareSlots() {
     return (
       <section className="rounded-2xl border border-neutral-800 bg-neutral-950/30 p-2.5">
@@ -680,15 +663,6 @@ export default function ImaginarySoloRaidTab({
                   className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm font-semibold text-neutral-100 active:scale-[0.99]"
                 >
                   덱 추가
-                </button>
-              ) : null}
-              {deckOpen ? (
-                <button
-                  type="button"
-                  onClick={saveDraftToLocal}
-                  className="rounded-2xl border border-amber-300/70 bg-amber-300 px-4 py-2 text-sm font-semibold text-neutral-950 shadow-[0_0_18px_rgba(252,211,77,0.22)] active:scale-[0.99]"
-                >
-                  임시저장
                 </button>
               ) : null}
             </div>
