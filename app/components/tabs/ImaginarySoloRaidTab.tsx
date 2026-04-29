@@ -54,6 +54,7 @@ type DeckBuildingTabProps = {
 
 const DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
 const LAYOUT_STORAGE_KEY = "soloraid_deck_building_wide_layout_v1";
+const SELECTED_TRASH_DROP_ID = "deck-building-selected-trash";
 const DECK_DRAFT_COUNT = 5;
 const SPARE_SLOT_COUNT = 10;
 
@@ -164,6 +165,25 @@ function isDroppedOutsideDeckSection(event: DragEndEvent, sectionElement: HTMLEl
   const rect = sectionElement.getBoundingClientRect();
 
   return centerX < rect.left || centerX > rect.right || centerY < rect.top || centerY > rect.bottom;
+}
+
+function isDroppedOnElement(event: DragEndEvent, element: HTMLElement | null): boolean {
+  if (!element) return false;
+
+  const translated = event.active.rect.current.translated;
+  if (!translated) return false;
+
+  const rect = element.getBoundingClientRect();
+  const centerX = translated.left + translated.width / 2;
+  const centerY = translated.top + translated.height / 2;
+  const centerInside = centerX >= rect.left && centerX <= rect.right && centerY >= rect.top && centerY <= rect.bottom;
+  const overlaps =
+    translated.left < rect.right &&
+    translated.right > rect.left &&
+    translated.top < rect.bottom &&
+    translated.bottom > rect.top;
+
+  return centerInside || overlaps;
 }
 
 type SpareSlotProps = {
@@ -278,6 +298,14 @@ export default function ImaginarySoloRaidTab({
   const [overlayWidth, setOverlayWidth] = useState<number | null>(null);
   const scoreRefs = useRef<Array<HTMLInputElement | null>>([]);
   const deckSectionRef = useRef<HTMLElement | null>(null);
+  const selectedTrashRef = useRef<HTMLDivElement | null>(null);
+  const { setNodeRef: setSelectedTrashNodeRef, isOver: selectedTrashOver } = useDroppable({
+    id: SELECTED_TRASH_DROP_ID,
+  });
+  const setSelectedTrashRefs = (node: HTMLDivElement | null) => {
+    selectedTrashRef.current = node;
+    setSelectedTrashNodeRef(node);
+  };
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -562,6 +590,7 @@ export default function ImaginarySoloRaidTab({
     const droppedSlotTarget = getDroppedDeckSlotTarget(event);
     const droppedSpareSlotIndex = parseSpareSlotIndex(event.over?.id);
     const dragItem = (event.active.data.current ?? activeDrag) as DragItemData | null;
+    const droppedOnSelectedTrash = event.over?.id === SELECTED_TRASH_DROP_ID || isDroppedOnElement(event, selectedTrashRef.current);
 
     setActiveDrag(null);
     setHoveredSlotTarget(null);
@@ -569,6 +598,22 @@ export default function ImaginarySoloRaidTab({
     setOverlayWidth(null);
 
     if (!dragItem?.nikkeName) return;
+
+    if (droppedOnSelectedTrash) {
+      if (dragItem.source === "selected") {
+        onRemoveSelectedNikke(dragItem.nikkeName);
+      }
+      return;
+    }
+
+    if (
+      dragItem.source === "spare" &&
+      typeof dragItem.slotIndex === "number" &&
+      isDroppedOutsideDeckSection(event, deckSectionRef.current)
+    ) {
+      removeFromSpareSlots(dragItem.slotIndex);
+      return;
+    }
 
     if (droppedSpareSlotIndex !== null) {
       if (dragItem.source === "selected" || dragItem.source === "deck") {
@@ -595,6 +640,9 @@ export default function ImaginarySoloRaidTab({
 
     if (dragItem.source === "spare") {
       if (!droppedSlotTarget || typeof dragItem.slotIndex !== "number") {
+        if (typeof dragItem.slotIndex === "number") {
+          removeFromSpareSlots(dragItem.slotIndex);
+        }
         return;
       }
 
@@ -770,7 +818,7 @@ export default function ImaginarySoloRaidTab({
           <div className={wideDeckLayout ? "flex flex-col items-start gap-3" : "flex items-center gap-3"}>
             <div className="min-w-0">
               <h2 className={`${wideDeckLayout ? "whitespace-nowrap" : ""} text-lg font-semibold`}>니케 선택</h2>
-              <div className="mt-1 text-sm text-neutral-400">설정 탭에서 선택한 니케 목록입니다.</div>
+              <div className="mt-1 text-sm text-neutral-400">설정 탭에서 선택한 니케 목록입니다. 이미지를 끌어 휴지통에 넣으면 목록에서 제거됩니다.</div>
             </div>
 
             <div className={`${wideDeckLayout ? "flex w-full flex-wrap items-center gap-2" : "ml-auto flex shrink-0 items-center gap-2"}`}>
@@ -797,6 +845,30 @@ export default function ImaginarySoloRaidTab({
               >
                 설정으로
               </button>
+              <div
+                ref={setSelectedTrashRefs}
+                className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition ${
+                  selectedTrashOver && activeDrag?.source === "selected"
+                    ? "border-red-300 bg-red-500/25 text-red-100 ring-2 ring-red-300/40"
+                    : "border-red-500/40 bg-red-500/10 text-red-300 hover:border-red-400 hover:bg-red-500/15"
+                }`}
+                title="니케 선택에서 제거"
+                aria-label="니케 선택에서 제거"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M4 7H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M10 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M14 11V17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path
+                    d="M6 7L7 20H17L18 7"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path d="M9 7V4H15V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
             </div>
           </div>
 
@@ -838,7 +910,7 @@ export default function ImaginarySoloRaidTab({
                               onAdd={addToDraft}
                               onRemove={onRemoveSelectedNikke}
                               inDeck={deckDraftNameSet.has(nikke.name)}
-                              compactRemoveButton={wideDeckLayout}
+                              hideRemoveButton={wideDeckLayout}
                             />
                           );
                         })}

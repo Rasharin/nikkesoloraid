@@ -13,6 +13,7 @@ type DraggableNikkeCardProps = {
   onRemove: (name: string) => void;
   inDeck?: boolean;
   compactRemoveButton?: boolean;
+  hideRemoveButton?: boolean;
 };
 
 function DraggableNikkeCardComponent({
@@ -22,6 +23,7 @@ function DraggableNikkeCardComponent({
   onRemove,
   inDeck = false,
   compactRemoveButton = false,
+  hideRemoveButton = false,
 }: DraggableNikkeCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `selected-${nikke.name}`,
@@ -53,31 +55,33 @@ function DraggableNikkeCardComponent({
       {...attributes}
       {...listeners}
     >
-      <button
-        type="button"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.stopPropagation();
-          onRemove(nikke.name);
-        }}
-        aria-label={`${nikke.name} 제거`}
-        className={`absolute z-[1] flex items-center justify-center rounded-full bg-black/75 text-red-400 transition hover:bg-black/90 hover:text-red-300 active:scale-[0.95] ${
-          compactRemoveButton ? "right-0.5 top-0.5 h-4 w-4" : "right-1.5 top-1.5 h-6 w-6"
-        }`}
-      >
-        <svg
-          width={compactRemoveButton ? "8" : "11"}
-          height={compactRemoveButton ? "8" : "11"}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
+      {hideRemoveButton ? null : (
+        <button
+          type="button"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove(nikke.name);
+          }}
+          aria-label={`${nikke.name} 제거`}
+          className={`absolute z-[1] flex items-center justify-center rounded-full bg-black/75 text-red-400 transition hover:bg-black/90 hover:text-red-300 active:scale-[0.95] ${
+            compactRemoveButton ? "right-0.5 top-0.5 h-4 w-4" : "right-1.5 top-1.5 h-6 w-6"
+          }`}
         >
-          <path d="M6 6L18 18" />
-          <path d="M18 6L6 18" />
-        </svg>
-      </button>
+          <svg
+            width={compactRemoveButton ? "8" : "11"}
+            height={compactRemoveButton ? "8" : "11"}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+          >
+            <path d="M6 6L18 18" />
+            <path d="M18 6L6 18" />
+          </svg>
+        </button>
+      )}
 
       <div
         className={`aspect-square w-full overflow-hidden rounded-xl border bg-neutral-950/40 transition ${
