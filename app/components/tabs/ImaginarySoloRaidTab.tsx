@@ -288,6 +288,7 @@ export default function ImaginarySoloRaidTab({
   const [nikkeOpen, setNikkeOpen] = useState(true);
   const [wideDeckLayout, setWideDeckLayout] = useState(true);
   const [deckSectionHeight, setDeckSectionHeight] = useState<number | null>(null);
+  const [expandedDeckSectionHeight, setExpandedDeckSectionHeight] = useState<number | null>(null);
   const [layoutStorageReady, setLayoutStorageReady] = useState(false);
   const [draftStorageReady, setDraftStorageReady] = useState(false);
   const [deckDrafts, setDeckDrafts] = useState<DeckDraftState[]>(() => createEmptyDeckDrafts());
@@ -369,7 +370,13 @@ export default function ImaginarySoloRaidTab({
     }
 
     const target = deckSectionRef.current;
-    const syncHeight = () => setDeckSectionHeight(target.getBoundingClientRect().height);
+    const syncHeight = () => {
+      const nextHeight = target.getBoundingClientRect().height;
+      if (deckOpen) {
+        setExpandedDeckSectionHeight(nextHeight);
+      }
+      setDeckSectionHeight(deckOpen ? nextHeight : expandedDeckSectionHeight ?? nextHeight);
+    };
     syncHeight();
 
     const observer = new ResizeObserver(syncHeight);
@@ -380,7 +387,7 @@ export default function ImaginarySoloRaidTab({
       observer.disconnect();
       window.removeEventListener("resize", syncHeight);
     };
-  }, [wideDeckLayout, deckOpen, deckDrafts.length]);
+  }, [wideDeckLayout, deckOpen, deckDrafts.length, expandedDeckSectionHeight]);
 
   useEffect(() => {
     if (!draftStorageReady) return;
@@ -443,6 +450,15 @@ export default function ImaginarySoloRaidTab({
     wideDeckLayout && deckSectionHeight
       ? ({ "--deck-section-height": `${Math.ceil(deckSectionHeight)}px` } as CSSProperties)
       : undefined;
+  const wideLayoutGridClass = !wideDeckLayout
+    ? "flex flex-col gap-5"
+    : deckOpen && nikkeOpen
+      ? "grid items-start gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]"
+      : deckOpen && !nikkeOpen
+        ? "grid items-start gap-5 lg:grid-cols-[56px_minmax(0,1fr)]"
+        : !deckOpen && nikkeOpen
+          ? "grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_56px]"
+          : "grid items-start gap-5 lg:grid-cols-[56px_56px]";
   const deckDraftNameSet = useMemo(() => {
     const names = new Set<string>();
     deckDrafts.forEach((deck) => {
@@ -740,7 +756,7 @@ export default function ImaginarySoloRaidTab({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className={wideDeckLayout ? "grid items-start gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]" : "flex flex-col gap-5"}>
+      <div className={wideLayoutGridClass}>
         <div className={wideDeckLayout ? "order-1 flex justify-end lg:col-span-2" : "order-1 flex justify-end"}>
           <button
             type="button"
@@ -751,7 +767,19 @@ export default function ImaginarySoloRaidTab({
           </button>
         </div>
 
-        <section ref={deckSectionRef} className={`${wideDeckLayout ? "order-3 self-start lg:order-3" : "order-3"} rounded-3xl border border-neutral-800 bg-neutral-900/50 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}>
+        <section ref={deckSectionRef} className={`${wideDeckLayout ? `order-3 self-start lg:order-3 ${deckOpen ? "p-4" : "p-2"}` : "order-3 p-4"} rounded-3xl border border-neutral-800 bg-neutral-900/50 shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}>
+          {wideDeckLayout && !deckOpen ? (
+            <button
+              type="button"
+              onClick={() => setDeckOpen(true)}
+              className="flex min-h-[160px] w-full flex-col items-center justify-start gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/30 px-2 py-3 text-neutral-200 transition hover:border-neutral-600 active:scale-[0.99]"
+              aria-label="덱 만들기 펼치기"
+            >
+              <span className="text-base leading-none text-neutral-400">&lt;</span>
+              <span className="[writing-mode:vertical-rl] text-sm font-semibold tracking-normal">덱 만들기</span>
+            </button>
+          ) : (
+            <>
           <div className="flex items-center gap-3">
             <div className="min-w-0">
               <h2 className="text-lg font-semibold">덱 만들기</h2>
@@ -765,7 +793,7 @@ export default function ImaginarySoloRaidTab({
                 className="order-last rounded-2xl border border-neutral-700 p-2 transition hover:border-neutral-500 active:scale-[0.99]"
                 aria-label={deckOpen ? "덱 만들기 접기" : "덱 만들기 펼치기"}
               >
-                <CollapseIcon open={deckOpen} />
+                {wideDeckLayout ? <span className="block w-[18px] text-center text-lg leading-[18px]">&gt;</span> : <CollapseIcon open={deckOpen} />}
               </button>
               {deckOpen ? (
                 <button
@@ -815,27 +843,55 @@ export default function ImaginarySoloRaidTab({
               {renderSpareSlots()}
             </div>
           ) : null}
+            </>
+          )}
         </section>
 
         <section
           style={nikkeSectionStyle}
-          className={`${wideDeckLayout ? "order-2 self-start lg:order-2 lg:h-[var(--deck-section-height)] lg:overflow-hidden" : "order-2"} flex min-h-0 flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}
+          className={`${wideDeckLayout ? `order-2 self-start lg:order-2 lg:h-[var(--deck-section-height)] lg:overflow-hidden ${nikkeOpen ? "p-5" : "p-2"}` : "order-2 p-5"} flex min-h-0 flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}
         >
+          {wideDeckLayout && !nikkeOpen ? (
+            <button
+              type="button"
+              onClick={() => setNikkeOpen(true)}
+              className="flex h-full min-h-[160px] w-full flex-col items-center justify-start gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/30 px-2 py-3 text-neutral-200 transition hover:border-neutral-600 active:scale-[0.99]"
+              aria-label="니케 선택 펼치기"
+            >
+              <span className="text-base leading-none text-neutral-400">&gt;</span>
+              <span className="[writing-mode:vertical-rl] text-sm font-semibold tracking-normal">니케 선택</span>
+            </button>
+          ) : (
+            <>
           <div className={wideDeckLayout ? "flex flex-col items-start gap-3" : "flex items-center gap-3"}>
-            <div className="min-w-0">
-              <h2 className={`${wideDeckLayout ? "whitespace-nowrap" : ""} text-lg font-semibold`}>니케 선택</h2>
+            <div className="w-full min-w-0">
+              <div className={wideDeckLayout ? "flex w-full items-center gap-2" : ""}>
+                <h2 className={`${wideDeckLayout ? "whitespace-nowrap" : ""} text-lg font-semibold`}>니케 선택</h2>
+                {wideDeckLayout ? (
+                  <button
+                    type="button"
+                    onClick={() => setNikkeOpen(false)}
+                    className="ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-neutral-700 text-lg leading-none text-neutral-300 transition hover:border-neutral-500 active:scale-[0.99]"
+                    aria-label="니케 선택 접기"
+                  >
+                    &lt;
+                  </button>
+                ) : null}
+              </div>
               <div className="mt-1 text-sm text-neutral-400">설정 탭에서 선택한 니케 목록입니다. 이미지를 끌어 휴지통에 넣으면 목록에서 제거됩니다.</div>
             </div>
 
             <div className={`${wideDeckLayout ? "flex w-full flex-wrap items-center gap-2" : "ml-auto flex shrink-0 items-center gap-2"}`}>
-              <button
-                type="button"
-                onClick={() => setNikkeOpen((prev) => !prev)}
-                className="order-last rounded-2xl border border-neutral-700 p-2 transition hover:border-neutral-500 active:scale-[0.99]"
-                aria-label={nikkeOpen ? "니케 선택 접기" : "니케 선택 펼치기"}
-              >
-                <CollapseIcon open={nikkeOpen} />
-              </button>
+              {!wideDeckLayout ? (
+                <button
+                  type="button"
+                  onClick={() => setNikkeOpen((prev) => !prev)}
+                  className="order-last rounded-2xl border border-neutral-700 p-2 transition hover:border-neutral-500 active:scale-[0.99]"
+                  aria-label={nikkeOpen ? "니케 선택 접기" : "니케 선택 펼치기"}
+                >
+                  <CollapseIcon open={nikkeOpen} />
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={onResetSelected}
@@ -901,7 +957,9 @@ export default function ImaginarySoloRaidTab({
                       <div
                         className={
                           wideDeckLayout
-                            ? "grid grid-cols-4 gap-x-2 gap-y-3"
+                            ? deckOpen
+                              ? "grid grid-cols-4 gap-x-2 gap-y-3"
+                              : "grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-x-2 gap-y-3 xl:grid-cols-[repeat(auto-fill,minmax(80px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(88px,1fr))]"
                             : "grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-x-2 gap-y-3 xl:grid-cols-[repeat(auto-fill,minmax(80px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(88px,1fr))]"
                         }
                       >
@@ -927,6 +985,8 @@ export default function ImaginarySoloRaidTab({
               </div>
             </>
           ) : null}
+            </>
+          )}
         </section>
       </div>
 
