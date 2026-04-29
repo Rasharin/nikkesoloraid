@@ -1208,7 +1208,6 @@ function UsageIcon({ active }: { active: boolean }) {
 export default function Page() {
   const pathname = usePathname();
   const router = useRouter();
-  const cachedSupabaseData = useMemo(() => readCachedSupabaseData(), []);
   const [tab, setTab] = useState<TabKey>(() => PATH_TAB_MAP[pathname] ?? "home");
   const [usageBoardTab, setUsageBoardTab] = useState<UsageBoardCategoryKey>("home");
   const [deckTabs, setDeckTabs] = useState<DeckTabItem[]>(DEFAULT_DECK_TABS);
@@ -1219,11 +1218,11 @@ export default function Page() {
   const [loadingDecks, setLoadingDecks] = useState(false);
 
   // supabase data
-  const [nikkes, setnikkes] = useState<NikkeRow[]>(() => cachedSupabaseData?.nikkes ?? []);
-  const [boss, setBoss] = useState<BossRow | null>(() => cachedSupabaseData?.bosses[0] ?? null);
-  const [bosses, setBosses] = useState<BossRow[]>(() => cachedSupabaseData?.bosses ?? []);
+  const [nikkes, setnikkes] = useState<NikkeRow[]>([]);
+  const [boss, setBoss] = useState<BossRow | null>(null);
+  const [bosses, setBosses] = useState<BossRow[]>([]);
   const [selectedBossId, setSelectedBossId] = useState<string | null>(null);
-  const [loadingData, setLoadingData] = useState(() => !cachedSupabaseData);
+  const [loadingData, setLoadingData] = useState(true);
 
   // selected nikkes (max 100) - localStorage
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
@@ -1291,6 +1290,16 @@ export default function Page() {
     const nextTab = pathTab === "calculator" && !canAccessCalculator ? "home" : pathTab;
     setTab((current) => (current === nextTab ? current : nextTab));
   }, [calculatorAccessResolved, canAccessCalculator, pathname]);
+
+  useEffect(() => {
+    const cached = readCachedSupabaseData();
+    if (!cached) return;
+
+    setnikkes(cached.nikkes);
+    setBosses(cached.bosses);
+    setBoss(cached.bosses[0] ?? null);
+    setLoadingData(false);
+  }, []);
 
   useEffect(() => {
     if (!calculatorAccessResolved) return;

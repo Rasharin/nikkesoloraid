@@ -17,7 +17,7 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import DeckBuilderSection, {
   getDroppedDeckSlotTarget,
@@ -53,6 +53,7 @@ type DeckBuildingTabProps = {
 };
 
 const DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
+const LAYOUT_STORAGE_KEY = "soloraid_deck_building_wide_layout_v1";
 const DECK_DRAFT_COUNT = 5;
 const SPARE_SLOT_COUNT = 10;
 
@@ -265,6 +266,9 @@ export default function ImaginarySoloRaidTab({
 }: DeckBuildingTabProps) {
   const [deckOpen, setDeckOpen] = useState(true);
   const [nikkeOpen, setNikkeOpen] = useState(true);
+  const [wideDeckLayout, setWideDeckLayout] = useState(false);
+  const [deckSectionHeight, setDeckSectionHeight] = useState<number | null>(null);
+  const [layoutStorageReady, setLayoutStorageReady] = useState(false);
   const [draftStorageReady, setDraftStorageReady] = useState(false);
   const [deckDrafts, setDeckDrafts] = useState<DeckDraftState[]>(() => createEmptyDeckDrafts());
   const [spareSlots, setSpareSlots] = useState<DraftSlot[]>(() => createEmptySpareSlots());
@@ -307,6 +311,42 @@ export default function ImaginarySoloRaidTab({
 
     setDraftStorageReady(true);
   }, []);
+
+  useEffect(() => {
+    try {
+      setWideDeckLayout(localStorage.getItem(LAYOUT_STORAGE_KEY) === "wide");
+    } catch {}
+
+    setLayoutStorageReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!layoutStorageReady) return;
+
+    try {
+      localStorage.setItem(LAYOUT_STORAGE_KEY, wideDeckLayout ? "wide" : "stacked");
+    } catch {}
+  }, [layoutStorageReady, wideDeckLayout]);
+
+  useEffect(() => {
+    if (!wideDeckLayout || !deckSectionRef.current) {
+      setDeckSectionHeight(null);
+      return;
+    }
+
+    const target = deckSectionRef.current;
+    const syncHeight = () => setDeckSectionHeight(target.getBoundingClientRect().height);
+    syncHeight();
+
+    const observer = new ResizeObserver(syncHeight);
+    observer.observe(target);
+    window.addEventListener("resize", syncHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", syncHeight);
+    };
+  }, [wideDeckLayout, deckOpen, deckDrafts.length]);
 
   useEffect(() => {
     if (!draftStorageReady) return;
@@ -365,6 +405,19 @@ export default function ImaginarySoloRaidTab({
 
   const overlayNikke = activeDrag?.nikkeName ? effectiveNikkeMap.get(activeDrag.nikkeName) : undefined;
   const overlayUrl = overlayNikke?.image_path ? getPublicUrl("nikke-images", overlayNikke.image_path) : "";
+  const nikkeSectionStyle =
+    wideDeckLayout && deckSectionHeight
+      ? ({ "--deck-section-height": `${Math.ceil(deckSectionHeight)}px` } as CSSProperties)
+      : undefined;
+  const deckDraftNameSet = useMemo(() => {
+    const names = new Set<string>();
+    deckDrafts.forEach((deck) => {
+      deck.draft.forEach((name) => {
+        if (name) names.add(name);
+      });
+    });
+    return names;
+  }, [deckDrafts]);
 
   function updateDeckScore(deckIndex: number, scoreText: string) {
     setDeckDrafts((prev) => prev.map((deck, index) => (index === deckIndex ? { ...deck, score: scoreText } : deck)));
@@ -519,12 +572,15 @@ export default function ImaginarySoloRaidTab({
 
     if (droppedSpareSlotIndex !== null) {
       if (dragItem.source === "selected" || dragItem.source === "deck") {
+        if (spareSlots.includes(dragItem.nikkeName)) return;
         setSpareSlots((prev) => {
-          if (prev.includes(dragItem.nikkeName)) return prev;
           const next = [...prev];
           next[droppedSpareSlotIndex] = dragItem.nikkeName;
           return next;
         });
+        if (dragItem.source === "deck" && typeof dragItem.deckIndex === "number" && typeof dragItem.slotIndex === "number") {
+          removeFromDraft(dragItem.deckIndex, dragItem.slotIndex);
+        }
         return;
       }
 
@@ -630,8 +686,18 @@ export default function ImaginarySoloRaidTab({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="flex flex-col gap-5">
-        <section ref={deckSectionRef} className="order-3 rounded-3xl border border-neutral-800 bg-neutral-900/50 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+      <div className={wideDeckLayout ? "grid items-start gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]" : "flex flex-col gap-5"}>
+        <div className={wideDeckLayout ? "order-1 flex justify-end lg:col-span-2" : "order-1 flex justify-end"}>
+          <button
+            type="button"
+            onClick={() => setWideDeckLayout((prev) => !prev)}
+            className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:border-neutral-500 active:scale-[0.99]"
+          >
+            가로세로 변경
+          </button>
+        </div>
+
+        <section ref={deckSectionRef} className={`${wideDeckLayout ? "order-3 self-start lg:order-3" : "order-3"} rounded-3xl border border-neutral-800 bg-neutral-900/50 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}>
           <div className="flex items-center gap-3">
             <div className="min-w-0">
               <h2 className="text-lg font-semibold">덱 만들기</h2>
@@ -697,14 +763,17 @@ export default function ImaginarySoloRaidTab({
           ) : null}
         </section>
 
-        <section className="order-2 flex min-h-0 flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
-          <div className="flex items-center gap-3">
+        <section
+          style={nikkeSectionStyle}
+          className={`${wideDeckLayout ? "order-2 self-start lg:order-2 lg:h-[var(--deck-section-height)] lg:overflow-hidden" : "order-2"} flex min-h-0 flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}
+        >
+          <div className={wideDeckLayout ? "flex flex-col items-start gap-3" : "flex items-center gap-3"}>
             <div className="min-w-0">
-              <h2 className="text-lg font-semibold">니케 선택</h2>
+              <h2 className={`${wideDeckLayout ? "whitespace-nowrap" : ""} text-lg font-semibold`}>니케 선택</h2>
               <div className="mt-1 text-sm text-neutral-400">설정 탭에서 선택한 니케 목록입니다.</div>
             </div>
 
-            <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div className={`${wideDeckLayout ? "flex w-full flex-wrap items-center gap-2" : "ml-auto flex shrink-0 items-center gap-2"}`}>
               <button
                 type="button"
                 onClick={() => setNikkeOpen((prev) => !prev)}
@@ -737,7 +806,7 @@ export default function ImaginarySoloRaidTab({
             </div>
           ) : (
             <>
-              <div className="mt-4 flex items-center justify-between gap-3 text-sm text-neutral-400">
+              <div className={`${wideDeckLayout ? "mt-4 flex flex-col gap-1.5" : "mt-4 flex items-center justify-between gap-3"} text-sm text-neutral-400`}>
                 <div>
                   선택됨: <span className="text-neutral-200">{effectiveSelectedNikkes.length}</span> / {maxSelected}
                 </div>
@@ -751,7 +820,13 @@ export default function ImaginarySoloRaidTab({
                       <div className="mb-2 border-b border-neutral-800 pb-1 text-xs text-neutral-400">
                         <span className="font-medium text-neutral-200">{group.label}</span>
                       </div>
-                      <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-x-2 gap-y-3 xl:grid-cols-[repeat(auto-fill,minmax(80px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(88px,1fr))]">
+                      <div
+                        className={
+                          wideDeckLayout
+                            ? "grid grid-cols-4 gap-x-2 gap-y-3"
+                            : "grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-x-2 gap-y-3 xl:grid-cols-[repeat(auto-fill,minmax(80px,1fr))] 2xl:grid-cols-[repeat(auto-fill,minmax(88px,1fr))]"
+                        }
+                      >
                         {group.nikkes.map((nikke) => {
                           const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
 
@@ -762,6 +837,8 @@ export default function ImaginarySoloRaidTab({
                               imageUrl={imageUrl}
                               onAdd={addToDraft}
                               onRemove={onRemoveSelectedNikke}
+                              inDeck={deckDraftNameSet.has(nikke.name)}
+                              compactRemoveButton={wideDeckLayout}
                             />
                           );
                         })}

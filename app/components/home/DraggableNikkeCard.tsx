@@ -11,9 +11,18 @@ type DraggableNikkeCardProps = {
   imageUrl: string;
   onAdd: (name: string) => void;
   onRemove: (name: string) => void;
+  inDeck?: boolean;
+  compactRemoveButton?: boolean;
 };
 
-function DraggableNikkeCardComponent({ nikke, imageUrl, onAdd, onRemove }: DraggableNikkeCardProps) {
+function DraggableNikkeCardComponent({
+  nikke,
+  imageUrl,
+  onAdd,
+  onRemove,
+  inDeck = false,
+  compactRemoveButton = false,
+}: DraggableNikkeCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `selected-${nikke.name}`,
     data: {
@@ -52,11 +61,13 @@ function DraggableNikkeCardComponent({ nikke, imageUrl, onAdd, onRemove }: Dragg
           onRemove(nikke.name);
         }}
         aria-label={`${nikke.name} 제거`}
-        className="absolute right-1.5 top-1.5 z-[1] flex h-6 w-6 items-center justify-center rounded-full bg-black/75 text-red-400 transition hover:bg-black/90 hover:text-red-300 active:scale-[0.95]"
+        className={`absolute z-[1] flex items-center justify-center rounded-full bg-black/75 text-red-400 transition hover:bg-black/90 hover:text-red-300 active:scale-[0.95] ${
+          compactRemoveButton ? "right-0.5 top-0.5 h-4 w-4" : "right-1.5 top-1.5 h-6 w-6"
+        }`}
       >
         <svg
-          width="11"
-          height="11"
+          width={compactRemoveButton ? "8" : "11"}
+          height={compactRemoveButton ? "8" : "11"}
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -70,7 +81,7 @@ function DraggableNikkeCardComponent({ nikke, imageUrl, onAdd, onRemove }: Dragg
 
       <div
         className={`aspect-square w-full overflow-hidden rounded-xl border bg-neutral-950/40 transition ${
-          isDragging ? "border-white/40 shadow-[0_0_0_1px_rgba(255,255,255,0.25)]" : "border-neutral-800"
+          isDragging || inDeck ? "border-white shadow-[0_0_0_1px_rgba(255,255,255,0.55)]" : "border-neutral-800"
         }`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
