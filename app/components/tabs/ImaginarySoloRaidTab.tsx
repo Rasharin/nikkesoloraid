@@ -286,7 +286,7 @@ export default function ImaginarySoloRaidTab({
 }: DeckBuildingTabProps) {
   const [deckOpen, setDeckOpen] = useState(true);
   const [nikkeOpen, setNikkeOpen] = useState(true);
-  const [wideDeckLayout, setWideDeckLayout] = useState(false);
+  const [wideDeckLayout, setWideDeckLayout] = useState(true);
   const [deckSectionHeight, setDeckSectionHeight] = useState<number | null>(null);
   const [layoutStorageReady, setLayoutStorageReady] = useState(false);
   const [draftStorageReady, setDraftStorageReady] = useState(false);
@@ -342,7 +342,13 @@ export default function ImaginarySoloRaidTab({
 
   useEffect(() => {
     try {
-      setWideDeckLayout(localStorage.getItem(LAYOUT_STORAGE_KEY) === "wide");
+      const savedLayout = localStorage.getItem(LAYOUT_STORAGE_KEY);
+      if (savedLayout === "wide") {
+        setWideDeckLayout(true);
+      }
+      if (savedLayout === "stacked") {
+        setWideDeckLayout(false);
+      }
     } catch {}
 
     setLayoutStorageReady(true);
