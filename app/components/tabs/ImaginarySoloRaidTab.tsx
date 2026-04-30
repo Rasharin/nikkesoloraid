@@ -837,7 +837,7 @@ export default function ImaginarySoloRaidTab({
                   onSaveDeck={() => void handleSaveDeck(deckIndex)}
                   onClearDraft={() => clearDraft(deckIndex)}
                   onDeleteDeck={() => removeDeckDraft(deckIndex)}
-                  className="border-neutral-800 bg-neutral-950/30 p-2.5 shadow-none"
+                  className="border-neutral-800 bg-neutral-950/30 p-1.5 shadow-none"
                 />
               ))}
               {renderSpareSlots()}

@@ -56,7 +56,7 @@ function DeckBuilderSectionComponent({
     <section ref={sectionRef} className={`rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 ${className ?? ""}`}>
       <div>
         <SortableContext items={slotIds} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-5 gap-0.5">
             {draft.map((name, index) => {
               const nikke = name ? nikkeMap.get(name) : undefined;
               const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
@@ -79,7 +79,7 @@ function DeckBuilderSectionComponent({
           </div>
         </SortableContext>
 
-        <div className="mt-2">
+        <div className="mt-1.5">
           <input
             ref={scoreRef}
             inputMode="decimal"
@@ -92,7 +92,7 @@ function DeckBuilderSectionComponent({
               }
             }}
             placeholder="점수입력 (예: 6510755443 또는 23.3억)"
-            className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-base outline-none transition focus:border-white/40"
+            className="w-full rounded-xl border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-sm outline-none transition focus:border-white/40"
           />
         </div>
 
@@ -100,14 +100,14 @@ function DeckBuilderSectionComponent({
           <button
             type="button"
             onClick={onSaveDeck}
-            className="flex-1 rounded-2xl bg-white px-4 py-3 text-base font-semibold text-neutral-900 active:scale-[0.99]"
+            className="flex-1 rounded-xl bg-white px-4 py-1.5 text-sm font-semibold text-neutral-900 active:scale-[0.99]"
           >
             {editingId ? "수정 저장" : "덱 저장"}
           </button>
           <button
             type="button"
             onClick={onClearDraft}
-            className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
+            className="rounded-xl border border-neutral-700 px-4 py-1.5 text-sm active:scale-[0.99]"
           >
             비우기
           </button>
@@ -115,7 +115,7 @@ function DeckBuilderSectionComponent({
             <button
               type="button"
               onClick={onDeleteDeck}
-              className="rounded-2xl border border-red-500/40 px-4 py-3 text-base text-red-200 active:scale-[0.99]"
+              className="rounded-xl border border-red-500/40 px-4 py-1.5 text-sm text-red-200 active:scale-[0.99]"
             >
               삭제
             </button>
@@ -125,7 +125,7 @@ function DeckBuilderSectionComponent({
           <button
             type="button"
             onClick={onSaveAllDecks}
-            className="mt-2 w-full rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-3 text-base font-semibold text-cyan-100 active:scale-[0.99]"
+            className="mt-2 w-full rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-1.5 text-sm font-semibold text-cyan-100 active:scale-[0.99]"
           >
             작성된 덱 모두 저장
           </button>

@@ -78,7 +78,7 @@ export default function DeckSlot({
       </div>
 
       {name ? (
-        <div className="mt-0.5 min-h-[1.05rem] text-center text-[11px] leading-tight text-neutral-200">
+        <div className="mt-0.5 w-full truncate text-center text-[10px] leading-none text-neutral-200">
           {formatNikkeDisplayName(name)}
         </div>
       ) : null}
