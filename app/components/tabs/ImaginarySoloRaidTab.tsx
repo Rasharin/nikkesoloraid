@@ -39,7 +39,21 @@ type DeckDraftState = {
   editingId: string | null;
 };
 
+type Deck = {
+  id: string;
+  chars: string[];
+  score: number;
+  createdAt: number;
+};
+
 type DeckBuildingTabProps = {
+  decksCount: number;
+  canRecommend: boolean;
+  best: {
+    picked: Deck[];
+    total: number;
+  };
+  fmt: (value: number) => string;
   selectedNames: string[];
   selectedNikkes: NikkeRow[];
   maxSelected: number;
@@ -50,10 +64,12 @@ type DeckBuildingTabProps = {
   onGoToSettings: () => void;
   onShowToast: (message: string) => void;
   onSubmitDeck: (payload: { draft: string[]; scoreText: string; editingId: string | null }) => Promise<boolean>;
+  onUpdateDeckScore: (id: string, scoreText: string) => Promise<boolean>;
 };
 
 const DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
 const LAYOUT_STORAGE_KEY = "soloraid_deck_building_wide_layout_v1";
+const RECOMMENDED_OPEN_STORAGE_KEY = "soloraid_deck_building_recommended_open_v1";
 const SELECTED_TRASH_DROP_ID = "deck-building-selected-trash";
 const DECK_DRAFT_COUNT = 5;
 const SPARE_SLOT_COUNT = 10;
@@ -273,6 +289,10 @@ function canDropOnSpareSlot(index: number, activeDrag: DragItemData | null, spar
 }
 
 export default function ImaginarySoloRaidTab({
+  decksCount,
+  canRecommend,
+  best,
+  fmt,
   selectedNames,
   selectedNikkes,
   maxSelected,
@@ -283,13 +303,16 @@ export default function ImaginarySoloRaidTab({
   onGoToSettings,
   onShowToast,
   onSubmitDeck,
+  onUpdateDeckScore,
 }: DeckBuildingTabProps) {
   const [deckOpen, setDeckOpen] = useState(true);
   const [nikkeOpen, setNikkeOpen] = useState(true);
+  const [recommendedOpen, setRecommendedOpen] = useState(false);
   const [wideDeckLayout, setWideDeckLayout] = useState(true);
   const [deckSectionHeight, setDeckSectionHeight] = useState<number | null>(null);
   const [expandedDeckSectionHeight, setExpandedDeckSectionHeight] = useState<number | null>(null);
   const [layoutStorageReady, setLayoutStorageReady] = useState(false);
+  const [recommendedOpenStorageReady, setRecommendedOpenStorageReady] = useState(false);
   const [draftStorageReady, setDraftStorageReady] = useState(false);
   const [deckDrafts, setDeckDrafts] = useState<DeckDraftState[]>(() => createEmptyDeckDrafts());
   const [spareSlots, setSpareSlots] = useState<DraftSlot[]>(() => createEmptySpareSlots());
@@ -297,6 +320,8 @@ export default function ImaginarySoloRaidTab({
   const [hoveredSlotTarget, setHoveredSlotTarget] = useState<DeckSlotTarget | null>(null);
   const [hoveredSpareSlotIndex, setHoveredSpareSlotIndex] = useState<number | null>(null);
   const [overlayWidth, setOverlayWidth] = useState<number | null>(null);
+  const [editingRecommendedDeckId, setEditingRecommendedDeckId] = useState<string | null>(null);
+  const [editingRecommendedScore, setEditingRecommendedScore] = useState("");
   const scoreRefs = useRef<Array<HTMLInputElement | null>>([]);
   const deckSectionRef = useRef<HTMLElement | null>(null);
   const selectedTrashRef = useRef<HTMLDivElement | null>(null);
@@ -356,12 +381,34 @@ export default function ImaginarySoloRaidTab({
   }, []);
 
   useEffect(() => {
+    try {
+      const savedOpen = localStorage.getItem(RECOMMENDED_OPEN_STORAGE_KEY);
+      if (savedOpen === "open") {
+        setRecommendedOpen(true);
+      }
+      if (savedOpen === "closed") {
+        setRecommendedOpen(false);
+      }
+    } catch {}
+
+    setRecommendedOpenStorageReady(true);
+  }, []);
+
+  useEffect(() => {
     if (!layoutStorageReady) return;
 
     try {
       localStorage.setItem(LAYOUT_STORAGE_KEY, wideDeckLayout ? "wide" : "stacked");
     } catch {}
   }, [layoutStorageReady, wideDeckLayout]);
+
+  useEffect(() => {
+    if (!recommendedOpenStorageReady) return;
+
+    try {
+      localStorage.setItem(RECOMMENDED_OPEN_STORAGE_KEY, recommendedOpen ? "open" : "closed");
+    } catch {}
+  }, [recommendedOpen, recommendedOpenStorageReady]);
 
   useEffect(() => {
     if (!wideDeckLayout || !deckSectionRef.current) {
@@ -416,8 +463,20 @@ export default function ImaginarySoloRaidTab({
         });
       }
     });
+    best.picked.forEach((deck) => {
+      deck.chars.forEach((name) => {
+        if (!next.has(name)) {
+          next.set(name, {
+            id: `recommended-fallback-${name}`,
+            name,
+            image_path: null,
+            burst: null,
+          });
+        }
+      });
+    });
     return next;
-  }, [nikkeMap, selectedNames]);
+  }, [best.picked, nikkeMap, selectedNames]);
 
   const effectiveSelectedNikkes = useMemo(() => {
     const byName = new Map(selectedNikkes.map((nikke) => [nikke.name, nikke]));
@@ -478,6 +537,13 @@ export default function ImaginarySoloRaidTab({
       prev.map((deck, index) => (index === deckIndex ? { ...deck, draft: createEmptyDraft(), score: "", editingId: null } : deck))
     );
     requestAnimationFrame(() => scoreRefs.current[deckIndex]?.focus());
+  }
+
+  function resetDeckBuilder() {
+    setDeckDrafts(createEmptyDeckDrafts());
+    setSpareSlots(createEmptySpareSlots());
+    scoreRefs.current = [];
+    onShowToast("덱 만들기를 초기화했어");
   }
 
   function addDeckDraft() {
@@ -557,6 +623,162 @@ export default function ImaginarySoloRaidTab({
             );
           })}
         </div>
+      </section>
+    );
+  }
+
+  async function saveRecommendedDeckScore(deckId: string) {
+    const saved = await onUpdateDeckScore(deckId, editingRecommendedScore);
+    if (!saved) return;
+    setEditingRecommendedDeckId(null);
+    setEditingRecommendedScore("");
+  }
+
+  function copyRecommendedDecksToBuilder() {
+    const recommendedDecks = best.picked.slice(0, DECK_DRAFT_COUNT);
+    if (recommendedDecks.length === 0) {
+      onShowToast("복사할 추천 조합이 없어");
+      return;
+    }
+
+    setDeckDrafts((prev) => {
+      const maxId = prev.reduce((currentMax, deck) => Math.max(currentMax, deck.id), 0);
+      const copiedDecks = recommendedDecks.map((deck, index) => ({
+          id: maxId + index + 1,
+          draft: normalizeDraftSlots(deck.chars, MAX_DECK_CHARS),
+          score: String(deck.score),
+          editingId: deck.id,
+      }));
+
+      return [...copiedDecks, ...prev];
+    });
+    setDeckOpen(true);
+    onShowToast("추천 조합을 덱 만들기에 복사했어");
+  }
+
+  function renderRecommendedDeckCard(deck: Deck) {
+    return (
+      <div key={deck.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-2">
+        <div className="flex items-end justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-1.5">
+            {deck.chars.map((name, slotIndex) => {
+              const nikke = effectiveNikkeMap.get(name);
+              const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+
+              return (
+                <div key={`${deck.id}-${slotIndex}-${name}`} className="min-w-0 max-w-[50px]">
+                  <div className="aspect-square overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {imageUrl ? (
+                      <img src={imageUrl} alt={name} draggable={false} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
+                    )}
+                  </div>
+                  <div className="mt-px text-center text-[10px] leading-[1.15] text-neutral-200">
+                    {formatNikkeDisplayName(name)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {editingRecommendedDeckId === deck.id ? (
+            <input
+              autoFocus
+              inputMode="decimal"
+              value={editingRecommendedScore}
+              onChange={(event) => setEditingRecommendedScore(event.target.value)}
+              onBlur={() => void saveRecommendedDeckScore(deck.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void saveRecommendedDeckScore(deck.id);
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setEditingRecommendedDeckId(null);
+                  setEditingRecommendedScore("");
+                }
+              }}
+              style={{
+                width: `${Math.max(editingRecommendedScore.length, String(deck.score).length, 8) + 2}ch`,
+              }}
+              className="min-w-[112px] shrink-0 self-center rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1 text-right text-lg font-semibold tabular-nums text-neutral-100 outline-none"
+            />
+          ) : (
+            <button
+              type="button"
+              onDoubleClick={() => {
+                setEditingRecommendedDeckId(deck.id);
+                setEditingRecommendedScore(String(deck.score));
+              }}
+              className="shrink-0 self-center text-lg font-semibold tabular-nums text-neutral-100"
+              title="더블 클릭해서 점수 수정"
+            >
+              {fmt(deck.score)}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderRecommendedDecksSection() {
+    const topDecks = best.picked.slice(0, 3);
+    const bottomDecks = best.picked.slice(3, 5);
+
+    return (
+      <section className="rounded-3xl border border-neutral-800 bg-neutral-900/50 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold">내 추천 조합</h2>
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
+              {decksCount}개 덱
+            </div>
+            <button
+              type="button"
+              onClick={() => setRecommendedOpen((prev) => !prev)}
+              className="grid h-8 w-8 place-items-center rounded-xl border border-neutral-700 text-sm font-semibold text-neutral-200 transition hover:border-neutral-500 active:scale-[0.99]"
+              aria-label={recommendedOpen ? "내 추천 조합 접기" : "내 추천 조합 열기"}
+            >
+              {recommendedOpen ? "v" : "^"}
+            </button>
+          </div>
+        </div>
+
+        {recommendedOpen ? (
+        <div className="mt-4 rounded-2xl bg-neutral-950/40 p-3">
+          {canRecommend ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-800 bg-neutral-900/70 px-3 py-2">
+                <div className="text-sm font-semibold text-neutral-300">총합</div>
+                <div className="text-2xl font-bold tabular-nums">{fmt(best.total)}</div>
+              </div>
+
+              <div className="grid gap-2 lg:grid-cols-3">
+                {topDecks.map((deck) => renderRecommendedDeckCard(deck))}
+              </div>
+              <div className="grid gap-2 lg:grid-cols-3">
+                {bottomDecks.map((deck) => renderRecommendedDeckCard(deck))}
+                <div className="flex items-end justify-end">
+                  <button
+                    type="button"
+                    onClick={copyRecommendedDecksToBuilder}
+                    className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
+                  >
+                    덱 복사
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            null
+          )}
+        </div>
+        ) : null}
       </section>
     );
   }
@@ -756,7 +978,10 @@ export default function ImaginarySoloRaidTab({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className={wideLayoutGridClass}>
+      <div className="space-y-5">
+        {renderRecommendedDecksSection()}
+
+        <div className={wideLayoutGridClass}>
         <div className={wideDeckLayout ? "order-1 flex justify-end lg:col-span-2" : "order-1 flex justify-end"}>
           <button
             type="button"
@@ -802,6 +1027,15 @@ export default function ImaginarySoloRaidTab({
                   className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 active:scale-[0.99]"
                 >
                   점수 반영
+                </button>
+              ) : null}
+              {deckOpen ? (
+                <button
+                  type="button"
+                  onClick={resetDeckBuilder}
+                  className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-100 active:scale-[0.99]"
+                >
+                  초기화
                 </button>
               ) : null}
               {deckOpen ? (
@@ -988,6 +1222,7 @@ export default function ImaginarySoloRaidTab({
             </>
           )}
         </section>
+        </div>
       </div>
 
       <DragOverlay zIndex={80} dropAnimation={null}>

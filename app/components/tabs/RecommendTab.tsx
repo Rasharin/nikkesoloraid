@@ -50,6 +50,7 @@ type RecommendTabProps = {
   onSubmitTip: (payload: { content: string }) => Promise<boolean>;
   onUpdateTip: (payload: { id: string; content: string }) => Promise<boolean>;
   onDeleteTip: (id: string) => Promise<boolean>;
+  onCopyDeckToBuilder: (deck: RecommendedDeck) => void;
   nikkeMap: Map<string, NikkeRow>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   fmt: (value: number) => string;
@@ -73,6 +74,7 @@ export default function RecommendTab({
   onSubmitTip,
   onUpdateTip,
   onDeleteTip,
+  onCopyDeckToBuilder,
   nikkeMap,
   getPublicUrl,
   fmt,
@@ -202,7 +204,7 @@ export default function RecommendTab({
           ) : (
             recommendedDecks.map((deck) => (
               <article key={deck.deckKey} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid max-w-[66%] grid-cols-5 gap-2">
                   {deck.chars.map((name) => {
                     const nikke = nikkeMap.get(name);
                     const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
@@ -217,7 +219,7 @@ export default function RecommendTab({
                             <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
                           )}
                         </div>
-                        <div className="mt-2 text-center text-xs leading-5 text-neutral-200">
+                        <div className="mt-1 text-center text-[11px] leading-4 text-neutral-200">
                           {formatNikkeDisplayName(name)}
                         </div>
                       </div>
@@ -227,7 +229,16 @@ export default function RecommendTab({
 
                 <div className="mt-3 flex items-center justify-between text-base">
                   <div className="text-neutral-300">사용 횟수 {deck.usedCount}회</div>
-                  <div className="font-semibold text-neutral-100">평균 {fmt(Math.round(deck.avgScore))}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="font-semibold text-neutral-100">평균 {fmt(Math.round(deck.avgScore))}</div>
+                    <button
+                      type="button"
+                      onClick={() => onCopyDeckToBuilder(deck)}
+                      className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
+                    >
+                      복사
+                    </button>
+                  </div>
                 </div>
               </article>
             ))

@@ -274,6 +274,9 @@ const SUPABASE_DATA_CACHE_KEY = "soloraid_supabase_data_cache_v1";
 const SUPABASE_DATA_CACHE_TTL = 1000 * 60 * 10;
 const USER_DECKS_CACHE_KEY = "soloraid_user_decks_cache_v1";
 const USER_DECKS_CACHE_TTL = 1000 * 60 * 5;
+const DECK_BUILDING_DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
+const DECK_BUILDING_DRAFT_COUNT = 5;
+const DECK_BUILDING_SPARE_SLOT_COUNT = 10;
 
 const MAX_SELECTED = 100;
 const MAX_DECK_CHARS = 5;
@@ -2488,6 +2491,53 @@ export default function Page() {
     }
   }
 
+  function copyRecommendedDeckToBuilder(deck: RecommendedDeck) {
+    const draft = deck.chars.slice(0, MAX_DECK_CHARS);
+    if (draft.length !== MAX_DECK_CHARS) {
+      showToast("복사할 추천 덱 정보가 부족해");
+      return;
+    }
+
+    try {
+      const rawDraft = localStorage.getItem(DECK_BUILDING_DRAFT_STORAGE_KEY);
+      const parsed = rawDraft ? (JSON.parse(rawDraft) as { deckDrafts?: unknown; spareSlots?: unknown }) : null;
+      const savedDeckDrafts = Array.isArray(parsed?.deckDrafts) ? parsed.deckDrafts : [];
+      const deckDrafts = Array.from({ length: Math.max(DECK_BUILDING_DRAFT_COUNT, savedDeckDrafts.length) }, (_, index) => {
+        const saved = savedDeckDrafts[index] as { id?: unknown; draft?: unknown; score?: unknown; editingId?: unknown } | undefined;
+        return {
+          id: typeof saved?.id === "number" && Number.isFinite(saved.id) ? saved.id : index + 1,
+          draft: Array.isArray(saved?.draft) ? saved.draft.slice(0, MAX_DECK_CHARS) : Array.from({ length: MAX_DECK_CHARS }, () => null),
+          score: typeof saved?.score === "string" ? saved.score : "",
+          editingId: typeof saved?.editingId === "string" ? saved.editingId : null,
+        };
+      });
+
+      const nextId = deckDrafts.reduce((maxId, deckDraft) => Math.max(maxId, deckDraft.id), 0) + 1;
+      deckDrafts.unshift({
+        id: nextId,
+        draft,
+        score: String(Math.round(deck.avgScore)),
+        editingId: null,
+      });
+
+      const spareSlots = Array.isArray(parsed?.spareSlots)
+        ? parsed.spareSlots.slice(0, DECK_BUILDING_SPARE_SLOT_COUNT)
+        : Array.from({ length: DECK_BUILDING_SPARE_SLOT_COUNT }, () => null);
+
+      localStorage.setItem(
+        DECK_BUILDING_DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          deckDrafts,
+          spareSlots,
+          savedAt: Date.now(),
+        })
+      );
+      showToast("복사 완료");
+    } catch {
+      showToast("복사 실패");
+    }
+  }
+
   function startEditDeck(d: Deck) {
     navigateToTab("home");
     setHomeEditRequest(d);
@@ -4192,6 +4242,7 @@ export default function Page() {
               onSubmitTip={submitSoloRaidTip}
               onUpdateTip={updateSoloRaidTip}
               onDeleteTip={deleteSoloRaidTip}
+              onCopyDeckToBuilder={copyRecommendedDeckToBuilder}
               nikkeMap={nikkeMap}
               getPublicUrl={getPublicUrl}
               fmt={fmt}
@@ -4202,6 +4253,10 @@ export default function Page() {
         {tab === "imaginary" && (
           <div className="mx-auto w-full lg:max-w-6xl">
             <ImaginarySoloRaidTab
+              decksCount={activeRaidDecks.length}
+              canRecommend={canRecommend}
+              best={best}
+              fmt={fmt}
               selectedNames={selectedNames}
               selectedNikkes={selectednikkes}
               maxSelected={MAX_SELECTED}
@@ -4212,6 +4267,7 @@ export default function Page() {
               onGoToSettings={() => navigateToTab("settings")}
               onShowToast={showToast}
               onSubmitDeck={submitDeckFromHome}
+              onUpdateDeckScore={updateDeckScore}
             />
           </div>
         )}
