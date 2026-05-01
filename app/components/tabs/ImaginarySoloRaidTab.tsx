@@ -1174,14 +1174,7 @@ export default function ImaginarySoloRaidTab({
             </div>
           ) : (
             <>
-              <div className={`${wideDeckLayout ? "mt-4 flex flex-col gap-1.5" : "mt-4 flex items-center justify-between gap-3"} text-sm text-neutral-400`}>
-                <div>
-                  선택됨: <span className="text-neutral-200">{effectiveSelectedNikkes.length}</span> / {maxSelected}
-                </div>
-                <div>니케를 드래그 하거나 클릭하여 덱에 추가 가능</div>
-              </div>
-
-              <div className="visible-scrollbar mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 overscroll-contain">
+              <div className="visible-scrollbar mt-2 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 overscroll-contain">
                 {selectedNikkesByBurst.map((group) =>
                   group.nikkes.length > 0 ? (
                     <div key={group.key}>
