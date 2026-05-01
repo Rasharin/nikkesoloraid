@@ -543,7 +543,7 @@ export default function ImaginarySoloRaidTab({
     setDeckDrafts(createEmptyDeckDrafts());
     setSpareSlots(createEmptySpareSlots());
     scoreRefs.current = [];
-    onShowToast("덱 만들기를 초기화했어");
+    onShowToast("덱 만들기를 초기화");
   }
 
   function addDeckDraft() {
