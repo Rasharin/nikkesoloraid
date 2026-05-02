@@ -2503,8 +2503,24 @@ export default function Page() {
 
     try {
       const rawDraft = localStorage.getItem(DECK_BUILDING_DRAFT_STORAGE_KEY);
-      const parsed = rawDraft ? (JSON.parse(rawDraft) as { deckDrafts?: unknown; spareSlots?: unknown }) : null;
-      const savedDeckDrafts = Array.isArray(parsed?.deckDrafts) ? parsed.deckDrafts : [];
+      const parsed = rawDraft
+        ? (JSON.parse(rawDraft) as { pages?: unknown; activePageId?: unknown; deckDrafts?: unknown; spareSlots?: unknown })
+        : null;
+      const savedPages = Array.isArray(parsed?.pages) && parsed.pages.length > 0 ? parsed.pages : null;
+      const activePageId =
+        typeof parsed?.activePageId === "number" && savedPages?.some((page) => page && typeof page === "object" && (page as { id?: unknown }).id === parsed.activePageId)
+          ? parsed.activePageId
+          : 1;
+      const activePage =
+        savedPages?.find((page) => page && typeof page === "object" && (page as { id?: unknown }).id === activePageId) ??
+        ({
+          id: activePageId,
+          deckDrafts: parsed?.deckDrafts,
+          spareSlots: parsed?.spareSlots,
+        } as { id: number; deckDrafts?: unknown; spareSlots?: unknown });
+      const savedDeckDrafts = Array.isArray((activePage as { deckDrafts?: unknown }).deckDrafts)
+        ? ((activePage as { deckDrafts?: unknown }).deckDrafts as unknown[])
+        : [];
       const deckDrafts = Array.from({ length: Math.max(DECK_BUILDING_DRAFT_COUNT, savedDeckDrafts.length) }, (_, index) => {
         const saved = savedDeckDrafts[index] as { id?: unknown; draft?: unknown; score?: unknown; editingId?: unknown } | undefined;
         return {
@@ -2523,15 +2539,24 @@ export default function Page() {
         editingId: null,
       });
 
-      const spareSlots = Array.isArray(parsed?.spareSlots)
-        ? parsed.spareSlots.slice(0, DECK_BUILDING_SPARE_SLOT_COUNT)
+      const savedSpareSlots = (activePage as { spareSlots?: unknown }).spareSlots;
+      const spareSlots = Array.isArray(savedSpareSlots)
+        ? savedSpareSlots.slice(0, DECK_BUILDING_SPARE_SLOT_COUNT)
         : Array.from({ length: DECK_BUILDING_SPARE_SLOT_COUNT }, () => null);
+      const nextActivePage = {
+        id: activePageId,
+        deckDrafts,
+        spareSlots,
+      };
+      const pages = savedPages
+        ? savedPages.map((page) => (page && typeof page === "object" && (page as { id?: unknown }).id === activePageId ? nextActivePage : page))
+        : [nextActivePage];
 
       localStorage.setItem(
         DECK_BUILDING_DRAFT_STORAGE_KEY,
         JSON.stringify({
-          deckDrafts,
-          spareSlots,
+          pages,
+          activePageId,
           savedAt: Date.now(),
         })
       );

@@ -39,6 +39,12 @@ type DeckDraftState = {
   editingId: string | null;
 };
 
+type DeckBuilderPageState = {
+  id: number;
+  deckDrafts: DeckDraftState[];
+  spareSlots: DraftSlot[];
+};
+
 type Deck = {
   id: string;
   chars: string[];
@@ -114,6 +120,14 @@ function createEmptySpareSlots(): DraftSlot[] {
   return Array.from({ length: SPARE_SLOT_COUNT }, () => null);
 }
 
+function createEmptyDeckBuilderPage(id: number): DeckBuilderPageState {
+  return {
+    id,
+    deckDrafts: createEmptyDeckDrafts(),
+    spareSlots: createEmptySpareSlots(),
+  };
+}
+
 function normalizeDraftSlots(value: unknown, length: number): DraftSlot[] {
   const next = Array.from({ length }, () => null) as DraftSlot[];
   if (!Array.isArray(value)) return next;
@@ -159,6 +173,31 @@ function normalizeSavedDeckDrafts(value: unknown): DeckDraftState[] {
       score: "",
       editingId: null,
     })),
+  ];
+}
+
+function normalizeSavedDeckBuilderPage(value: unknown, fallbackId: number): DeckBuilderPageState {
+  if (!value || typeof value !== "object") return createEmptyDeckBuilderPage(fallbackId);
+
+  const saved = value as Partial<DeckBuilderPageState>;
+  return {
+    id: typeof saved.id === "number" && Number.isFinite(saved.id) ? saved.id : fallbackId,
+    deckDrafts: normalizeSavedDeckDrafts(saved.deckDrafts),
+    spareSlots: normalizeDraftSlots(saved.spareSlots, SPARE_SLOT_COUNT),
+  };
+}
+
+function normalizeSavedDeckBuilderPages(value: unknown, legacyDrafts: unknown, legacySpareSlots: unknown): DeckBuilderPageState[] {
+  if (Array.isArray(value) && value.length > 0) {
+    return value.map((page, index) => normalizeSavedDeckBuilderPage(page, index + 1));
+  }
+
+  return [
+    {
+      id: 1,
+      deckDrafts: normalizeSavedDeckDrafts(legacyDrafts),
+      spareSlots: normalizeDraftSlots(legacySpareSlots, SPARE_SLOT_COUNT),
+    },
   ];
 }
 
@@ -314,8 +353,8 @@ export default function ImaginarySoloRaidTab({
   const [layoutStorageReady, setLayoutStorageReady] = useState(false);
   const [recommendedOpenStorageReady, setRecommendedOpenStorageReady] = useState(false);
   const [draftStorageReady, setDraftStorageReady] = useState(false);
-  const [deckDrafts, setDeckDrafts] = useState<DeckDraftState[]>(() => createEmptyDeckDrafts());
-  const [spareSlots, setSpareSlots] = useState<DraftSlot[]>(() => createEmptySpareSlots());
+  const [deckPages, setDeckPages] = useState<DeckBuilderPageState[]>(() => [createEmptyDeckBuilderPage(1)]);
+  const [activeDeckPageId, setActiveDeckPageId] = useState(1);
   const [activeDrag, setActiveDrag] = useState<DragItemData | null>(null);
   const [hoveredSlotTarget, setHoveredSlotTarget] = useState<DeckSlotTarget | null>(null);
   const [hoveredSpareSlotIndex, setHoveredSpareSlotIndex] = useState<number | null>(null);
@@ -332,6 +371,9 @@ export default function ImaginarySoloRaidTab({
     selectedTrashRef.current = node;
     setSelectedTrashNodeRef(node);
   };
+  const activeDeckPage = deckPages.find((page) => page.id === activeDeckPageId) ?? deckPages[0] ?? createEmptyDeckBuilderPage(1);
+  const deckDrafts = activeDeckPage.deckDrafts;
+  const spareSlots = activeDeckPage.spareSlots;
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -355,11 +397,18 @@ export default function ImaginarySoloRaidTab({
       const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
       if (rawDraft) {
         const parsed = JSON.parse(rawDraft) as {
+          pages?: unknown;
+          activePageId?: unknown;
           deckDrafts?: unknown;
           spareSlots?: unknown;
         };
-        setDeckDrafts(normalizeSavedDeckDrafts(parsed.deckDrafts));
-        setSpareSlots(normalizeDraftSlots(parsed.spareSlots, SPARE_SLOT_COUNT));
+        const pages = normalizeSavedDeckBuilderPages(parsed.pages, parsed.deckDrafts, parsed.spareSlots);
+        const savedActivePageId =
+          typeof parsed.activePageId === "number" && pages.some((page) => page.id === parsed.activePageId)
+            ? parsed.activePageId
+            : pages[0]?.id ?? 1;
+        setDeckPages(pages);
+        setActiveDeckPageId(savedActivePageId);
       }
     } catch {}
 
@@ -443,13 +492,17 @@ export default function ImaginarySoloRaidTab({
       localStorage.setItem(
         DRAFT_STORAGE_KEY,
         JSON.stringify({
-          deckDrafts,
-          spareSlots,
+          pages: deckPages,
+          activePageId: activeDeckPageId,
           savedAt: Date.now(),
         })
       );
     } catch {}
-  }, [deckDrafts, draftStorageReady, spareSlots]);
+  }, [activeDeckPageId, deckPages, draftStorageReady]);
+
+  useEffect(() => {
+    scoreRefs.current = [];
+  }, [activeDeckPageId]);
 
   const effectiveNikkeMap = useMemo(() => {
     const next = new Map(nikkeMap);
@@ -528,26 +581,41 @@ export default function ImaginarySoloRaidTab({
     return names;
   }, [deckDrafts]);
 
+  function updateActiveDeckPage(updater: (page: DeckBuilderPageState) => DeckBuilderPageState) {
+    setDeckPages((prev) => prev.map((page) => (page.id === activeDeckPageId ? updater(page) : page)));
+  }
+
+  function setActiveDeckDrafts(updater: (deckDrafts: DeckDraftState[]) => DeckDraftState[]) {
+    updateActiveDeckPage((page) => ({ ...page, deckDrafts: updater(page.deckDrafts) }));
+  }
+
+  function setActiveSpareSlots(updater: (spareSlots: DraftSlot[]) => DraftSlot[]) {
+    updateActiveDeckPage((page) => ({ ...page, spareSlots: updater(page.spareSlots) }));
+  }
+
   function updateDeckScore(deckIndex: number, scoreText: string) {
-    setDeckDrafts((prev) => prev.map((deck, index) => (index === deckIndex ? { ...deck, score: scoreText } : deck)));
+    setActiveDeckDrafts((prev) => prev.map((deck, index) => (index === deckIndex ? { ...deck, score: scoreText } : deck)));
   }
 
   function clearDraft(deckIndex: number) {
-    setDeckDrafts((prev) =>
+    setActiveDeckDrafts((prev) =>
       prev.map((deck, index) => (index === deckIndex ? { ...deck, draft: createEmptyDraft(), score: "", editingId: null } : deck))
     );
     requestAnimationFrame(() => scoreRefs.current[deckIndex]?.focus());
   }
 
   function resetDeckBuilder() {
-    setDeckDrafts(createEmptyDeckDrafts());
-    setSpareSlots(createEmptySpareSlots());
+    updateActiveDeckPage((page) => ({
+      ...page,
+      deckDrafts: createEmptyDeckDrafts(),
+      spareSlots: createEmptySpareSlots(),
+    }));
     scoreRefs.current = [];
     onShowToast("덱 만들기를 초기화");
   }
 
   function addDeckDraft() {
-    setDeckDrafts((prev) => {
+    setActiveDeckDrafts((prev) => {
       const nextId = prev.reduce((maxId, deck) => Math.max(maxId, deck.id), 0) + 1;
       return [
         ...prev,
@@ -562,12 +630,12 @@ export default function ImaginarySoloRaidTab({
   }
 
   function removeDeckDraft(deckIndex: number) {
-    setDeckDrafts((prev) => prev.filter((_, index) => index !== deckIndex));
+    setActiveDeckDrafts((prev) => prev.filter((_, index) => index !== deckIndex));
     scoreRefs.current.splice(deckIndex, 1);
   }
 
   function addToDraft(name: string) {
-    setDeckDrafts((prev) => {
+    setActiveDeckDrafts((prev) => {
       const targetIndex = prev.findIndex((deck) => !deck.draft.includes(name) && deck.draft.some((slot) => slot === null));
       if (targetIndex === -1) return prev;
 
@@ -587,7 +655,7 @@ export default function ImaginarySoloRaidTab({
   }
 
   function removeFromDraft(deckIndex: number, slotIndex: number) {
-    setDeckDrafts((prev) =>
+    setActiveDeckDrafts((prev) =>
       prev.map((deck, index) =>
         index === deckIndex
           ? { ...deck, draft: deck.draft.map((value, currentIndex) => (currentIndex === slotIndex ? null : value)) }
@@ -597,7 +665,42 @@ export default function ImaginarySoloRaidTab({
   }
 
   function removeFromSpareSlots(slotIndex: number) {
-    setSpareSlots((prev) => prev.map((value, currentIndex) => (currentIndex === slotIndex ? null : value)));
+    setActiveSpareSlots((prev) => prev.map((value, currentIndex) => (currentIndex === slotIndex ? null : value)));
+  }
+
+  function addDeckBuilderPage() {
+    setDeckPages((prev) => {
+      const nextId = prev.reduce((maxId, page) => Math.max(maxId, page.id), 0) + 1;
+      setActiveDeckPageId(nextId);
+      return [...prev, createEmptyDeckBuilderPage(nextId)];
+    });
+  }
+
+  function removeActiveDeckBuilderPage() {
+    setDeckPages((prev) => {
+      if (prev.length <= 1) {
+        setActiveDeckPageId(1);
+        scoreRefs.current = [];
+        return [createEmptyDeckBuilderPage(1)];
+      }
+
+      const activeIndex = prev.findIndex((page) => page.id === activeDeckPageId);
+      const nextPages = prev.filter((page) => page.id !== activeDeckPageId);
+      const nextActiveIndex = Math.max(0, activeIndex - 1);
+      setActiveDeckPageId(nextPages[nextActiveIndex]?.id ?? nextPages[0]?.id ?? 1);
+      scoreRefs.current = [];
+      return nextPages;
+    });
+    setActiveDrag(null);
+    setHoveredSlotTarget(null);
+    setHoveredSpareSlotIndex(null);
+  }
+
+  function switchDeckBuilderPage(pageId: number) {
+    setActiveDeckPageId(pageId);
+    setActiveDrag(null);
+    setHoveredSlotTarget(null);
+    setHoveredSpareSlotIndex(null);
   }
 
   function renderSpareSlots() {
@@ -641,7 +744,7 @@ export default function ImaginarySoloRaidTab({
       return;
     }
 
-    setDeckDrafts((prev) => {
+    setActiveDeckDrafts((prev) => {
       const maxId = prev.reduce((currentMax, deck) => Math.max(currentMax, deck.id), 0);
       const copiedDecks = recommendedDecks.map((deck, index) => ({
           id: maxId + index + 1,
@@ -862,7 +965,7 @@ export default function ImaginarySoloRaidTab({
     if (droppedSpareSlotIndex !== null) {
       if (dragItem.source === "selected" || dragItem.source === "deck") {
         if (spareSlots.includes(dragItem.nikkeName)) return;
-        setSpareSlots((prev) => {
+        setActiveSpareSlots((prev) => {
           const next = [...prev];
           next[droppedSpareSlotIndex] = dragItem.nikkeName;
           return next;
@@ -875,7 +978,7 @@ export default function ImaginarySoloRaidTab({
 
       if (dragItem.source === "spare" && typeof dragItem.slotIndex === "number") {
         if (dragItem.slotIndex === droppedSpareSlotIndex) return;
-        setSpareSlots((prev) => swapDraftSlots(prev, dragItem.slotIndex as number, droppedSpareSlotIndex));
+        setActiveSpareSlots((prev) => swapDraftSlots(prev, dragItem.slotIndex as number, droppedSpareSlotIndex));
         return;
       }
 
@@ -890,7 +993,7 @@ export default function ImaginarySoloRaidTab({
         return;
       }
 
-      setDeckDrafts((prev) => {
+      setActiveDeckDrafts((prev) => {
         const target = prev[droppedSlotTarget.deckIndex];
         if (!target || target.draft.includes(dragItem.nikkeName)) return prev;
 
@@ -909,7 +1012,7 @@ export default function ImaginarySoloRaidTab({
 
     if (dragItem.source === "selected") {
       if (!droppedSlotTarget) return;
-      setDeckDrafts((prev) => {
+      setActiveDeckDrafts((prev) => {
         const target = prev[droppedSlotTarget.deckIndex];
         if (!target || target.draft.includes(dragItem.nikkeName)) return prev;
 
@@ -937,7 +1040,7 @@ export default function ImaginarySoloRaidTab({
     }
     if (dragItem.deckIndex === droppedSlotTarget.deckIndex && dragItem.slotIndex === droppedSlotTarget.slotIndex) return;
 
-    setDeckDrafts((prev) => {
+    setActiveDeckDrafts((prev) => {
       const sourceDeck = prev[dragItem.deckIndex as number];
       const targetDeck = prev[droppedSlotTarget.deckIndex];
       if (!sourceDeck || !targetDeck) return prev;
@@ -1011,7 +1114,8 @@ export default function ImaginarySoloRaidTab({
               <div className="mt-1 text-sm text-neutral-400">아래 덱은 기기에 저장됩니다 점수 반영을 누르면 서버에 반영됩니다.</div>
             </div>
 
-            <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div className="ml-auto flex shrink-0 flex-col items-end gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setDeckOpen((prev) => !prev)}
@@ -1046,6 +1150,44 @@ export default function ImaginarySoloRaidTab({
                 >
                   덱 추가
                 </button>
+              ) : null}
+              </div>
+              {deckOpen ? (
+                <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
+                  {deckPages.map((page, pageIndex) => (
+                    <button
+                      key={page.id}
+                      type="button"
+                      onClick={() => switchDeckBuilderPage(page.id)}
+                      className={`grid h-8 min-w-8 place-items-center rounded-xl border px-2 text-sm font-semibold tabular-nums transition active:scale-[0.99] ${
+                        page.id === activeDeckPageId
+                          ? "border-cyan-400/60 bg-cyan-400/15 text-cyan-100"
+                          : "border-neutral-700 text-neutral-200 hover:border-neutral-500"
+                      }`}
+                      aria-label={`덱 만들기 ${pageIndex + 1}페이지`}
+                    >
+                      {pageIndex + 1}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addDeckBuilderPage}
+                    className="grid h-8 min-w-8 place-items-center rounded-xl border border-neutral-700 px-2 text-sm font-semibold text-neutral-100 transition hover:border-neutral-500 active:scale-[0.99]"
+                    aria-label="덱 만들기 페이지 추가"
+                    title="페이지 추가"
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removeActiveDeckBuilderPage}
+                    className="grid h-8 min-w-8 place-items-center rounded-xl border border-neutral-700 px-2 text-sm font-semibold text-neutral-100 transition hover:border-red-400/70 hover:text-red-100 active:scale-[0.99]"
+                    aria-label="현재 덱 만들기 페이지 삭제"
+                    title="현재 페이지 삭제"
+                  >
+                    -
+                  </button>
+                </div>
               ) : null}
             </div>
           </div>
