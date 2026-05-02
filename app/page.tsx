@@ -53,6 +53,12 @@ type RecommendedDeckSnapshot = {
   decks: RecommendedDeck[];
   updatedAt: number;
 };
+
+function compareRecommendedDecksByScore(a: RecommendedDeck, b: RecommendedDeck) {
+  if (a.avgScore !== b.avgScore) return b.avgScore - a.avgScore;
+  return b.usedCount - a.usedCount;
+}
+
 type RecommendationDeck = {
   chars: string[];
   score: number;
@@ -2325,15 +2331,12 @@ export default function Page() {
         usedCount: group.usedCount,
         avgScore: group.totalScore / group.usedCount,
       }))
-      .sort((a, b) => {
-        if (a.usedCount !== b.usedCount) return b.usedCount - a.usedCount;
-        return b.avgScore - a.avgScore;
-      });
+      .sort(compareRecommendedDecksByScore);
   }, [communityRaidDecks]);
   const displayedRecommendedDecks = useMemo(() => {
     if (!currentDeckRaidKey) return [];
     if (recommendedDecks.length > 0) return recommendedDecks;
-    return recommendedDeckSnapshots[currentDeckRaidKey]?.decks ?? [];
+    return [...(recommendedDeckSnapshots[currentDeckRaidKey]?.decks ?? [])].sort(compareRecommendedDecksByScore);
   }, [currentDeckRaidKey, recommendedDeckSnapshots, recommendedDecks]);
   const best = useMemo(() => pickBest5(activeRaidDecks), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
