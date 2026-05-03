@@ -38,3 +38,20 @@ export function formatScore(score: number, mode: ScoreDisplayMode): string {
 
   return Math.round(score).toLocaleString("en-US");
 }
+
+export function formatPlainScoreText(input: string): string {
+  if (input.includes(EOK_SUFFIX)) return input;
+
+  const withoutSpaces = input.replace(/\s+/g, "");
+  if (/^[\d,]+(?:\.\d*)?$/.test(withoutSpaces) && withoutSpaces.endsWith(",")) {
+    return withoutSpaces;
+  }
+
+  const compact = withoutSpaces.replaceAll(",", "");
+  if (!/^\d+(?:\.\d*)?$/.test(compact)) return input;
+
+  const [integerPart, fractionPart] = compact.split(".");
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  return fractionPart === undefined ? formattedInteger : `${formattedInteger}.${fractionPart}`;
+}

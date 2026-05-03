@@ -19,6 +19,7 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
+import { formatPlainScoreText } from "../../../lib/score-format";
 import DeckBuilderSection, {
   getDroppedDeckSlotTarget,
   getHoveredDeckSlotTarget,
@@ -250,7 +251,7 @@ export default function HomeTab({
           });
         }
         setDraft(restoredDraft);
-        setScore(typeof saved?.score === "string" ? saved.score : "");
+        setScore(typeof saved?.score === "string" ? formatPlainScoreText(saved.score) : "");
         setEditingId(typeof saved?.editingId === "string" ? saved.editingId : null);
       } else if (Array.isArray(parsed.draft)) {
         const restoredDraft = createEmptyDraft();
@@ -258,7 +259,7 @@ export default function HomeTab({
           restoredDraft[index] = typeof value === "string" ? value : null;
         });
         setDraft(restoredDraft);
-        setScore(typeof parsed.score === "string" ? parsed.score : "");
+        setScore(typeof parsed.score === "string" ? formatPlainScoreText(parsed.score) : "");
         setEditingId(typeof parsed.editingId === "string" ? parsed.editingId : null);
       }
     } catch { }
@@ -292,12 +293,12 @@ export default function HomeTab({
     if (!editRequest) return;
 
     setDraft(buildDraftFromChars(editRequest.chars));
-    setScore(String(editRequest.score));
+    setScore(fmt(editRequest.score));
     setEditingId(editRequest.id);
     requestAnimationFrame(() => scoreRef.current?.focus());
     onShowToast("수정 모드: 니케 변경 후 점수 저장");
     onEditRequestConsumed();
-  }, [editRequest, onEditRequestConsumed, onShowToast]);
+  }, [editRequest, fmt, onEditRequestConsumed, onShowToast]);
 
   useEffect(() => {
     if (!draftStorageReady) return;
@@ -592,9 +593,9 @@ export default function HomeTab({
           {editingRecommendedDeckId === deck.id ? (
             <input
               autoFocus
-              inputMode="decimal"
+              inputMode="text"
               value={editingRecommendedScore}
-              onChange={(event) => setEditingRecommendedScore(event.target.value)}
+              onChange={(event) => setEditingRecommendedScore(formatPlainScoreText(event.target.value))}
               onBlur={() => void saveRecommendedDeckScore(deck.id)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -608,7 +609,7 @@ export default function HomeTab({
                 }
               }}
               style={{
-                width: `${Math.max(editingRecommendedScore.length, String(deck.score).length, compact ? 8 : 10) + 2}ch`,
+                width: `${Math.max(editingRecommendedScore.length, fmt(deck.score).length, compact ? 8 : 10) + 2}ch`,
               }}
               className={`shrink-0 self-center rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1 text-right font-semibold tabular-nums text-neutral-100 outline-none ${
                 compact ? "min-w-[112px] text-lg" : "min-w-[144px] text-2xl"
@@ -619,7 +620,7 @@ export default function HomeTab({
               type="button"
               onDoubleClick={() => {
                 setEditingRecommendedDeckId(deck.id);
-                setEditingRecommendedScore(String(deck.score));
+                setEditingRecommendedScore(fmt(deck.score));
               }}
               className={`shrink-0 self-center font-semibold tabular-nums text-neutral-100 ${
                 compact ? "text-lg" : "text-2xl"

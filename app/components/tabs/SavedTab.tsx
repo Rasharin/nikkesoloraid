@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
+import { formatPlainScoreText } from "../../../lib/score-format";
 
 type Deck = {
   id: string;
@@ -150,9 +151,9 @@ export default function SavedTab({
                 {editingScoreId === deck.id ? (
                   <div className="mt-3 flex items-center gap-2">
                     <input
-                      inputMode="decimal"
+                      inputMode="text"
                       value={editingScoreText}
-                      onChange={(event) => setEditingScoreText(event.target.value)}
+                      onChange={(event) => setEditingScoreText(formatPlainScoreText(event.target.value))}
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
                           event.preventDefault();
@@ -196,7 +197,7 @@ export default function SavedTab({
                     onClick={() => {
                       if (readOnly) return;
                       setEditingScoreId(deck.id);
-                      setEditingScoreText(String(deck.score));
+                      setEditingScoreText(fmt(deck.score));
                     }}
                     disabled={readOnly}
                     className="flex-1 rounded-2xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"

@@ -19,6 +19,7 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
+import { formatPlainScoreText } from "../../../lib/score-format";
 import DeckBuilderSection, {
   getDroppedDeckSlotTarget,
   getHoveredDeckSlotTarget,
@@ -157,7 +158,7 @@ function normalizeSavedDeckDrafts(value: unknown): DeckDraftState[] {
       return {
         id: typeof saved.id === "number" && Number.isFinite(saved.id) ? saved.id : index + 1,
         draft: normalizeDraftSlots(saved.draft, MAX_DECK_CHARS),
-        score: typeof saved.score === "string" ? saved.score : "",
+        score: typeof saved.score === "string" ? formatPlainScoreText(saved.score) : "",
         editingId: typeof saved.editingId === "string" ? saved.editingId : null,
       } satisfies DeckDraftState;
     })
@@ -749,7 +750,7 @@ export default function ImaginarySoloRaidTab({
       const copiedDecks = recommendedDecks.map((deck, index) => ({
           id: maxId + index + 1,
           draft: normalizeDraftSlots(deck.chars, MAX_DECK_CHARS),
-          score: String(deck.score),
+          score: fmt(deck.score),
           editingId: deck.id,
       }));
 
@@ -789,9 +790,9 @@ export default function ImaginarySoloRaidTab({
           {editingRecommendedDeckId === deck.id ? (
             <input
               autoFocus
-              inputMode="decimal"
+              inputMode="text"
               value={editingRecommendedScore}
-              onChange={(event) => setEditingRecommendedScore(event.target.value)}
+              onChange={(event) => setEditingRecommendedScore(formatPlainScoreText(event.target.value))}
               onBlur={() => void saveRecommendedDeckScore(deck.id)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -805,7 +806,7 @@ export default function ImaginarySoloRaidTab({
                 }
               }}
               style={{
-                width: `${Math.max(editingRecommendedScore.length, String(deck.score).length, 8) + 2}ch`,
+                width: `${Math.max(editingRecommendedScore.length, fmt(deck.score).length, 8) + 2}ch`,
               }}
               className="min-w-[112px] shrink-0 self-center rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1 text-right text-lg font-semibold tabular-nums text-neutral-100 outline-none"
             />
@@ -814,7 +815,7 @@ export default function ImaginarySoloRaidTab({
               type="button"
               onDoubleClick={() => {
                 setEditingRecommendedDeckId(deck.id);
-                setEditingRecommendedScore(String(deck.score));
+                setEditingRecommendedScore(fmt(deck.score));
               }}
               className="shrink-0 self-center text-lg font-semibold tabular-nums text-neutral-100"
               title="더블 클릭해서 점수 수정"

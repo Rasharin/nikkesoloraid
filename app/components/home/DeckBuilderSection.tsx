@@ -4,6 +4,7 @@ import type { DragEndEvent, DragOverEvent } from "@dnd-kit/core";
 import { memo, useMemo, type Ref } from "react";
 import { rectSortingStrategy, SortableContext, arrayMove } from "@dnd-kit/sortable";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
+import { formatPlainScoreText } from "../../../lib/score-format";
 import DeckSlot from "./DeckSlot";
 import { getDeckSlotId, parseDeckSlotTarget, type DraftSlot, type DragItemData, type NikkeRow } from "./deckBuilderTypes";
 
@@ -82,9 +83,9 @@ function DeckBuilderSectionComponent({
         <div className="mt-1.5">
           <input
             ref={scoreRef}
-            inputMode="decimal"
+            inputMode="text"
             value={score}
-            onChange={(event) => onScoreChange(event.target.value)}
+            onChange={(event) => onScoreChange(formatPlainScoreText(event.target.value))}
             onKeyDown={(event) => {
               if (event.key === "Enter") {
                 event.preventDefault();
