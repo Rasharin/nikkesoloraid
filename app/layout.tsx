@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { siteUrl } from "@/lib/site";
+import { canonicalUrl, siteUrl } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 const siteName = "니케 솔로레이드 덱 도우미";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
+  alternates: {
+    canonical: canonicalUrl("/"),
+  },
   title: {
     default: siteName,
     template: "%s | 니케 솔로레이드 덱 도우미",
@@ -31,7 +34,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: siteName,
     description: "니케 덱 추천 최적화 사이트",
-    url: siteUrl,
+    url: canonicalUrl("/"),
     siteName,
     locale: "ko_KR",
     type: "website",
