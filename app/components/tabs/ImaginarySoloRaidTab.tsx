@@ -364,8 +364,10 @@ export default function ImaginarySoloRaidTab({
   const [overlayWidth, setOverlayWidth] = useState<number | null>(null);
   const [editingRecommendedDeckId, setEditingRecommendedDeckId] = useState<string | null>(null);
   const [editingRecommendedScore, setEditingRecommendedScore] = useState("");
+  const [nikkeSearch, setNikkeSearch] = useState("");
   const scoreRefs = useRef<Array<HTMLInputElement | null>>([]);
   const deckSectionRef = useRef<HTMLElement | null>(null);
+  const nikkeSectionRef = useRef<HTMLElement | null>(null);
   const selectedTrashRef = useRef<HTMLDivElement | null>(null);
   const previousScoreDisplayModeRef = useRef<ScoreDisplayMode>(scoreDisplayMode);
   const { setNodeRef: setSelectedTrashNodeRef, isOver: selectedTrashOver } = useDroppable({
@@ -536,6 +538,19 @@ export default function ImaginarySoloRaidTab({
     scoreRefs.current = [];
   }, [activeDeckPageId]);
 
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!nikkeSearch.trim()) return;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (nikkeSectionRef.current?.contains(target)) return;
+      setNikkeSearch("");
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [nikkeSearch]);
+
   const effectiveNikkeMap = useMemo(() => {
     const next = new Map(nikkeMap);
     selectedNames.forEach((name) => {
@@ -570,6 +585,17 @@ export default function ImaginarySoloRaidTab({
       .filter((nikke): nikke is NikkeRow => Boolean(nikke));
   }, [effectiveNikkeMap, selectedNames, selectedNikkes]);
 
+  const filteredSelectedNikkes = useMemo(() => {
+    const query = nikkeSearch.trim().toLowerCase();
+    if (!query) return effectiveSelectedNikkes;
+
+    return effectiveSelectedNikkes.filter((nikke) => {
+      const matchesName = nikke.name.toLowerCase().includes(query);
+      const matchesAlias = nikke.aliases?.some((alias) => alias.toLowerCase().includes(query)) ?? false;
+      return matchesName || matchesAlias;
+    });
+  }, [effectiveSelectedNikkes, nikkeSearch]);
+
   const selectedNikkesByBurst = useMemo(() => {
     const groups = [
       { key: "burst-1", label: "버스트 I", nikkes: [] as NikkeRow[] },
@@ -578,7 +604,7 @@ export default function ImaginarySoloRaidTab({
       { key: "burst-etc", label: "기타", nikkes: [] as NikkeRow[] },
     ];
 
-    effectiveSelectedNikkes.forEach((nikke) => {
+    filteredSelectedNikkes.forEach((nikke) => {
       if (nikke.burst === 1) groups[0].nikkes.push(nikke);
       else if (nikke.burst === 2) groups[1].nikkes.push(nikke);
       else if (nikke.burst === 3) groups[2].nikkes.push(nikke);
@@ -586,7 +612,7 @@ export default function ImaginarySoloRaidTab({
     });
 
     return groups;
-  }, [effectiveSelectedNikkes]);
+  }, [filteredSelectedNikkes]);
 
   const overlayNikke = activeDrag?.nikkeName ? effectiveNikkeMap.get(activeDrag.nikkeName) : undefined;
   const overlayUrl = overlayNikke?.image_path ? getPublicUrl("nikke-images", overlayNikke.image_path) : "";
@@ -1002,6 +1028,9 @@ export default function ImaginarySoloRaidTab({
           next[droppedSpareSlotIndex] = dragItem.nikkeName;
           return next;
         });
+        if (dragItem.source === "selected") {
+          setNikkeSearch("");
+        }
         if (dragItem.source === "deck" && typeof dragItem.deckIndex === "number" && typeof dragItem.slotIndex === "number") {
           removeFromDraft(dragItem.deckIndex, dragItem.slotIndex);
         }
@@ -1058,6 +1087,7 @@ export default function ImaginarySoloRaidTab({
           return { ...deck, draft: nextDraft };
         });
       });
+      setNikkeSearch("");
       return;
     }
 
@@ -1279,6 +1309,7 @@ export default function ImaginarySoloRaidTab({
         </section>
 
         <section
+          ref={nikkeSectionRef}
           style={nikkeSectionStyle}
           className={`${wideDeckLayout ? `order-2 self-start lg:order-2 lg:h-[var(--deck-section-height)] lg:overflow-hidden ${nikkeOpen ? "p-5" : "p-2"}` : "order-2 p-5"} flex min-h-0 flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}
         >
@@ -1309,7 +1340,44 @@ export default function ImaginarySoloRaidTab({
                   </button>
                 ) : null}
               </div>
-              <div className="mt-1 text-sm text-neutral-400">설정 탭에서 선택한 니케 목록입니다. 이미지를 끌어 휴지통에 넣으면 목록에서 제거됩니다.</div>
+              <div className="mt-2 flex items-center rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4">
+                <input
+                  value={nikkeSearch}
+                  onChange={(event) => setNikkeSearch(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setNikkeSearch("");
+                    }
+                  }}
+                  placeholder="니케 이름 검색"
+                  className="flex-1 bg-transparent py-2.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-500"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setNikkeSearch("")}
+                  aria-label="검색어 지우기"
+                  disabled={!nikkeSearch}
+                  style={{ borderRadius: "9999px" }}
+                  className={`ml-2 flex h-9 min-w-[36px] shrink-0 items-center justify-center appearance-none overflow-hidden border-0 p-0 transition active:scale-[0.98] ${
+                    nikkeSearch ? "bg-neutral-800 text-neutral-100 hover:bg-neutral-700" : "bg-neutral-900/70 text-neutral-600"
+                  }`}
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M6 6L18 18" />
+                    <path d="M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div className={`${wideDeckLayout ? "flex w-full flex-wrap items-center gap-2" : "ml-auto flex shrink-0 items-center gap-2"}`}>
@@ -1369,6 +1437,8 @@ export default function ImaginarySoloRaidTab({
             <div className="mt-4 text-sm text-neutral-300">
               <span className="text-neutral-200">설정 탭</span>에서 최대 {maxSelected}개 선택 가능.
             </div>
+          ) : filteredSelectedNikkes.length === 0 ? (
+            <div className="mt-4 text-sm text-neutral-300">조건에 맞는 니케가 없습니다.</div>
           ) : (
             <>
               <div className="visible-scrollbar mt-2 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1 overscroll-contain">

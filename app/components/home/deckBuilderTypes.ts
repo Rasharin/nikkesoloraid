@@ -9,6 +9,7 @@ export type NikkeRow = {
   name: string;
   image_path: string | null;
   burst?: number | null;
+  aliases?: string[];
 };
 
 export type DraftSlot = string | null;
