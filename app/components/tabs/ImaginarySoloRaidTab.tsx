@@ -19,7 +19,7 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
-import { formatPlainScoreText, formatScore, type ScoreDisplayMode } from "../../../lib/score-format";
+import { formatPlainScoreText, formatScore, parseScoreInput, type ScoreDisplayMode } from "../../../lib/score-format";
 import DeckBuilderSection, {
   getDroppedDeckSlotTarget,
   getHoveredDeckSlotTarget,
@@ -365,6 +365,7 @@ export default function ImaginarySoloRaidTab({
   const [editingRecommendedDeckId, setEditingRecommendedDeckId] = useState<string | null>(null);
   const [editingRecommendedScore, setEditingRecommendedScore] = useState("");
   const [nikkeSearch, setNikkeSearch] = useState("");
+  const [selectedDeckDraftIds, setSelectedDeckDraftIds] = useState<Set<number>>(new Set());
   const scoreRefs = useRef<Array<HTMLInputElement | null>>([]);
   const deckSectionRef = useRef<HTMLElement | null>(null);
   const nikkeSectionRef = useRef<HTMLElement | null>(null);
@@ -539,6 +540,14 @@ export default function ImaginarySoloRaidTab({
   }, [activeDeckPageId]);
 
   useEffect(() => {
+    const activeDeckIds = new Set(deckDrafts.map((deck) => deck.id));
+    setSelectedDeckDraftIds((prev) => {
+      const next = new Set(Array.from(prev).filter((id) => activeDeckIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [deckDrafts]);
+
+  useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
       if (!nikkeSearch.trim()) return;
       const target = event.target;
@@ -638,6 +647,15 @@ export default function ImaginarySoloRaidTab({
     });
     return names;
   }, [deckDrafts]);
+  const selectedDeckScoreTotal = useMemo(
+    () =>
+      deckDrafts.reduce((total, deck) => {
+        if (!selectedDeckDraftIds.has(deck.id)) return total;
+        const score = parseScoreInput(deck.score);
+        return score !== null && Number.isFinite(score) ? total + score : total;
+      }, 0),
+    [deckDrafts, selectedDeckDraftIds]
+  );
 
   function updateActiveDeckPage(updater: (page: DeckBuilderPageState) => DeckBuilderPageState) {
     setDeckPages((prev) => prev.map((page) => (page.id === activeDeckPageId ? updater(page) : page)));
@@ -688,8 +706,26 @@ export default function ImaginarySoloRaidTab({
   }
 
   function removeDeckDraft(deckIndex: number) {
+    const targetId = deckDrafts[deckIndex]?.id;
     setActiveDeckDrafts((prev) => prev.filter((_, index) => index !== deckIndex));
+    if (typeof targetId === "number") {
+      setSelectedDeckDraftIds((prev) => {
+        if (!prev.has(targetId)) return prev;
+        const next = new Set(prev);
+        next.delete(targetId);
+        return next;
+      });
+    }
     scoreRefs.current.splice(deckIndex, 1);
+  }
+
+  function toggleDeckDraftSelected(deckId: number) {
+    setSelectedDeckDraftIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(deckId)) next.delete(deckId);
+      else next.add(deckId);
+      return next;
+    });
   }
 
   function addToDraft(name: string) {
@@ -952,7 +988,10 @@ export default function ImaginarySoloRaidTab({
   }
 
   async function handleSaveAllDecks() {
-    for (const deck of deckDrafts) {
+    const targetDecks =
+      selectedDeckDraftIds.size > 0 ? deckDrafts.filter((deck) => selectedDeckDraftIds.has(deck.id)) : deckDrafts;
+
+    for (const deck of targetDecks) {
       const completeDraft = deck.draft.filter((value): value is string => value !== null);
       const hasAnyValue = completeDraft.length > 0 || deck.score.trim().length > 0;
       if (!hasAnyValue) continue;
@@ -1210,13 +1249,20 @@ export default function ImaginarySoloRaidTab({
                 {wideDeckLayout ? <span className="block w-[18px] text-center text-lg leading-[18px]">&gt;</span> : <CollapseIcon open={deckOpen} />}
               </button>
               {deckOpen ? (
-                <button
-                  type="button"
-                  onClick={() => void handleSaveAllDecks()}
-                  className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 active:scale-[0.99]"
-                >
-                  점수 반영
-                </button>
+                <>
+                  {selectedDeckDraftIds.size > 0 ? (
+                    <div className="rounded-2xl border border-yellow-400/40 bg-yellow-400/10 px-4 py-2 text-sm font-semibold text-yellow-100">
+                      선택 합계 {displayScore(selectedDeckScoreTotal)}
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveAllDecks()}
+                    className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 active:scale-[0.99]"
+                  >
+                    점수 반영
+                  </button>
+                </>
               ) : null}
               {deckOpen ? (
                 <button
@@ -1298,6 +1344,8 @@ export default function ImaginarySoloRaidTab({
                   onSaveDeck={() => void handleSaveDeck(deckIndex)}
                   onClearDraft={() => clearDraft(deckIndex)}
                   onDeleteDeck={() => removeDeckDraft(deckIndex)}
+                  selected={selectedDeckDraftIds.has(deck.id)}
+                  onToggleSelected={() => toggleDeckDraftSelected(deck.id)}
                   className="border-neutral-800 bg-neutral-950/30 p-1.5 shadow-none"
                 />
               ))}

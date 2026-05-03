@@ -27,6 +27,8 @@ type DeckBuilderSectionProps = {
   onDeleteDeck?: () => void;
   onSaveAllDecks?: () => void;
   showSaveAll?: boolean;
+  selected?: boolean;
+  onToggleSelected?: () => void;
   className?: string;
 };
 
@@ -49,6 +51,8 @@ function DeckBuilderSectionComponent({
   onDeleteDeck,
   onSaveAllDecks,
   showSaveAll,
+  selected,
+  onToggleSelected,
   className,
 }: DeckBuilderSectionProps) {
   const slotIds = useMemo(() => draft.map((_, index) => getDeckSlotId(index, deckIndex)), [deckIndex, draft]);
@@ -105,6 +109,20 @@ function DeckBuilderSectionComponent({
           >
             {editingId ? "수정 저장" : "덱 저장"}
           </button>
+          {onToggleSelected ? (
+            <button
+              type="button"
+              onClick={onToggleSelected}
+              className={`rounded-xl border px-4 py-1.5 text-sm font-semibold transition active:scale-[0.99] ${
+                selected
+                  ? "border-yellow-300/70 bg-yellow-400/20 text-yellow-100"
+                  : "border-neutral-700 text-neutral-200 hover:border-neutral-500"
+              }`}
+              aria-pressed={selected}
+            >
+              선택
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onClearDraft}
