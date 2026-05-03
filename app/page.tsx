@@ -70,6 +70,8 @@ type RecommendationRecord = {
   decks: RecommendationDeck[];
   updatedAt: number;
 };
+
+const MIN_RECOMMENDED_DECK_SCORE = 100_000_000;
 type RecommendationRow = {
   user_id: string;
   raid_key: string;
@@ -458,7 +460,7 @@ function hasOverlap(a: Set<string>, b: Set<string>) {
 /** 중복 금지 + 5덱 + 합계 최대 (Branch & Bound) */
 function pickBest5(decks: Deck[]): { picked: Deck[]; total: number } {
   const clean = decks
-    .filter((d) => d.chars.length === 5 && Number.isFinite(d.score) && d.score > 0)
+    .filter((d) => d.chars.length === 5 && Number.isFinite(d.score) && d.score > MIN_RECOMMENDED_DECK_SCORE)
     .map((d) => ({ ...d, _set: deckCharSet(d.chars) }));
 
   clean.sort((a, b) => b.score - a.score);
@@ -1071,7 +1073,12 @@ function mapRecommendedDeckSnapshot(row: SiteSettingRow): RecommendedDeckSnapsho
       const usedCount = Number(candidate.usedCount);
       const avgScore = Number(candidate.avgScore);
 
-      if (chars.length === 0 || !Number.isFinite(usedCount) || !Number.isFinite(avgScore)) continue;
+      if (
+        chars.length === 0 ||
+        !Number.isFinite(usedCount) ||
+        !Number.isFinite(avgScore) ||
+        avgScore <= MIN_RECOMMENDED_DECK_SCORE
+      ) continue;
 
       decks.push({
         deckKey: buildDeckKey(chars),
@@ -2323,6 +2330,8 @@ export default function Page() {
     const grouped = new Map<string, { chars: string[]; totalScore: number; usedCount: number }>();
 
     for (const deck of communityRaidDecks) {
+      if (!Number.isFinite(deck.score) || deck.score <= MIN_RECOMMENDED_DECK_SCORE) continue;
+
       const normalizedChars = [...deck.chars].map((char) => char.trim()).sort((a, b) => a.localeCompare(b));
       const key = buildDeckKey(normalizedChars);
       const existing = grouped.get(key);

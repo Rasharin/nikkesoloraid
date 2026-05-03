@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 
 type NikkeRow = {
@@ -10,6 +10,7 @@ type NikkeRow = {
   burst: number | null;
   element: string | null;
   role: string | null;
+  aliases?: string[];
 };
 
 type RecommendedDeck = {
@@ -31,6 +32,31 @@ type SoloRaidTip = {
   createdAt: number;
   source: "remote" | "local";
 };
+
+type RecommendedDeckSortMode = "usedCount" | "score";
+
+const RECOMMENDED_DECK_SORT_MODE_KEY = "soloraid_recommended_deck_sort_mode_v1";
+
+function compareRecommendedDecksByScore(a: RecommendedDeck, b: RecommendedDeck) {
+  if (a.avgScore !== b.avgScore) return b.avgScore - a.avgScore;
+  return b.usedCount - a.usedCount;
+}
+
+function compareRecommendedDecksByUsedCount(a: RecommendedDeck, b: RecommendedDeck) {
+  if (a.usedCount !== b.usedCount) return b.usedCount - a.usedCount;
+  return b.avgScore - a.avgScore;
+}
+
+function readStoredRecommendedDeckSortMode(): RecommendedDeckSortMode {
+  if (typeof window === "undefined") return "score";
+
+  try {
+    const value = localStorage.getItem(RECOMMENDED_DECK_SORT_MODE_KEY);
+    return value === "usedCount" || value === "score" ? value : "score";
+  } catch {
+    return "score";
+  }
+}
 
 type RecommendTabProps = {
   raidLabel: string;
@@ -87,6 +113,8 @@ export default function RecommendTab({
   const [editingContent, setEditingContent] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingTipId, setDeletingTipId] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [sortMode, setSortMode] = useState<RecommendedDeckSortMode>(() => readStoredRecommendedDeckSortMode());
 
   const tipDateFormatter = useMemo(
     () =>
@@ -99,6 +127,34 @@ export default function RecommendTab({
       }),
     []
   );
+
+  const filteredRecommendedDecks = useMemo(() => {
+    const queries = q
+      .split(",")
+      .map((part) => part.trim().toLowerCase())
+      .filter(Boolean);
+    const matchedDecks =
+      queries.length === 0
+        ? recommendedDecks
+        : recommendedDecks.filter((deck) =>
+            queries.every((query) =>
+              deck.chars.some((name) => {
+                const nikke = nikkeMap.get(name);
+                const matchesName = name.toLowerCase().includes(query);
+                const matchesAlias = nikke?.aliases?.some((alias) => alias.toLowerCase().includes(query)) ?? false;
+                return matchesName || matchesAlias;
+              })
+            )
+          );
+
+    return [...matchedDecks].sort(sortMode === "usedCount" ? compareRecommendedDecksByUsedCount : compareRecommendedDecksByScore);
+  }, [nikkeMap, q, recommendedDecks, sortMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RECOMMENDED_DECK_SORT_MODE_KEY, sortMode);
+    } catch { }
+  }, [sortMode]);
 
   async function handleSubmitTip() {
     if (savingTip || !canWriteTips) return;
@@ -172,7 +228,73 @@ export default function RecommendTab({
             <h2 className="text-lg font-semibold">추천 조합</h2>
             <div className="text-sm text-neutral-400">{raidLabel} 전체 사용자 저장 덱 기준 추천 조합입니다.</div>
           </div>
-          <div className="text-xs text-neutral-400">{recommendedDecks.length}개</div>
+          <div className="text-xs text-neutral-400">
+            {q.trim() ? `${filteredRecommendedDecks.length}/${recommendedDecks.length}개` : `${recommendedDecks.length}개`}
+          </div>
+        </div>
+
+        <div className="mt-2">
+          <div className="flex items-center rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4">
+            <input
+              value={q}
+              onChange={(event) => setQ(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setQ("");
+                }
+              }}
+              placeholder="니케 이름 검색"
+              className="flex-1 bg-transparent py-2.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-500"
+            />
+
+            <button
+              type="button"
+              onClick={() => setQ("")}
+              aria-label="검색어 지우기"
+              disabled={!q}
+              style={{ borderRadius: "9999px" }}
+              className={`ml-2 flex h-9 min-w-[36px] shrink-0 items-center justify-center appearance-none overflow-hidden border-0 p-0 transition active:scale-[0.98] ${
+                q ? "bg-neutral-800 text-neutral-100 hover:bg-neutral-700" : "bg-neutral-900/70 text-neutral-600"
+              }`}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              >
+                <path d="M6 6L18 18" />
+                <path d="M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="text-sm font-medium text-neutral-300">정렬 기준</div>
+          <div className="flex rounded-2xl border border-neutral-800 bg-neutral-950/50 p-1">
+            {[
+              { key: "usedCount", label: "사용 횟수" },
+              { key: "score", label: "점수" },
+            ].map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setSortMode(option.key as RecommendedDeckSortMode)}
+                className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
+                  sortMode === option.key
+                    ? "bg-neutral-100 text-neutral-950"
+                    : "text-neutral-300 hover:bg-neutral-800/80 hover:text-neutral-100"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="mt-2 flex flex-wrap gap-2">
@@ -201,8 +323,12 @@ export default function RecommendTab({
             <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-300">
               추천 조합이 없습니다.
             </div>
+          ) : filteredRecommendedDecks.length === 0 ? (
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-300">
+              조건에 맞는 추천 조합이 없습니다.
+            </div>
           ) : (
-            recommendedDecks.map((deck) => (
+            filteredRecommendedDecks.map((deck) => (
               <article key={deck.deckKey} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
                 <div className="grid max-w-[66%] grid-cols-5 gap-2">
                   {deck.chars.map((name) => {
