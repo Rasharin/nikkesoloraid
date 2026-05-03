@@ -280,6 +280,17 @@ const SUPABASE_DATA_CACHE_KEY = "soloraid_supabase_data_cache_v1";
 const SUPABASE_DATA_CACHE_TTL = 1000 * 60 * 10;
 const USER_DECKS_CACHE_KEY = "soloraid_user_decks_cache_v1";
 const USER_DECKS_CACHE_TTL = 1000 * 60 * 5;
+
+function readStoredScoreDisplayMode(): ScoreDisplayMode {
+  if (typeof window === "undefined") return "number";
+
+  try {
+    const rawMode = window.localStorage.getItem(SCORE_DISPLAY_MODE_KEY);
+    return rawMode === "number" || rawMode === "eok" ? rawMode : "number";
+  } catch {
+    return "number";
+  }
+}
 const DECK_BUILDING_DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
 const DECK_BUILDING_DRAFT_COUNT = 5;
 const DECK_BUILDING_SPARE_SLOT_COUNT = 10;
@@ -1282,7 +1293,7 @@ export default function Page() {
   const [termsText, setTermsText] = useState("");
   const [privacyText, setPrivacyText] = useState("");
   const [savingLegalTextKey, setSavingLegalTextKey] = useState<string | null>(null);
-  const [scoreDisplayMode, setScoreDisplayMode] = useState<ScoreDisplayMode>("number");
+  const [scoreDisplayMode, setScoreDisplayModeState] = useState<ScoreDisplayMode>(() => readStoredScoreDisplayMode());
   const isLicensePage = pathname === "/license";
   const isNoticePage = pathname === "/notice";
   const isPrivacyPage = pathname === "/privacy";
@@ -1533,6 +1544,13 @@ export default function Page() {
   };
 
   const fmt = (n: number) => formatScore(n, scoreDisplayMode);
+  const updateScoreDisplayMode = (mode: ScoreDisplayMode) => {
+    setScoreDisplayModeState(mode);
+
+    try {
+      localStorage.setItem(SCORE_DISPLAY_MODE_KEY, mode);
+    } catch { }
+  };
 
   // 로그인 유저 추적
   useEffect(() => {
@@ -1903,19 +1921,16 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    try {
-      const rawMode = localStorage.getItem(SCORE_DISPLAY_MODE_KEY);
-      if (rawMode === "number" || rawMode === "eok") {
-        setScoreDisplayMode(rawMode);
-      }
-    } catch { }
-  }, []);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== SCORE_DISPLAY_MODE_KEY) return;
+      if (event.newValue !== "number" && event.newValue !== "eok") return;
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(SCORE_DISPLAY_MODE_KEY, scoreDisplayMode);
-    } catch { }
-  }, [scoreDisplayMode]);
+      setScoreDisplayModeState(event.newValue);
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -4284,7 +4299,8 @@ export default function Page() {
               decksCount={activeRaidDecks.length}
               canRecommend={canRecommend}
               best={best}
-              fmt={fmt}
+              scoreDisplayMode={scoreDisplayMode}
+              onScoreDisplayModeChange={updateScoreDisplayMode}
               selectedNames={selectedNames}
               selectedNikkes={selectednikkes}
               maxSelected={MAX_SELECTED}
@@ -4357,7 +4373,7 @@ export default function Page() {
             onDeleteInquiry={deleteContactInquiry}
             fmt={fmt}
             scoreDisplayMode={scoreDisplayMode}
-            onScoreDisplayModeChange={(mode) => setScoreDisplayMode(mode)}
+            onScoreDisplayModeChange={updateScoreDisplayMode}
           />
         )}
           </>

@@ -19,7 +19,7 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
-import { formatPlainScoreText } from "../../../lib/score-format";
+import { formatPlainScoreText, formatScore, type ScoreDisplayMode } from "../../../lib/score-format";
 import DeckBuilderSection, {
   getDroppedDeckSlotTarget,
   getHoveredDeckSlotTarget,
@@ -60,7 +60,8 @@ type DeckBuildingTabProps = {
     picked: Deck[];
     total: number;
   };
-  fmt: (value: number) => string;
+  scoreDisplayMode: ScoreDisplayMode;
+  onScoreDisplayModeChange: (mode: ScoreDisplayMode) => void;
   selectedNames: string[];
   selectedNikkes: NikkeRow[];
   maxSelected: number;
@@ -332,7 +333,8 @@ export default function ImaginarySoloRaidTab({
   decksCount,
   canRecommend,
   best,
-  fmt,
+  scoreDisplayMode,
+  onScoreDisplayModeChange,
   selectedNames,
   selectedNikkes,
   maxSelected,
@@ -365,6 +367,7 @@ export default function ImaginarySoloRaidTab({
   const scoreRefs = useRef<Array<HTMLInputElement | null>>([]);
   const deckSectionRef = useRef<HTMLElement | null>(null);
   const selectedTrashRef = useRef<HTMLDivElement | null>(null);
+  const previousScoreDisplayModeRef = useRef<ScoreDisplayMode>(scoreDisplayMode);
   const { setNodeRef: setSelectedTrashNodeRef, isOver: selectedTrashOver } = useDroppable({
     id: SELECTED_TRASH_DROP_ID,
   });
@@ -375,6 +378,7 @@ export default function ImaginarySoloRaidTab({
   const activeDeckPage = deckPages.find((page) => page.id === activeDeckPageId) ?? deckPages[0] ?? createEmptyDeckBuilderPage(1);
   const deckDrafts = activeDeckPage.deckDrafts;
   const spareSlots = activeDeckPage.spareSlots;
+  const displayScore = (value: number) => formatScore(value, scoreDisplayMode);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -500,6 +504,33 @@ export default function ImaginarySoloRaidTab({
       );
     } catch {}
   }, [activeDeckPageId, deckPages, draftStorageReady]);
+
+  useEffect(() => {
+    const previousMode = previousScoreDisplayModeRef.current;
+    if (previousMode === scoreDisplayMode) return;
+
+    const scoreByDeckId = new Map(best.picked.map((deck) => [deck.id, deck.score]));
+    if (scoreByDeckId.size > 0) {
+      setDeckPages((prev) =>
+        prev.map((page) => ({
+          ...page,
+          deckDrafts: page.deckDrafts.map((deck) => {
+            if (!deck.editingId) return deck;
+
+            const numericScore = scoreByDeckId.get(deck.editingId);
+            if (typeof numericScore !== "number") return deck;
+
+            const previousDisplay = formatScore(numericScore, previousMode);
+            if (deck.score !== previousDisplay) return deck;
+
+            return { ...deck, score: formatScore(numericScore, scoreDisplayMode) };
+          }),
+        }))
+      );
+    }
+
+    previousScoreDisplayModeRef.current = scoreDisplayMode;
+  }, [best.picked, scoreDisplayMode]);
 
   useEffect(() => {
     scoreRefs.current = [];
@@ -750,7 +781,7 @@ export default function ImaginarySoloRaidTab({
       const copiedDecks = recommendedDecks.map((deck, index) => ({
           id: maxId + index + 1,
           draft: normalizeDraftSlots(deck.chars, MAX_DECK_CHARS),
-          score: fmt(deck.score),
+          score: displayScore(deck.score),
           editingId: deck.id,
       }));
 
@@ -763,30 +794,30 @@ export default function ImaginarySoloRaidTab({
   function renderRecommendedDeckCard(deck: Deck) {
     return (
       <div key={deck.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-2">
-        <div className="flex items-end justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-1.5">
-            {deck.chars.map((name, slotIndex) => {
-              const nikke = effectiveNikkeMap.get(name);
-              const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+        <div className="grid min-w-0 grid-cols-5 gap-1.5">
+          {deck.chars.map((name, slotIndex) => {
+            const nikke = effectiveNikkeMap.get(name);
+            const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
 
-              return (
-                <div key={`${deck.id}-${slotIndex}-${name}`} className="min-w-0 max-w-[50px]">
-                  <div className="aspect-square overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    {imageUrl ? (
-                      <img src={imageUrl} alt={name} draggable={false} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
-                    )}
-                  </div>
-                  <div className="mt-px text-center text-[10px] leading-[1.15] text-neutral-200">
-                    {formatNikkeDisplayName(name)}
-                  </div>
+            return (
+              <div key={`${deck.id}-${slotIndex}-${name}`} className="min-w-0">
+                <div className="aspect-square overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {imageUrl ? (
+                    <img src={imageUrl} alt={name} draggable={false} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
+                <div className="mt-px truncate text-center text-[10px] leading-[1.15] text-neutral-200" title={formatNikkeDisplayName(name)}>
+                  {formatNikkeDisplayName(name)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
+        <div className="mt-2 flex justify-end">
           {editingRecommendedDeckId === deck.id ? (
             <input
               autoFocus
@@ -806,7 +837,7 @@ export default function ImaginarySoloRaidTab({
                 }
               }}
               style={{
-                width: `${Math.max(editingRecommendedScore.length, fmt(deck.score).length, 8) + 2}ch`,
+                width: `${Math.max(editingRecommendedScore.length, displayScore(deck.score).length, 8) + 2}ch`,
               }}
               className="min-w-[112px] shrink-0 self-center rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1 text-right text-lg font-semibold tabular-nums text-neutral-100 outline-none"
             />
@@ -815,12 +846,12 @@ export default function ImaginarySoloRaidTab({
               type="button"
               onDoubleClick={() => {
                 setEditingRecommendedDeckId(deck.id);
-                setEditingRecommendedScore(fmt(deck.score));
+                setEditingRecommendedScore(displayScore(deck.score));
               }}
               className="shrink-0 self-center text-lg font-semibold tabular-nums text-neutral-100"
               title="더블 클릭해서 점수 수정"
             >
-              {fmt(deck.score)}
+              {displayScore(deck.score)}
             </button>
           )}
         </div>
@@ -859,7 +890,7 @@ export default function ImaginarySoloRaidTab({
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-800 bg-neutral-900/70 px-3 py-2">
                 <div className="text-sm font-semibold text-neutral-300">총합</div>
-                <div className="text-2xl font-bold tabular-nums">{fmt(best.total)}</div>
+                <div className="text-2xl font-bold tabular-nums">{displayScore(best.total)}</div>
               </div>
 
               <div className="grid gap-2 lg:grid-cols-3">
@@ -1086,7 +1117,30 @@ export default function ImaginarySoloRaidTab({
         {renderRecommendedDecksSection()}
 
         <div className={wideLayoutGridClass}>
-        <div className={wideDeckLayout ? "order-1 flex justify-end lg:col-span-2" : "order-1 flex justify-end"}>
+        <div className={wideDeckLayout ? "order-1 flex flex-wrap items-center justify-end gap-2 lg:col-span-2" : "order-1 flex flex-wrap items-center justify-end gap-2"}>
+          <div className="flex h-10 items-center gap-2 rounded-2xl border border-neutral-800 bg-neutral-950/50 px-3 text-xs font-medium text-neutral-300 sm:text-sm">
+            <span className="whitespace-nowrap text-neutral-400">점수 표기</span>
+            <span className={`whitespace-nowrap ${scoreDisplayMode === "eok" ? "text-neutral-100" : "text-neutral-500"}`}>
+              00억
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={scoreDisplayMode === "number"}
+              aria-label="점수 표기 방법 변경"
+              onClick={() => onScoreDisplayModeChange(scoreDisplayMode === "eok" ? "number" : "eok")}
+              className="relative h-6 w-11 shrink-0 rounded-full border border-neutral-700 bg-neutral-900 transition hover:border-neutral-500 active:scale-[0.98]"
+            >
+              <span
+                className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-neutral-100 shadow transition-transform ${
+                  scoreDisplayMode === "number" ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+            <span className={`whitespace-nowrap ${scoreDisplayMode === "number" ? "text-neutral-100" : "text-neutral-500"}`}>
+              숫자표기
+            </span>
+          </div>
           <button
             type="button"
             onClick={() => setWideDeckLayout((prev) => !prev)}

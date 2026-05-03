@@ -121,7 +121,7 @@ function RecommendedDeckSlot({ deckId, slotIndex, name, imageUrl, highlighted, c
     : "border-neutral-800";
 
   return (
-    <div key={`${deckId}-${slotIndex}`} className="min-w-0">
+    <div key={`${deckId}-${slotIndex}`} className="w-full min-w-0">
       <div
         ref={setRefs}
         style={style}
@@ -138,11 +138,26 @@ function RecommendedDeckSlot({ deckId, slotIndex, name, imageUrl, highlighted, c
           <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
         )}
       </div>
-      <div className="mt-px text-center text-[10px] leading-[1.15] text-neutral-200">
+      <div className="mt-px truncate text-center text-[10px] leading-[1.15] text-neutral-200" title={formatNikkeDisplayName(name)}>
         {formatNikkeDisplayName(name)}
       </div>
     </div>
   );
+}
+
+function getRecommendedScoreTextClass(scoreText: string, compact: boolean): string {
+  const length = scoreText.length;
+  if (compact) {
+    if (length > 15) return "text-[10px]";
+    if (length > 12) return "text-xs";
+    if (length > 9) return "text-sm";
+    return "text-lg";
+  }
+
+  if (length > 16) return "text-xs";
+  if (length > 13) return "text-sm";
+  if (length > 10) return "text-lg";
+  return "text-2xl";
 }
 
 const HOME_DRAFT_STORAGE_KEY = "soloraid_home_draft_v1";
@@ -565,10 +580,13 @@ export default function HomeTab({
   }
 
   function renderRecommendedDeckCard(deck: Deck, compact = false) {
+    const scoreText = fmt(deck.score);
+    const scoreTextClass = getRecommendedScoreTextClass(scoreText, compact);
+
     return (
       <div key={deck.id} className={`rounded-2xl border border-neutral-800 bg-neutral-950/70 ${compact ? "p-2" : "p-2.5"}`}>
         <div className="flex items-end justify-between gap-3">
-          <div className={`flex items-start ${compact ? "gap-1.5" : "gap-2"}`}>
+          <div className={`flex flex-none items-start ${compact ? "gap-1.5" : "gap-2"}`}>
             {deck.chars.map((name, slotIndex) => {
               const nikke = effectiveNikkeMap.get(name);
               const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
@@ -576,7 +594,7 @@ export default function HomeTab({
                 hoveredRecommendedTarget?.deckId === deck.id && hoveredRecommendedTarget.slotIndex === slotIndex;
 
               return (
-                <div key={`${deck.id}-${slotIndex}-${name}`} className={`min-w-0 ${compact ? "max-w-[50px]" : "max-w-[58px]"}`}>
+                <div key={`${deck.id}-${slotIndex}-${name}`} className={`min-w-0 shrink-0 ${compact ? "w-[50px]" : "w-[58px]"}`}>
                   <RecommendedDeckSlot
                     deckId={deck.id}
                     slotIndex={slotIndex}
@@ -609,11 +627,12 @@ export default function HomeTab({
                 }
               }}
               style={{
-                width: `${Math.max(editingRecommendedScore.length, fmt(deck.score).length, compact ? 8 : 10) + 2}ch`,
+                width: compact ? "96px" : "120px",
               }}
-              className={`shrink-0 self-center rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1 text-right font-semibold tabular-nums text-neutral-100 outline-none ${
-                compact ? "min-w-[112px] text-lg" : "min-w-[144px] text-2xl"
-              }`}
+              className={`min-w-0 shrink self-center rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-right font-semibold tabular-nums text-neutral-100 outline-none ${getRecommendedScoreTextClass(
+                editingRecommendedScore || scoreText,
+                compact
+              )}`}
             />
           ) : (
             <button
@@ -622,12 +641,10 @@ export default function HomeTab({
                 setEditingRecommendedDeckId(deck.id);
                 setEditingRecommendedScore(fmt(deck.score));
               }}
-              className={`shrink-0 self-center font-semibold tabular-nums text-neutral-100 ${
-                compact ? "text-lg" : "text-2xl"
-              }`}
+              className={`min-w-0 shrink self-center whitespace-nowrap text-right font-semibold tabular-nums text-neutral-100 ${scoreTextClass}`}
               title="더블 클릭해서 점수 수정"
             >
-              {fmt(deck.score)}
+              {scoreText}
             </button>
           )}
         </div>
