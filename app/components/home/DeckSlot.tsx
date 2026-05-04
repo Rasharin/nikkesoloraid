@@ -55,7 +55,14 @@ export default function DeckSlot({
       : "border-neutral-800";
 
   return (
-    <div ref={setNodeRef} style={style} className={`relative isolate flex min-w-0 flex-col items-center transition-transform ${showDropHint && canDrop ? "z-10" : ""}`}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-deck-slot-target="true"
+      data-deck-index={deckIndex}
+      data-slot-index={index}
+      className={`relative isolate flex min-w-0 flex-col items-center ${showDropHint && canDrop ? "z-10" : ""}`}
+    >
       <div className={`relative aspect-square w-full overflow-hidden rounded-2xl border bg-neutral-950/40 transition-all duration-150 ${dropStateClass}`}>
         {isFilled ? (
           <button

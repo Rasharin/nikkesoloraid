@@ -95,7 +95,7 @@ export default function LoginButton({ onProfileClick }: LoginButtonProps) {
           <button
             type="button"
             onClick={onProfileClick}
-            className="overflow-hidden rounded-full active:scale-[0.99]"
+            className="flex flex-col items-center gap-1 active:scale-[0.99]"
             aria-label="Open my page"
           >
             <img
@@ -104,6 +104,7 @@ export default function LoginButton({ onProfileClick }: LoginButtonProps) {
               className="h-9 w-9 rounded-full border border-neutral-700 object-cover"
               referrerPolicy="no-referrer"
             />
+            <span className="text-[10px] leading-none text-neutral-400">마이페이지</span>
           </button>
         ) : null}
         <button

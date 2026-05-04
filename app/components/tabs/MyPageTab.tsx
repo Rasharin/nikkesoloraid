@@ -46,6 +46,7 @@ type NikkeRow = {
 type NikkeElementValue = "iron" | "fire" | "wind" | "water" | "electric" | null;
 type NikkeRoleValue = "attacker" | "supporter" | "defender" | null;
 type AdminSectionKey = "nikkes" | "recommended" | "bosses" | "video";
+type ThemeMode = "dark" | "light";
 
 type MyPageTabProps = {
   deckTabs: readonly DeckTabItem[];
@@ -85,6 +86,8 @@ type MyPageTabProps = {
   fmt: (value: number) => string;
   scoreDisplayMode: ScoreDisplayMode;
   onScoreDisplayModeChange: (mode: ScoreDisplayMode) => void;
+  themeMode: ThemeMode;
+  onThemeModeChange: (mode: ThemeMode) => void;
 };
 
 function adminTabClass(active: boolean) {
@@ -120,6 +123,8 @@ export default function MyPageTab({
   fmt,
   scoreDisplayMode,
   onScoreDisplayModeChange,
+  themeMode,
+  onThemeModeChange,
 }: MyPageTabProps) {
   const [openRaidKey, setOpenRaidKey] = useState<string>("");
   const [adminSection, setAdminSection] = useState<AdminSectionKey>("nikkes");
@@ -383,6 +388,30 @@ export default function MyPageTab({
               className={adminTabClass(scoreDisplayMode === "number")}
             >
               숫자 표기
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+          <div>
+            <div className="text-sm font-medium text-neutral-100">테마</div>
+            <div className="mt-1 text-xs text-neutral-400">선택한 테마는 새로고침 후에도 유지됩니다.</div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onThemeModeChange("light")}
+              className={adminTabClass(themeMode === "light")}
+            >
+              Light
+            </button>
+            <button
+              type="button"
+              onClick={() => onThemeModeChange("dark")}
+              className={adminTabClass(themeMode === "dark")}
+            >
+              Dark
             </button>
           </div>
         </div>

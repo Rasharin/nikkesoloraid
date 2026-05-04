@@ -15,9 +15,9 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { formatPlainScoreText, formatScore, parseScoreInput, type ScoreDisplayMode } from "../../../lib/score-format";
 import DeckBuilderSection, {
@@ -26,7 +26,7 @@ import DeckBuilderSection, {
   renderDragOverlayCard,
 } from "../home/DeckBuilderSection";
 import DraggableNikkeCard from "../home/DraggableNikkeCard";
-import { createEmptyDraft, MAX_DECK_CHARS, type DragItemData, type DraftSlot, type NikkeRow } from "../home/deckBuilderTypes";
+import { createEmptyDraft, MAX_DECK_CHARS, parseDeckSlotTarget, type DragItemData, type DraftSlot, type NikkeRow } from "../home/deckBuilderTypes";
 
 type DeckSlotTarget = {
   deckIndex: number;
@@ -75,12 +75,76 @@ type DeckBuildingTabProps = {
   onUpdateDeckScore: (id: string, scoreText: string) => Promise<boolean>;
 };
 
+type SortableDeckDraftProps = {
+  deck: DeckDraftState;
+  deckIndex: number;
+  children: ReactNode;
+};
+
+type ActiveDeckDraftDrag = {
+  id: number;
+  deckIndex: number;
+  width: number | null;
+};
+
+function SortableDeckDraft({ deck, deckIndex, children }: SortableDeckDraftProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({
+    id: getDeckDraftSortableId(deck.id),
+    animateLayoutChanges: () => false,
+    data: {
+      source: "deck-draft",
+      deckDraftId: deck.id,
+      deckIndex,
+    },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative min-w-0 ${isDragging ? "z-20 opacity-25" : ""}`}
+    >
+      <button
+        type="button"
+        className="absolute right-2 top-2 z-10 grid h-7 w-7 touch-none place-items-center rounded-lg border border-neutral-700 bg-neutral-950/80 text-neutral-300 transition hover:border-neutral-500 active:scale-[0.98]"
+        aria-label="Reorder deck"
+        title="Reorder deck"
+        {...attributes}
+        {...listeners}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M8 6H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M8 12H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path d="M8 18H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
+      {children}
+    </div>
+  );
+}
+
 const DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
 const LAYOUT_STORAGE_KEY = "soloraid_deck_building_wide_layout_v1";
 const RECOMMENDED_OPEN_STORAGE_KEY = "soloraid_deck_building_recommended_open_v1";
 const SELECTED_TRASH_DROP_ID = "deck-building-selected-trash";
 const DECK_DRAFT_COUNT = 5;
 const SPARE_SLOT_COUNT = 10;
+
+function getDeckDraftSortableId(id: number): string {
+  return `deck-building-draft-${id}`;
+}
+
+function parseDeckDraftSortableId(id: unknown): number | null {
+  if (typeof id !== "string") return null;
+  if (!id.startsWith("deck-building-draft-")) return null;
+
+  const deckId = Number(id.slice("deck-building-draft-".length));
+  return Number.isInteger(deckId) ? deckId : null;
+}
 
 function getSpareSlotId(index: number): string {
   return `deck-building-spare-slot-${index}`;
@@ -209,6 +273,54 @@ function swapDraftSlots(draft: DraftSlot[], fromIndex: number, toIndex: number):
   next[fromIndex] = next[toIndex] ?? null;
   next[toIndex] = fromValue;
   return next;
+}
+
+function placeNikkeInDraft(draft: DraftSlot[], nikkeName: string, targetIndex: number): DraftSlot[] {
+  const existingIndex = draft.findIndex((slot) => slot === nikkeName);
+  if (existingIndex === targetIndex) return draft;
+  if (existingIndex !== -1) return swapDraftSlots(draft, existingIndex, targetIndex);
+
+  const targetValue = draft[targetIndex] ?? null;
+  if (targetValue) {
+    const emptyIndex = draft.findIndex((slot) => slot === null);
+    if (emptyIndex === -1) return draft;
+
+    const next = [...draft];
+    next[targetIndex] = nikkeName;
+    next[emptyIndex] = targetValue;
+    return next;
+  }
+
+  const next = [...draft];
+  next[targetIndex] = nikkeName;
+  return next;
+}
+
+function getCollisionDeckSlotTarget(event: DragEndEvent): DeckSlotTarget | null {
+  const collisions = event.collisions ?? [];
+
+  for (const collision of collisions) {
+    if (collision.id === event.active.id) continue;
+    const target = parseDeckSlotTarget(collision.id);
+    if (target) return target;
+  }
+
+  return null;
+}
+
+function getPointedDeckSlotTarget(event: DragEndEvent): DeckSlotTarget | null {
+  const translated = event.active.rect.current.translated;
+  if (!translated || typeof document === "undefined") return null;
+
+  const centerX = translated.left + translated.width / 2;
+  const centerY = translated.top + translated.height / 2;
+  const element = document.elementFromPoint(centerX, centerY);
+  const slotElement = element?.closest<HTMLElement>("[data-deck-slot-target='true']");
+  if (!slotElement) return null;
+
+  const deckIndex = Number(slotElement.dataset.deckIndex);
+  const slotIndex = Number(slotElement.dataset.slotIndex);
+  return Number.isInteger(deckIndex) && Number.isInteger(slotIndex) ? { deckIndex, slotIndex } : null;
 }
 
 function isDroppedOutsideDeckSection(event: DragEndEvent, sectionElement: HTMLElement | null): boolean {
@@ -359,6 +471,7 @@ export default function ImaginarySoloRaidTab({
   const [deckPages, setDeckPages] = useState<DeckBuilderPageState[]>(() => [createEmptyDeckBuilderPage(1)]);
   const [activeDeckPageId, setActiveDeckPageId] = useState(1);
   const [activeDrag, setActiveDrag] = useState<DragItemData | null>(null);
+  const [activeDeckDraftDrag, setActiveDeckDraftDrag] = useState<ActiveDeckDraftDrag | null>(null);
   const [hoveredSlotTarget, setHoveredSlotTarget] = useState<DeckSlotTarget | null>(null);
   const [hoveredSpareSlotIndex, setHoveredSpareSlotIndex] = useState<number | null>(null);
   const [overlayWidth, setOverlayWidth] = useState<number | null>(null);
@@ -625,6 +738,10 @@ export default function ImaginarySoloRaidTab({
 
   const overlayNikke = activeDrag?.nikkeName ? effectiveNikkeMap.get(activeDrag.nikkeName) : undefined;
   const overlayUrl = overlayNikke?.image_path ? getPublicUrl("nikke-images", overlayNikke.image_path) : "";
+  const overlayDeckDraft =
+    activeDeckDraftDrag !== null
+      ? deckDrafts.find((deck) => deck.id === activeDeckDraftDrag.id) ?? deckDrafts[activeDeckDraftDrag.deckIndex]
+      : null;
   const nikkeSectionStyle =
     wideDeckLayout && deckSectionHeight
       ? ({ "--deck-section-height": `${Math.ceil(deckSectionHeight)}px` } as CSSProperties)
@@ -647,6 +764,7 @@ export default function ImaginarySoloRaidTab({
     });
     return names;
   }, [deckDrafts]);
+  const deckDraftSortableIds = useMemo(() => deckDrafts.map((deck) => getDeckDraftSortableId(deck.id)), [deckDrafts]);
   const selectedDeckScoreTotal = useMemo(
     () =>
       deckDrafts.reduce((total, deck) => {
@@ -921,6 +1039,45 @@ export default function ImaginarySoloRaidTab({
     );
   }
 
+  function renderDeckDraftOverlay(deck: DeckDraftState | null, width: number | null) {
+    if (!deck) return null;
+
+    return (
+      <div
+        className="pointer-events-none relative z-[80] origin-center scale-[1.02] cursor-grabbing rounded-2xl border border-cyan-200/70 bg-neutral-900/95 p-3 shadow-[0_28px_70px_rgba(0,0,0,0.5)] ring-2 ring-cyan-300/45"
+        style={{ width: width ? `${Math.round(width)}px` : undefined }}
+      >
+        <div className="grid grid-cols-5 gap-0.5">
+          {deck.draft.map((name, index) => {
+            const nikke = name ? effectiveNikkeMap.get(name) : undefined;
+            const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+
+            return (
+              <div key={`${deck.id}-${index}-${name ?? "empty"}`} className="min-w-0">
+                <div className="aspect-square overflow-hidden rounded-xl border border-neutral-700 bg-neutral-950/60">
+                  {imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imageUrl} alt={name ?? ""} draggable={false} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="grid h-full w-full place-items-center text-lg text-neutral-600">+</div>
+                  )}
+                </div>
+                {name ? (
+                  <div className="mt-0.5 truncate text-center text-[10px] leading-none text-neutral-200">
+                    {formatNikkeDisplayName(name)}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+        {deck.score.trim() ? (
+          <div className="mt-2 truncate text-right text-sm font-semibold tabular-nums text-neutral-100">{deck.score}</div>
+        ) : null}
+      </div>
+    );
+  }
+
   function renderRecommendedDecksSection() {
     const topDecks = best.picked.slice(0, 3);
     const bottomDecks = best.picked.slice(3, 5);
@@ -1003,12 +1160,33 @@ export default function ImaginarySoloRaidTab({
     const { source, nikkeName, deckIndex, slotIndex } = (event.active.data.current ?? {}) as Partial<DragItemData>;
     const initialRect = event.active.rect.current.initial;
 
-    if (!nikkeName || (source !== "selected" && source !== "deck" && source !== "spare")) {
+    if (source === "deck-draft") {
+      const deckDraftId =
+        typeof (event.active.data.current as { deckDraftId?: unknown } | undefined)?.deckDraftId === "number"
+          ? ((event.active.data.current as { deckDraftId: number }).deckDraftId)
+          : parseDeckDraftSortableId(event.active.id);
       setActiveDrag(null);
+      setActiveDeckDraftDrag(
+        deckDraftId === null
+          ? null
+          : {
+              id: deckDraftId,
+              deckIndex: typeof deckIndex === "number" ? deckIndex : 0,
+              width: initialRect?.width ?? null,
+            }
+      );
       setOverlayWidth(null);
       return;
     }
 
+    if (!nikkeName || (source !== "selected" && source !== "deck" && source !== "spare")) {
+      setActiveDrag(null);
+      setActiveDeckDraftDrag(null);
+      setOverlayWidth(null);
+      return;
+    }
+
+    setActiveDeckDraftDrag(null);
     setActiveDrag({
       source,
       nikkeName,
@@ -1025,21 +1203,41 @@ export default function ImaginarySoloRaidTab({
 
   function handleDragCancel() {
     setActiveDrag(null);
+    setActiveDeckDraftDrag(null);
     setHoveredSlotTarget(null);
     setHoveredSpareSlotIndex(null);
     setOverlayWidth(null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
-    const droppedSlotTarget = getDroppedDeckSlotTarget(event);
+    const droppedSlotTarget = getDroppedDeckSlotTarget(event) ?? getCollisionDeckSlotTarget(event) ?? getPointedDeckSlotTarget(event);
     const droppedSpareSlotIndex = parseSpareSlotIndex(event.over?.id);
     const dragItem = (event.active.data.current ?? activeDrag) as DragItemData | null;
     const droppedOnSelectedTrash = event.over?.id === SELECTED_TRASH_DROP_ID || isDroppedOnElement(event, selectedTrashRef.current);
 
     setActiveDrag(null);
+    setActiveDeckDraftDrag(null);
     setHoveredSlotTarget(null);
     setHoveredSpareSlotIndex(null);
     setOverlayWidth(null);
+
+    if ((dragItem as { source?: string })?.source === "deck-draft") {
+      const sortableDragItem = dragItem as unknown as { deckDraftId?: unknown };
+      const activeDeckId =
+        typeof sortableDragItem.deckDraftId === "number"
+          ? sortableDragItem.deckDraftId
+          : parseDeckDraftSortableId(event.active.id);
+      const overDeckId = parseDeckDraftSortableId(event.over?.id);
+      const overDeckIndex = overDeckId === null && droppedSlotTarget ? droppedSlotTarget.deckIndex : null;
+
+      setActiveDeckDrafts((prev) => {
+        const fromIndex = prev.findIndex((deck) => deck.id === activeDeckId);
+        const toIndex = overDeckId !== null ? prev.findIndex((deck) => deck.id === overDeckId) : overDeckIndex;
+        if (fromIndex === -1 || toIndex === null || toIndex < 0 || toIndex >= prev.length || fromIndex === toIndex) return prev;
+        return arrayMove(prev, fromIndex, toIndex);
+      });
+      return;
+    }
 
     if (!dragItem?.nikkeName) return;
 
@@ -1061,12 +1259,9 @@ export default function ImaginarySoloRaidTab({
 
     if (droppedSpareSlotIndex !== null) {
       if (dragItem.source === "selected" || dragItem.source === "deck") {
-        if (spareSlots.includes(dragItem.nikkeName)) return;
-        setActiveSpareSlots((prev) => {
-          const next = [...prev];
-          next[droppedSpareSlotIndex] = dragItem.nikkeName;
-          return next;
-        });
+        const nextSpareSlots = placeNikkeInDraft(spareSlots, dragItem.nikkeName, droppedSpareSlotIndex);
+        if (nextSpareSlots === spareSlots) return;
+        setActiveSpareSlots(() => nextSpareSlots);
         if (dragItem.source === "selected") {
           setNikkeSearch("");
         }
@@ -1095,12 +1290,12 @@ export default function ImaginarySoloRaidTab({
 
       setActiveDeckDrafts((prev) => {
         const target = prev[droppedSlotTarget.deckIndex];
-        if (!target || target.draft.includes(dragItem.nikkeName)) return prev;
+        if (!target) return prev;
 
         return prev.map((deck, index) => {
           if (index !== droppedSlotTarget.deckIndex) return deck;
-          const nextDraft = [...deck.draft];
-          nextDraft[droppedSlotTarget.slotIndex] = dragItem.nikkeName;
+          const nextDraft = placeNikkeInDraft(deck.draft, dragItem.nikkeName, droppedSlotTarget.slotIndex);
+          if (nextDraft === deck.draft) return deck;
           if (nextDraft.every((slot) => slot !== null)) {
             requestAnimationFrame(() => scoreRefs.current[index]?.focus());
           }
@@ -1114,12 +1309,12 @@ export default function ImaginarySoloRaidTab({
       if (!droppedSlotTarget) return;
       setActiveDeckDrafts((prev) => {
         const target = prev[droppedSlotTarget.deckIndex];
-        if (!target || target.draft.includes(dragItem.nikkeName)) return prev;
+        if (!target) return prev;
 
         return prev.map((deck, index) => {
           if (index !== droppedSlotTarget.deckIndex) return deck;
-          const nextDraft = [...deck.draft];
-          nextDraft[droppedSlotTarget.slotIndex] = dragItem.nikkeName;
+          const nextDraft = placeNikkeInDraft(deck.draft, dragItem.nikkeName, droppedSlotTarget.slotIndex);
+          if (nextDraft === deck.draft) return deck;
           if (nextDraft.every((slot) => slot !== null)) {
             requestAnimationFrame(() => scoreRefs.current[index]?.focus());
           }
@@ -1136,7 +1331,6 @@ export default function ImaginarySoloRaidTab({
       return;
     }
     if (!droppedSlotTarget) {
-      removeFromDraft(dragItem.deckIndex, dragItem.slotIndex);
       return;
     }
     if (dragItem.deckIndex === droppedSlotTarget.deckIndex && dragItem.slotIndex === droppedSlotTarget.slotIndex) return;
@@ -1201,7 +1395,7 @@ export default function ImaginarySoloRaidTab({
               className="relative h-6 w-11 shrink-0 rounded-full border border-neutral-700 bg-neutral-900 transition hover:border-neutral-500 active:scale-[0.98]"
             >
               <span
-                className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-neutral-100 shadow transition-transform ${
+                className={`score-mode-toggle-thumb absolute left-1 top-1 h-4 w-4 rounded-full bg-neutral-100 shadow transition-transform ${
                   scoreDisplayMode === "number" ? "translate-x-5" : "translate-x-0"
                 }`}
               />
@@ -1325,30 +1519,33 @@ export default function ImaginarySoloRaidTab({
 
           {deckOpen ? (
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              {deckDrafts.map((deck, deckIndex) => (
-                <DeckBuilderSection
-                  key={deck.id}
-                  deckIndex={deckIndex}
-                  draft={deck.draft}
-                  nikkeMap={effectiveNikkeMap}
-                  getPublicUrl={getPublicUrl}
-                  score={deck.score}
-                  scoreRef={(node) => {
-                    scoreRefs.current[deckIndex] = node;
-                  }}
-                  editingId={deck.editingId}
-                  activeDrag={activeDrag}
-                  hoveredSlotIndex={hoveredSlotTarget?.deckIndex === deckIndex ? hoveredSlotTarget.slotIndex : null}
-                  onScoreChange={(value) => updateDeckScore(deckIndex, value)}
-                  onRemoveFromDraft={(slotIndex) => removeFromDraft(deckIndex, slotIndex)}
-                  onSaveDeck={() => void handleSaveDeck(deckIndex)}
-                  onClearDraft={() => clearDraft(deckIndex)}
-                  onDeleteDeck={() => removeDeckDraft(deckIndex)}
-                  selected={selectedDeckDraftIds.has(deck.id)}
-                  onToggleSelected={() => toggleDeckDraftSelected(deck.id)}
-                  className="border-neutral-800 bg-neutral-950/30 p-1.5 shadow-none"
-                />
-              ))}
+              <SortableContext items={deckDraftSortableIds} strategy={rectSortingStrategy}>
+                {deckDrafts.map((deck, deckIndex) => (
+                  <SortableDeckDraft key={deck.id} deck={deck} deckIndex={deckIndex}>
+                    <DeckBuilderSection
+                      deckIndex={deckIndex}
+                      draft={deck.draft}
+                      nikkeMap={effectiveNikkeMap}
+                      getPublicUrl={getPublicUrl}
+                      score={deck.score}
+                      scoreRef={(node) => {
+                        scoreRefs.current[deckIndex] = node;
+                      }}
+                      editingId={deck.editingId}
+                      activeDrag={activeDrag}
+                      hoveredSlotIndex={hoveredSlotTarget?.deckIndex === deckIndex ? hoveredSlotTarget.slotIndex : null}
+                      onScoreChange={(value) => updateDeckScore(deckIndex, value)}
+                      onRemoveFromDraft={(slotIndex) => removeFromDraft(deckIndex, slotIndex)}
+                      onSaveDeck={() => void handleSaveDeck(deckIndex)}
+                      onClearDraft={() => clearDraft(deckIndex)}
+                      onDeleteDeck={() => removeDeckDraft(deckIndex)}
+                      selected={selectedDeckDraftIds.has(deck.id)}
+                      onToggleSelected={() => toggleDeckDraftSelected(deck.id)}
+                      className="border-neutral-800 bg-neutral-950/30 p-1.5 shadow-none"
+                    />
+                  </SortableDeckDraft>
+                ))}
+              </SortableContext>
               {renderSpareSlots()}
             </div>
           ) : null}
@@ -1534,7 +1731,9 @@ export default function ImaginarySoloRaidTab({
       </div>
 
       <DragOverlay zIndex={80} dropAnimation={null}>
-        {renderDragOverlayCard(overlayNikke, overlayUrl, overlayWidth)}
+        {activeDeckDraftDrag
+          ? renderDeckDraftOverlay(overlayDeckDraft, activeDeckDraftDrag.width)
+          : renderDragOverlayCard(overlayNikke, overlayUrl, overlayWidth)}
       </DragOverlay>
     </DndContext>
   );

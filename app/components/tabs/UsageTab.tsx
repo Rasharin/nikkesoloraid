@@ -11,7 +11,7 @@ type UsageBoardTab = {
 };
 
 function UsageBoardTabIcon({ tabKey, active }: { tabKey: string; active: boolean }) {
-  const stroke = active ? "black" : "#e5e5e5";
+  const stroke = "currentColor";
 
   if (tabKey === "home") {
     return (

@@ -13,7 +13,7 @@ export type NikkeRow = {
 };
 
 export type DraftSlot = string | null;
-export type DragSource = "selected" | "deck" | "spare" | "recommended";
+export type DragSource = "selected" | "deck" | "spare" | "recommended" | "deck-draft";
 
 export type DragItemData = {
   source: DragSource;

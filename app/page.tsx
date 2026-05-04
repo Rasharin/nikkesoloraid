@@ -70,6 +70,7 @@ type RecommendationRecord = {
   decks: RecommendationDeck[];
   updatedAt: number;
 };
+type ThemeMode = "dark" | "light";
 
 const MIN_RECOMMENDED_DECK_SCORE = 100_000_000;
 type RecommendationRow = {
@@ -282,6 +283,7 @@ const SUPABASE_DATA_CACHE_KEY = "soloraid_supabase_data_cache_v1";
 const SUPABASE_DATA_CACHE_TTL = 1000 * 60 * 10;
 const USER_DECKS_CACHE_KEY = "soloraid_user_decks_cache_v1";
 const USER_DECKS_CACHE_TTL = 1000 * 60 * 5;
+const THEME_MODE_KEY = "soloraid_theme_mode_v1";
 
 function readStoredScoreDisplayMode(): ScoreDisplayMode {
   if (typeof window === "undefined") return "number";
@@ -291,6 +293,17 @@ function readStoredScoreDisplayMode(): ScoreDisplayMode {
     return rawMode === "number" || rawMode === "eok" ? rawMode : "number";
   } catch {
     return "number";
+  }
+}
+
+function readStoredThemeMode(): ThemeMode {
+  if (typeof window === "undefined") return "dark";
+
+  try {
+    const rawMode = window.localStorage.getItem(THEME_MODE_KEY) ?? window.localStorage.getItem("theme");
+    return rawMode === "light" || rawMode === "dark" ? rawMode : "dark";
+  } catch {
+    return "dark";
   }
 }
 const DECK_BUILDING_DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
@@ -1290,6 +1303,7 @@ export default function Page() {
   const [privacyText, setPrivacyText] = useState("");
   const [savingLegalTextKey, setSavingLegalTextKey] = useState<string | null>(null);
   const [scoreDisplayMode, setScoreDisplayModeState] = useState<ScoreDisplayMode>(() => readStoredScoreDisplayMode());
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredThemeMode());
   const isLicensePage = pathname === "/license";
   const isNoticePage = pathname === "/notice";
   const isPrivacyPage = pathname === "/privacy";
@@ -1547,6 +1561,22 @@ export default function Page() {
       localStorage.setItem(SCORE_DISPLAY_MODE_KEY, mode);
     } catch { }
   };
+
+  const updateThemeMode = (mode: ThemeMode) => {
+    setThemeMode(mode);
+
+    try {
+      localStorage.setItem(THEME_MODE_KEY, mode);
+      localStorage.setItem("theme", mode);
+    } catch { }
+  };
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = themeMode;
+    document.body.dataset.theme = themeMode;
+    document.documentElement.classList.toggle("dark", themeMode === "dark");
+    document.body.classList.toggle("dark", themeMode === "dark");
+  }, [themeMode]);
 
   // 로그인 유저 추적
   useEffect(() => {
@@ -4006,7 +4036,7 @@ export default function Page() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-50">
+    <div suppressHydrationWarning className={`theme-${themeMode} ${themeMode === "dark" ? "dark" : ""} min-h-screen bg-[var(--bg)] text-[var(--text)]`}>
       <div className="mx-auto max-w-xl px-4 pb-10 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
         {/* Header */}
         <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3.5 backdrop-blur lg:-mx-8 lg:px-8 lg:py-4">
@@ -4018,7 +4048,12 @@ export default function Page() {
                 className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo.png" alt="니케 솔로레이드 덱 도우미" className="h-16 w-auto object-contain lg:h-20" />
+                <div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icon.png" alt="니케 솔로레이드 덱 도우미" className="hidden h-16 w-auto object-contain dark:block lg:h-20" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/logo-black.png" alt="니케 솔로레이드 덱 도우미" className="block h-16 w-auto object-contain dark:hidden lg:h-20" />
+                </div>
               </Link>
               <div className="mt-1.5 pl-1 text-xs leading-5 text-neutral-400 lg:text-sm">
                 <h1 className="font-medium text-neutral-300">니케 솔로레이드 덱 도우미 사이트</h1>
@@ -4372,6 +4407,8 @@ export default function Page() {
             fmt={fmt}
             scoreDisplayMode={scoreDisplayMode}
             onScoreDisplayModeChange={updateScoreDisplayMode}
+            themeMode={themeMode}
+            onThemeModeChange={updateThemeMode}
           />
         )}
           </>

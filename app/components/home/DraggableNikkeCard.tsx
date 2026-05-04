@@ -96,7 +96,7 @@ function DraggableNikkeCardComponent({
         )}
       </div>
 
-      <div className="mt-1 break-words text-center text-xs leading-tight text-neutral-200 line-clamp-2">
+      <div className="mt-1 w-full truncate text-center text-xs leading-tight text-neutral-200">
         {formatNikkeDisplayName(nikke.name)}
       </div>
     </div>
