@@ -64,7 +64,7 @@ function DraggableNikkeCardComponent({
             onRemove(nikke.name);
           }}
           aria-label={`${nikke.name} 제거`}
-          className={`absolute z-[1] flex items-center justify-center rounded-full bg-black/75 text-red-400 transition hover:bg-black/90 hover:text-red-300 active:scale-[0.95] ${
+          className={`absolute z-[1] flex items-center justify-center rounded-full bg-[var(--theme-panel)] text-red-400 transition hover:bg-[var(--theme-card)] hover:text-red-300 active:scale-[0.95] ${
             compactRemoveButton ? "right-0.5 top-0.5 h-4 w-4" : "right-1.5 top-1.5 h-6 w-6"
           }`}
         >
@@ -84,8 +84,8 @@ function DraggableNikkeCardComponent({
       )}
 
       <div
-        className={`aspect-square w-full overflow-hidden rounded-xl border bg-neutral-950/40 transition ${
-          isDragging || inDeck ? "border-white shadow-[0_0_0_1px_rgba(255,255,255,0.55)]" : "border-neutral-800"
+        className={`aspect-square w-full overflow-hidden rounded-xl border bg-[var(--card)] transition ${
+          isDragging || inDeck ? "border-[var(--theme-border-strong)] shadow-[0_0_0_1px_rgba(255,255,255,0.55)]" : "border-[var(--border)]"
         }`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -96,7 +96,7 @@ function DraggableNikkeCardComponent({
         )}
       </div>
 
-      <div className="mt-1 w-full truncate text-center text-xs leading-tight text-neutral-200">
+      <div className="mt-1 w-full truncate text-center text-xs leading-tight text-[var(--theme-text-soft)]">
         {formatNikkeDisplayName(nikke.name)}
       </div>
     </div>

@@ -58,7 +58,7 @@ function DeckBuilderSectionComponent({
   const slotIds = useMemo(() => draft.map((_, index) => getDeckSlotId(index, deckIndex)), [deckIndex, draft]);
 
   return (
-    <section ref={sectionRef} className={`rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 ${className ?? ""}`}>
+    <section ref={sectionRef} className={`rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 ${className ?? ""}`}>
       <div>
         <SortableContext items={slotIds} strategy={rectSortingStrategy}>
           <div className="grid grid-cols-5 gap-0.5">
@@ -97,7 +97,7 @@ function DeckBuilderSectionComponent({
               }
             }}
             placeholder="점수입력 (예: 6510755443 또는 23.3억)"
-            className="w-full rounded-xl border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-sm outline-none transition focus:border-white/40"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--theme-input)] px-3 py-2 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--theme-border-strong)]"
           />
         </div>
 
@@ -115,8 +115,8 @@ function DeckBuilderSectionComponent({
               onClick={onToggleSelected}
               className={`rounded-xl border px-4 py-1.5 text-sm font-semibold transition active:scale-[0.99] ${
                 selected
-                  ? "border-yellow-300/70 bg-yellow-400/20 text-yellow-100"
-                  : "border-neutral-700 text-neutral-200 hover:border-neutral-500"
+                  ? "border-yellow-500/60 bg-yellow-400/20 text-[var(--text)]"
+                  : "border-[var(--border)] text-[var(--text)] hover:border-[var(--theme-border-strong)]"
               }`}
               aria-pressed={selected}
             >
@@ -126,7 +126,7 @@ function DeckBuilderSectionComponent({
           <button
             type="button"
             onClick={onClearDraft}
-            className="rounded-xl border border-neutral-700 px-4 py-1.5 text-sm active:scale-[0.99]"
+            className="rounded-xl border border-[var(--border)] px-4 py-1.5 text-sm text-[var(--text)] active:scale-[0.99]"
           >
             비우기
           </button>
@@ -134,7 +134,7 @@ function DeckBuilderSectionComponent({
             <button
               type="button"
               onClick={onDeleteDeck}
-              className="rounded-xl border border-red-500/40 px-4 py-1.5 text-sm text-red-200 active:scale-[0.99]"
+              className="rounded-xl border border-red-500/40 px-4 py-1.5 text-sm text-[var(--text)] active:scale-[0.99]"
             >
               삭제
             </button>
@@ -144,7 +144,7 @@ function DeckBuilderSectionComponent({
           <button
             type="button"
             onClick={onSaveAllDecks}
-            className="mt-2 w-full rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-1.5 text-sm font-semibold text-cyan-100 active:scale-[0.99]"
+            className="mt-2 w-full rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-1.5 text-sm font-semibold text-[var(--text)] active:scale-[0.99]"
           >
             작성된 덱 모두 저장
           </button>
@@ -201,10 +201,10 @@ export function renderDragOverlayCard(nikke: NikkeRow | undefined, imageUrl: str
 
   return (
     <div
-      className="pointer-events-none relative z-[80] origin-center scale-[1.03] cursor-grabbing rounded-2xl border border-cyan-200/70 bg-neutral-900/95 p-1.5 shadow-[0_28px_70px_rgba(0,0,0,0.5)] ring-2 ring-cyan-300/45"
+      className="pointer-events-none relative z-[80] origin-center scale-[1.03] cursor-grabbing rounded-2xl border border-cyan-200/70 bg-[var(--theme-panel)] p-1.5 shadow-[0_28px_70px_rgba(0,0,0,0.5)] ring-2 ring-cyan-300/45"
       style={{ width: width ? `${Math.round(width)}px` : "88px" }}
     >
-      <div className="aspect-square overflow-hidden rounded-xl border border-neutral-700 bg-neutral-950/60">
+      <div className="aspect-square overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {imageUrl ? (
           <img src={imageUrl} alt={nikke.name} draggable={false} className="h-full w-full object-cover" />
@@ -212,7 +212,7 @@ export function renderDragOverlayCard(nikke: NikkeRow | undefined, imageUrl: str
           <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
         )}
       </div>
-      <div className="mt-1 min-h-[2.5rem] text-center text-[11px] leading-tight text-neutral-100">
+      <div className="mt-1 min-h-[2.5rem] text-center text-[11px] leading-tight text-[var(--text)]">
         {formatNikkeDisplayName(nikke.name)}
       </div>
     </div>

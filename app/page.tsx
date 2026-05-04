@@ -1576,6 +1576,10 @@ export default function Page() {
     document.body.dataset.theme = themeMode;
     document.documentElement.classList.toggle("dark", themeMode === "dark");
     document.body.classList.toggle("dark", themeMode === "dark");
+    document.documentElement.classList.toggle("theme-light", themeMode === "light");
+    document.documentElement.classList.toggle("theme-dark", themeMode === "dark");
+    document.body.classList.toggle("theme-light", themeMode === "light");
+    document.body.classList.toggle("theme-dark", themeMode === "dark");
   }, [themeMode]);
 
   // 로그인 유저 추적
@@ -4039,7 +4043,7 @@ export default function Page() {
     <div suppressHydrationWarning className={`theme-${themeMode} ${themeMode === "dark" ? "dark" : ""} min-h-screen bg-[var(--bg)] text-[var(--text)]`}>
       <div className="mx-auto max-w-xl px-4 pb-10 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
         {/* Header */}
-        <div className="sticky top-0 z-10 -mx-4 mb-4 bg-neutral-950/90 px-4 py-3.5 backdrop-blur lg:-mx-8 lg:px-8 lg:py-4">
+        <div className="sticky top-0 z-10 -mx-4 mb-4 bg-[var(--bg)] px-4 py-3.5 backdrop-blur lg:-mx-8 lg:px-8 lg:py-4">
           <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-6">
             <div className="flex flex-col items-start">
               <Link
@@ -4055,8 +4059,8 @@ export default function Page() {
                   <img src="/logo-black.png" alt="니케 솔로레이드 덱 도우미" className="block h-16 w-auto object-contain dark:hidden lg:h-20" />
                 </div>
               </Link>
-              <div className="mt-1.5 pl-1 text-xs leading-5 text-neutral-400 lg:text-sm">
-                <h1 className="font-medium text-neutral-300">니케 솔로레이드 덱 도우미 사이트</h1>
+              <div className="mt-1.5 pl-1 text-xs leading-5 text-[var(--muted)] lg:text-sm">
+                <h1 className="font-medium text-[var(--theme-text-soft)]">니케 솔로레이드 덱 도우미 사이트</h1>
                 <p>니케 솔로레이드 덱을 자동으로 계산하고 최적 조합을 추천하는 도우미입니다.</p>
               </div>
             </div>
@@ -4065,7 +4069,7 @@ export default function Page() {
               <button
                 onClick={() => navigateToTab("home")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
-                  tab === "home" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                  tab === "home" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
                 }`}
               >
                 <HomeIcon active={tab === "home"} />
@@ -4075,7 +4079,7 @@ export default function Page() {
               <button
                 onClick={() => navigateToTab("saved")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
-                  tab === "saved" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                  tab === "saved" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
                 }`}
               >
                 <SaveIcon active={tab === "saved"} />
@@ -4085,7 +4089,7 @@ export default function Page() {
               <button
                 onClick={() => navigateToTab("recommend")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
-                  tab === "recommend" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                  tab === "recommend" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
                 }`}
               >
                 <RecommendIcon active={tab === "recommend"} />
@@ -4095,7 +4099,7 @@ export default function Page() {
               <button
                 onClick={() => navigateToTab("imaginary")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
-                  tab === "imaginary" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                  tab === "imaginary" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
                 }`}
               >
                 <DeckBuildingIcon active={tab === "imaginary"} />
@@ -4105,7 +4109,7 @@ export default function Page() {
               <button
                 onClick={() => navigateToTab("usage")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
-                  tab === "usage" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                  tab === "usage" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
                 }`}
               >
                 <UsageIcon active={tab === "usage"} />
@@ -4116,7 +4120,7 @@ export default function Page() {
                 <button
                   onClick={() => navigateToTab("calculator")}
                   className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
-                    tab === "calculator" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                    tab === "calculator" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
                   }`}
                 >
                   <CalculatorIcon active={tab === "calculator"} />
@@ -4127,7 +4131,7 @@ export default function Page() {
               <button
                 onClick={() => navigateToTab("settings")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
-                  tab === "settings" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                  tab === "settings" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
                 }`}
               >
                 <NikkeManagementIcon active={tab === "settings"} />
@@ -4137,7 +4141,7 @@ export default function Page() {
               <button
                 onClick={() => navigateToTab("contact")}
                 className={`flex min-w-0 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
-                  tab === "contact" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
+                  tab === "contact" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
                 }`}
               >
                 <ContactIcon active={tab === "contact"} />

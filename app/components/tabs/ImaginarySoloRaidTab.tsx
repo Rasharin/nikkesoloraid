@@ -110,7 +110,7 @@ function SortableDeckDraft({ deck, deckIndex, children }: SortableDeckDraftProps
     >
       <button
         type="button"
-        className="absolute right-2 top-2 z-10 grid h-7 w-7 touch-none place-items-center rounded-lg border border-neutral-700 bg-neutral-950/80 text-neutral-300 transition hover:border-neutral-500 active:scale-[0.98]"
+        className="absolute right-2 top-2 z-10 grid h-7 w-7 touch-none place-items-center rounded-lg border border-[var(--border)] bg-[var(--card)] text-[var(--theme-text-soft)] transition hover:border-[var(--theme-border-strong)] active:scale-[0.98]"
         aria-label="Reorder deck"
         title="Reorder deck"
         {...attributes}
@@ -394,12 +394,12 @@ function SpareSlot({ index, name, nikke, imageUrl, activeDrag, hovered, canDrop,
       ? "border-cyan-300/90 bg-cyan-400/10 ring-2 ring-cyan-300/60 shadow-[0_0_0_1px_rgba(103,232,249,0.35)]"
       : "border-red-400/80 bg-red-400/10 ring-2 ring-red-400/45 shadow-[0_0_0_1px_rgba(248,113,113,0.28)]"
     : isDragging
-      ? "border-white/20 bg-neutral-950/20 shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+      ? "border-[var(--theme-border-strong)] bg-[var(--card)] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
       : "border-neutral-800";
 
   return (
     <div ref={setRefs} style={style} className="relative isolate min-w-0 transition-transform">
-      <div className={`relative aspect-square w-full overflow-hidden rounded-2xl border bg-neutral-950/40 transition-all duration-150 ${stateClass}`}>
+      <div className={`relative aspect-square w-full overflow-hidden rounded-2xl border bg-[var(--card)] transition-all duration-150 ${stateClass}`}>
         {isFilled ? (
           <button
             type="button"
@@ -917,7 +917,7 @@ export default function ImaginarySoloRaidTab({
 
   function renderSpareSlots() {
     return (
-      <section className="rounded-2xl border border-neutral-800 bg-neutral-950/30 p-2.5">
+      <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-2.5">
         <div className="grid grid-cols-5 gap-2">
           {spareSlots.map((name, index) => {
             const nikke = name ? effectiveNikkeMap.get(name) : undefined;
@@ -973,7 +973,7 @@ export default function ImaginarySoloRaidTab({
 
   function renderRecommendedDeckCard(deck: Deck) {
     return (
-      <div key={deck.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-2">
+      <div key={deck.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-2">
         <div className="grid min-w-0 grid-cols-5 gap-1.5">
           {deck.chars.map((name, slotIndex) => {
             const nikke = effectiveNikkeMap.get(name);
@@ -1054,7 +1054,7 @@ export default function ImaginarySoloRaidTab({
 
             return (
               <div key={`${deck.id}-${index}-${name ?? "empty"}`} className="min-w-0">
-                <div className="aspect-square overflow-hidden rounded-xl border border-neutral-700 bg-neutral-950/60">
+                <div className="aspect-square overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]">
                   {imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={imageUrl} alt={name ?? ""} draggable={false} className="h-full w-full object-cover" />
@@ -1083,7 +1083,7 @@ export default function ImaginarySoloRaidTab({
     const bottomDecks = best.picked.slice(3, 5);
 
     return (
-      <section className="rounded-3xl border border-neutral-800 bg-neutral-900/50 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
+      <section className="rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
         <div className="flex items-center gap-3">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold">내 추천 조합</h2>
@@ -1104,10 +1104,10 @@ export default function ImaginarySoloRaidTab({
         </div>
 
         {recommendedOpen ? (
-        <div className="mt-4 rounded-2xl bg-neutral-950/40 p-3">
+        <div className="mt-4 rounded-2xl bg-[var(--card)] p-3">
           {canRecommend ? (
             <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-800 bg-neutral-900/70 px-3 py-2">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--theme-panel)] px-3 py-2">
                 <div className="text-sm font-semibold text-neutral-300">총합</div>
                 <div className="text-2xl font-bold tabular-nums">{displayScore(best.total)}</div>
               </div>
@@ -1121,7 +1121,7 @@ export default function ImaginarySoloRaidTab({
                   <button
                     type="button"
                     onClick={copyRecommendedDecksToBuilder}
-                    className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
+                    className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
                   >
                     덱 복사
                   </button>
@@ -1381,7 +1381,7 @@ export default function ImaginarySoloRaidTab({
 
         <div className={wideLayoutGridClass}>
         <div className={wideDeckLayout ? "order-1 flex flex-wrap items-center justify-end gap-2 lg:col-span-2" : "order-1 flex flex-wrap items-center justify-end gap-2"}>
-          <div className="flex h-10 items-center gap-2 rounded-2xl border border-neutral-800 bg-neutral-950/50 px-3 text-xs font-medium text-neutral-300 sm:text-sm">
+          <div className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 text-xs font-medium text-[var(--theme-text-soft)] sm:text-sm">
             <span className="whitespace-nowrap text-neutral-400">점수 표기</span>
             <span className={`whitespace-nowrap ${scoreDisplayMode === "eok" ? "text-neutral-100" : "text-neutral-500"}`}>
               00억
@@ -1392,7 +1392,7 @@ export default function ImaginarySoloRaidTab({
               aria-checked={scoreDisplayMode === "number"}
               aria-label="점수 표기 방법 변경"
               onClick={() => onScoreDisplayModeChange(scoreDisplayMode === "eok" ? "number" : "eok")}
-              className="relative h-6 w-11 shrink-0 rounded-full border border-neutral-700 bg-neutral-900 transition hover:border-neutral-500 active:scale-[0.98]"
+              className="relative h-6 w-11 shrink-0 rounded-full border border-[var(--border)] bg-[var(--theme-panel)] transition hover:border-[var(--theme-border-strong)] active:scale-[0.98]"
             >
               <span
                 className={`score-mode-toggle-thumb absolute left-1 top-1 h-4 w-4 rounded-full bg-neutral-100 shadow transition-transform ${
@@ -1407,18 +1407,18 @@ export default function ImaginarySoloRaidTab({
           <button
             type="button"
             onClick={() => setWideDeckLayout((prev) => !prev)}
-            className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm font-semibold text-neutral-100 transition hover:border-neutral-500 active:scale-[0.99]"
+            className="rounded-2xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:border-[var(--theme-border-strong)] active:scale-[0.99]"
           >
             가로세로 변경
           </button>
         </div>
 
-        <section ref={deckSectionRef} className={`${wideDeckLayout ? `order-3 self-start lg:order-3 ${deckOpen ? "p-4" : "p-2"}` : "order-3 p-4"} rounded-3xl border border-neutral-800 bg-neutral-900/50 shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}>
+        <section ref={deckSectionRef} className={`${wideDeckLayout ? `order-3 self-start lg:order-3 ${deckOpen ? "p-4" : "p-2"}` : "order-3 p-4"} rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}>
           {wideDeckLayout && !deckOpen ? (
             <button
               type="button"
               onClick={() => setDeckOpen(true)}
-              className="flex min-h-[160px] w-full flex-col items-center justify-start gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/30 px-2 py-3 text-neutral-200 transition hover:border-neutral-600 active:scale-[0.99]"
+              className="flex min-h-[160px] w-full flex-col items-center justify-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-2 py-3 text-[var(--text)] transition hover:border-[var(--theme-border-strong)] active:scale-[0.99]"
               aria-label="덱 만들기 펼치기"
             >
               <span className="text-base leading-none text-neutral-400">&lt;</span>
@@ -1445,14 +1445,14 @@ export default function ImaginarySoloRaidTab({
               {deckOpen ? (
                 <>
                   {selectedDeckDraftIds.size > 0 ? (
-                    <div className="rounded-2xl border border-yellow-400/40 bg-yellow-400/10 px-4 py-2 text-sm font-semibold text-yellow-100">
+                    <div className="rounded-2xl border border-yellow-400/40 bg-yellow-400/10 px-4 py-2 text-sm font-semibold text-[var(--text)]">
                       선택 합계 {displayScore(selectedDeckScoreTotal)}
                     </div>
                   ) : null}
                   <button
                     type="button"
                     onClick={() => void handleSaveAllDecks()}
-                    className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 active:scale-[0.99]"
+                    className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-[var(--text)] active:scale-[0.99]"
                   >
                     점수 반영
                   </button>
@@ -1462,7 +1462,7 @@ export default function ImaginarySoloRaidTab({
                 <button
                   type="button"
                   onClick={resetDeckBuilder}
-                  className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-100 active:scale-[0.99]"
+                  className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-[var(--text)] active:scale-[0.99]"
                 >
                   초기화
                 </button>
@@ -1471,7 +1471,7 @@ export default function ImaginarySoloRaidTab({
                 <button
                   type="button"
                   onClick={addDeckDraft}
-                  className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm font-semibold text-neutral-100 active:scale-[0.99]"
+                  className="rounded-2xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text)] active:scale-[0.99]"
                 >
                   덱 추가
                 </button>
@@ -1486,8 +1486,8 @@ export default function ImaginarySoloRaidTab({
                       onClick={() => switchDeckBuilderPage(page.id)}
                       className={`grid h-8 min-w-8 place-items-center rounded-xl border px-2 text-sm font-semibold tabular-nums transition active:scale-[0.99] ${
                         page.id === activeDeckPageId
-                          ? "border-cyan-400/60 bg-cyan-400/15 text-cyan-100"
-                          : "border-neutral-700 text-neutral-200 hover:border-neutral-500"
+                          ? "border-cyan-400/60 bg-cyan-400/15 text-[var(--text)]"
+                          : "border-[var(--border)] text-[var(--text)] hover:border-[var(--theme-border-strong)]"
                       }`}
                       aria-label={`덱 만들기 ${pageIndex + 1}페이지`}
                     >
@@ -1497,7 +1497,7 @@ export default function ImaginarySoloRaidTab({
                   <button
                     type="button"
                     onClick={addDeckBuilderPage}
-                    className="grid h-8 min-w-8 place-items-center rounded-xl border border-neutral-700 px-2 text-sm font-semibold text-neutral-100 transition hover:border-neutral-500 active:scale-[0.99]"
+                    className="grid h-8 min-w-8 place-items-center rounded-xl border border-[var(--border)] px-2 text-sm font-semibold text-[var(--text)] transition hover:border-[var(--theme-border-strong)] active:scale-[0.99]"
                     aria-label="덱 만들기 페이지 추가"
                     title="페이지 추가"
                   >
@@ -1506,7 +1506,7 @@ export default function ImaginarySoloRaidTab({
                   <button
                     type="button"
                     onClick={removeActiveDeckBuilderPage}
-                    className="grid h-8 min-w-8 place-items-center rounded-xl border border-neutral-700 px-2 text-sm font-semibold text-neutral-100 transition hover:border-red-400/70 hover:text-red-100 active:scale-[0.99]"
+                    className="grid h-8 min-w-8 place-items-center rounded-xl border border-[var(--border)] px-2 text-sm font-semibold text-[var(--text)] transition hover:border-red-400/70 active:scale-[0.99]"
                     aria-label="현재 덱 만들기 페이지 삭제"
                     title="현재 페이지 삭제"
                   >
@@ -1541,7 +1541,7 @@ export default function ImaginarySoloRaidTab({
                       onDeleteDeck={() => removeDeckDraft(deckIndex)}
                       selected={selectedDeckDraftIds.has(deck.id)}
                       onToggleSelected={() => toggleDeckDraftSelected(deck.id)}
-                      className="border-neutral-800 bg-neutral-950/30 p-1.5 shadow-none"
+                      className="border-[var(--border)] bg-[var(--card)] p-1.5 shadow-none"
                     />
                   </SortableDeckDraft>
                 ))}
@@ -1556,13 +1556,13 @@ export default function ImaginarySoloRaidTab({
         <section
           ref={nikkeSectionRef}
           style={nikkeSectionStyle}
-          className={`${wideDeckLayout ? `order-2 self-start lg:order-2 lg:h-[var(--deck-section-height)] lg:overflow-hidden ${nikkeOpen ? "p-5" : "p-2"}` : "order-2 p-5"} flex min-h-0 flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}
+          className={`${wideDeckLayout ? `order-2 self-start lg:order-2 lg:h-[var(--deck-section-height)] lg:overflow-hidden ${nikkeOpen ? "p-5" : "p-2"}` : "order-2 p-5"} flex min-h-0 flex-col rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}
         >
           {wideDeckLayout && !nikkeOpen ? (
             <button
               type="button"
               onClick={() => setNikkeOpen(true)}
-              className="flex h-full min-h-[160px] w-full flex-col items-center justify-start gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/30 px-2 py-3 text-neutral-200 transition hover:border-neutral-600 active:scale-[0.99]"
+              className="flex h-full min-h-[160px] w-full flex-col items-center justify-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-2 py-3 text-[var(--text)] transition hover:border-[var(--theme-border-strong)] active:scale-[0.99]"
               aria-label="니케 선택 펼치기"
             >
               <span className="text-base leading-none text-neutral-400">&gt;</span>
@@ -1585,7 +1585,7 @@ export default function ImaginarySoloRaidTab({
                   </button>
                 ) : null}
               </div>
-              <div className="mt-2 flex items-center rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4">
+              <div className="mt-2 flex items-center rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4">
                 <input
                   value={nikkeSearch}
                   onChange={(event) => setNikkeSearch(event.target.value)}
@@ -1596,7 +1596,7 @@ export default function ImaginarySoloRaidTab({
                     }
                   }}
                   placeholder="니케 이름 검색"
-                  className="flex-1 bg-transparent py-2.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-500"
+                  className="flex-1 bg-transparent py-2.5 text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
                 />
 
                 <button
@@ -1639,7 +1639,7 @@ export default function ImaginarySoloRaidTab({
               <button
                 type="button"
                 onClick={onResetSelected}
-                className="rounded-xl border border-white/30 px-3 py-2 text-sm text-white hover:bg-white/10 active:scale-[0.99]"
+                className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-[var(--text)] hover:bg-[var(--card)] active:scale-[0.99]"
               >
                 리스트 초기화
               </button>
@@ -1655,7 +1655,7 @@ export default function ImaginarySoloRaidTab({
                 ref={setSelectedTrashRefs}
                 className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition ${
                   selectedTrashOver && activeDrag?.source === "selected"
-                    ? "border-red-300 bg-red-500/25 text-red-100 ring-2 ring-red-300/40"
+                    ? "border-red-300 bg-red-500/25 text-[var(--text)] ring-2 ring-red-300/40"
                     : "border-red-500/40 bg-red-500/10 text-red-300 hover:border-red-400 hover:bg-red-500/15"
                 }`}
                 title="니케 선택에서 제거"

@@ -52,7 +52,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('soloraid_theme_mode_v1')||localStorage.getItem('theme');if(t!=='light'&&t!=='dark')t='dark';document.documentElement.dataset.theme=t;document.documentElement.classList.toggle('dark',t==='dark');}catch(e){}",
+              "try{var t=localStorage.getItem('soloraid_theme_mode_v1')||localStorage.getItem('theme');if(t!=='light'&&t!=='dark')t='dark';var e=document.documentElement;e.dataset.theme=t;e.classList.toggle('dark',t==='dark');e.classList.toggle('theme-light',t==='light');e.classList.toggle('theme-dark',t==='dark');}catch(e){}",
           }}
         />
       </head>

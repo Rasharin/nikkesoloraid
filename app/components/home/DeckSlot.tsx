@@ -51,8 +51,8 @@ export default function DeckSlot({
       ? "border-cyan-300/90 bg-cyan-400/10 ring-2 ring-cyan-300/60 shadow-[0_0_0_1px_rgba(103,232,249,0.35)]"
       : "border-red-400/80 bg-red-400/10 ring-2 ring-red-400/45 shadow-[0_0_0_1px_rgba(248,113,113,0.28)]"
     : isDragging
-      ? "border-white/20 bg-neutral-950/20 shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
-      : "border-neutral-800";
+      ? "border-[var(--theme-border-strong)] bg-[var(--card)] shadow-[0_10px_24px_rgba(0,0,0,0.18)]"
+      : "border-[var(--border)]";
 
   return (
     <div
@@ -63,7 +63,7 @@ export default function DeckSlot({
       data-slot-index={index}
       className={`relative isolate flex min-w-0 flex-col items-center ${showDropHint && canDrop ? "z-10" : ""}`}
     >
-      <div className={`relative aspect-square w-full overflow-hidden rounded-2xl border bg-neutral-950/40 transition-all duration-150 ${dropStateClass}`}>
+      <div className={`relative aspect-square w-full overflow-hidden rounded-2xl border bg-[var(--card)] transition-all duration-150 ${dropStateClass}`}>
         {isFilled ? (
           <button
             type="button"
@@ -85,7 +85,7 @@ export default function DeckSlot({
       </div>
 
       {name ? (
-        <div className="mt-0.5 w-full truncate text-center text-[10px] leading-none text-neutral-200">
+        <div className="mt-0.5 w-full truncate text-center text-[10px] leading-none text-[var(--theme-text-soft)]">
           {formatNikkeDisplayName(name)}
         </div>
       ) : null}
