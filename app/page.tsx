@@ -4050,7 +4050,7 @@ export default function Page() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icon.png" alt="니케 솔로레이드 덱 도우미" className="hidden h-16 w-auto object-contain dark:block lg:h-20" />
+                  <img src="/logo-light.png" alt="니케 솔로레이드 덱 도우미" className="hidden h-16 w-auto object-contain dark:block lg:h-20" />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/logo-black.png" alt="니케 솔로레이드 덱 도우미" className="block h-16 w-auto object-contain dark:hidden lg:h-20" />
                 </div>
