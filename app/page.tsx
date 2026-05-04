@@ -415,7 +415,7 @@ function readCachedSupabaseData(): SupabaseDataCache | null {
   if (typeof window === "undefined") return null;
 
   try {
-    const raw = sessionStorage.getItem(SUPABASE_DATA_CACHE_KEY);
+    const raw = localStorage.getItem(SUPABASE_DATA_CACHE_KEY) ?? sessionStorage.getItem(SUPABASE_DATA_CACHE_KEY);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw) as Partial<SupabaseDataCache>;
@@ -437,7 +437,9 @@ function writeCachedSupabaseData(cache: SupabaseDataCache) {
   if (typeof window === "undefined") return;
 
   try {
-    sessionStorage.setItem(SUPABASE_DATA_CACHE_KEY, JSON.stringify(cache));
+    const serializedCache = JSON.stringify(cache);
+    localStorage.setItem(SUPABASE_DATA_CACHE_KEY, serializedCache);
+    sessionStorage.setItem(SUPABASE_DATA_CACHE_KEY, serializedCache);
   } catch {}
 }
 
@@ -1670,6 +1672,7 @@ export default function Page() {
     let cancelled = false;
 
     async function loadRecommendedVideo() {
+      if (tab !== "recommend" && tab !== "mypage") return;
       try {
         const nextUrl = await fetchRecommendedVideoUrl();
         if (!cancelled) {
@@ -1694,6 +1697,7 @@ export default function Page() {
     let cancelled = false;
 
     async function loadRecommendedNikkes() {
+      if (tab !== "settings" && tab !== "mypage") return;
       try {
         const nextNames = await fetchRecommendedNikkeNames();
         if (!cancelled) {
@@ -1712,12 +1716,13 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tab]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadLegalTexts() {
+      if (!isLegalPage && tab !== "mypage") return;
       try {
         const nextTexts = await fetchLegalTexts();
         if (cancelled) return;
@@ -1736,12 +1741,13 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isLegalPage, tab]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadSoloRaidTips() {
+      if (tab !== "recommend") return;
       if (!activeRaidKey) {
         setSoloRaidTips([]);
         return;
@@ -1781,7 +1787,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [activeRaidKey, userId]);
+  }, [activeRaidKey, tab, userId]);
 
   useEffect(() => {
     if (!authResolved) return;
@@ -1834,6 +1840,7 @@ export default function Page() {
     let cancelled = false;
 
     async function loadContactInquiries() {
+      if (tab !== "mypage") return;
       if (process.env.NODE_ENV !== "production" && !userId) {
         if (!cancelled) {
           setContactInquiries(loadLocalContactInquiries().sort((a, b) => b.createdAt - a.createdAt));
@@ -1872,12 +1879,13 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [isMasterUser, userId]);
+  }, [isMasterUser, tab, userId]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadUsagePosts() {
+      if (tab !== "usage") return;
       setLoadingUsagePosts(true);
       try {
         const posts = await fetchUsagePosts(usageBoardTab);
@@ -1902,7 +1910,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [usageBoardTab]);
+  }, [tab, usageBoardTab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2103,6 +2111,7 @@ export default function Page() {
     let cancelled = false;
 
     async function loadRecommendedDeckSnapshots() {
+      if (tab !== "home" && tab !== "recommend" && tab !== "imaginary" && tab !== "mypage") return;
       const targetRaidKeys = deckTabs
         .map((tab) => tab.key)
         .filter((raidKey) => raidKey.toLowerCase() !== "test");
@@ -2136,7 +2145,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [deckTabs]);
+  }, [deckTabs, tab]);
 
   useEffect(() => {
     if (!selectedNamesReady) return;
@@ -2178,10 +2187,20 @@ export default function Page() {
       let nextBosses = bosses;
       const bossSource = (forceSoloRaidActive ?? soloRaidActive) ? "bosses" : "boss_default";
 
-      const { data: nikkeData, error: nikkeErr } = await supabase
-        .from("nikkes")
-        .select("id,name,image_path,created_at,burst,element,role,aliases")
-        .order("name", { ascending: true });
+      const [nikkeResult, bossResult] = await Promise.all([
+        supabase
+          .from("nikkes")
+          .select("id,name,image_path,created_at,burst,element,role,aliases")
+          .order("name", { ascending: true }),
+        supabase
+          .from(bossSource)
+          .select("id,title,description,image_path,starts_at,ends_at,created_at")
+          .order("created_at", { ascending: false })
+          .limit(20),
+      ]);
+
+      const { data: nikkeData, error: nikkeErr } = nikkeResult;
+      const { data: bossData, error: bossErr } = bossResult;
 
       if (nikkeErr) {
         console.error(nikkeErr);
@@ -2190,12 +2209,6 @@ export default function Page() {
         nextNikkes = normalizeNikkeRows(nikkeData);
         setnikkes(nextNikkes);
       }
-
-      const { data: bossData, error: bossErr } = await supabase
-        .from(bossSource)
-        .select("id,title,description,image_path,starts_at,ends_at,created_at")
-        .order("created_at", { ascending: false })
-        .limit(20);
 
       if (bossErr) {
         console.error(bossErr);
@@ -2231,6 +2244,13 @@ export default function Page() {
   // initial fetch
   useEffect(() => {
     if (!appConfigLoaded) return;
+    const cached = readCachedSupabaseData();
+    const bossSource = soloRaidActive ? "bosses" : "boss_default";
+    if (cached && cached.bossSource === bossSource && cached.nikkes.length > 0) {
+      setLoadingData(false);
+      return;
+    }
+
     refreshSupabase();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appConfigLoaded, soloRaidActive]);
@@ -2318,6 +2338,7 @@ export default function Page() {
     let cancelled = false;
 
     async function loadCommunityRaidDecks() {
+      if (tab !== "home" && tab !== "recommend" && tab !== "imaginary") return;
       if (!currentDeckRaidKey) {
         setCommunityRaidDecks([]);
         setLoadingCommunityRaidDecks(false);
@@ -2348,7 +2369,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [currentDeckRaidKey, decks]);
+  }, [currentDeckRaidKey, tab]);
   const recommendedDecks = useMemo(() => {
     const grouped = new Map<string, { chars: string[]; totalScore: number; usedCount: number }>();
 
