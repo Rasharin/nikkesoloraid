@@ -253,7 +253,7 @@ const USAGE_BOARD_TABS: ReadonlyArray<{ key: UsageBoardCategoryKey; label: strin
   { key: "saved", label: "저장된 덱" },
   { key: "recommend", label: "추천" },
   { key: "deck-building", label: "덱 빌딩" },
-  { key: "settings", label: "설정" },
+  { key: "settings", label: "니케 관리" },
 ];
 
 // -------------------- Constants --------------------
@@ -1156,21 +1156,10 @@ function RecommendIcon({ active }: { active: boolean }) {
   );
 }
 
-function ImaginaryIcon({ active }: { active: boolean }) {
+function DeckBuildingIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <path
-        d="M12 3.5c2.8 2.2 4.2 4.6 4.2 7.2A4.2 4.2 0 0 1 12 15a4.2 4.2 0 0 1-4.2-4.3C7.8 8.1 9.2 5.7 12 3.5Z"
-        stroke={active ? "white" : "#a3a3a3"}
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6 20c1.3-2 3.3-3 6-3s4.7 1 6 3"
-        stroke={active ? "white" : "#a3a3a3"}
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
+      <path d="M4 5h6v6H4V5ZM14 5h6v6h-6V5ZM4 15h6v4H4v-4ZM14 15h6v4h-6v-4Z" stroke={active ? "white" : "#a3a3a3"} strokeWidth="2" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -1185,16 +1174,16 @@ function CalculatorIcon({ active }: { active: boolean }) {
   );
 }
 
-function GearIcon({ active }: { active: boolean }) {
+function NikkeManagementIcon({ active }: { active: boolean }) {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-      <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke={active ? "white" : "#a3a3a3"} strokeWidth="2" />
       <path
-        d="M19.4 15a7.9 7.9 0 0 0 .1-6l-2.1.2a6.2 6.2 0 0 0-1.3-1.3l.2-2.1a7.9 7.9 0 0 0-6-.1l.2 2.1a6.2 6.2 0 0 0-1.3 1.3L7 9a7.9 7.9 0 0 0-.1 6l2.1-.2c.4.5.8 1 1.3 1.3l-.2 2.1a7.9 7.9 0 0 0 6 .1l-.2-2.1c.5-.4 1-.8 1.3-1.3l2.2.2Z"
+        d="M12 3.5c2.8 2.2 4.2 4.6 4.2 7.2A4.2 4.2 0 0 1 12 15a4.2 4.2 0 0 1-4.2-4.3C7.8 8.1 9.2 5.7 12 3.5Z"
         stroke={active ? "white" : "#a3a3a3"}
         strokeWidth="2"
         strokeLinejoin="round"
       />
+      <path d="M6 20c1.3-2 3.3-3 6-3s4.7 1 6 3" stroke={active ? "white" : "#a3a3a3"} strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -4074,7 +4063,7 @@ export default function Page() {
                   tab === "imaginary" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
                 }`}
               >
-                <ImaginaryIcon active={tab === "imaginary"} />
+                <DeckBuildingIcon active={tab === "imaginary"} />
                 <div>덱 빌딩</div>
               </button>
 
@@ -4106,8 +4095,8 @@ export default function Page() {
                   tab === "settings" ? "bg-white/6 text-white" : "text-neutral-400 hover:bg-white/4 hover:text-neutral-200"
                 }`}
               >
-                <GearIcon active={tab === "settings"} />
-                <div>설정</div>
+                <NikkeManagementIcon active={tab === "settings"} />
+                <div>니케 관리</div>
               </button>
 
               <button

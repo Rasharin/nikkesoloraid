@@ -49,13 +49,13 @@ function UsageBoardTabIcon({ tabKey, active }: { tabKey: string; active: boolean
   if (tabKey === "settings") {
     return (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke={stroke} strokeWidth="2" />
         <path
-          d="M19.4 15a7.9 7.9 0 0 0 .1-6l-2.1.2a6.2 6.2 0 0 0-1.3-1.3l.2-2.1a7.9 7.9 0 0 0-6-.1l.2 2.1a6.2 6.2 0 0 0-1.3 1.3L7 9a7.9 7.9 0 0 0-.1 6l2.1-.2c.4.5.8 1 1.3 1.3l-.2 2.1a7.9 7.9 0 0 0 6 .1l-.2-2.1c.5-.4 1-.8 1.3-1.3l2.2.2Z"
+          d="M12 3.5c2.8 2.2 4.2 4.6 4.2 7.2A4.2 4.2 0 0 1 12 15a4.2 4.2 0 0 1-4.2-4.3C7.8 8.1 9.2 5.7 12 3.5Z"
           stroke={stroke}
           strokeWidth="2"
           strokeLinejoin="round"
         />
+        <path d="M6 20c1.3-2 3.3-3 6-3s4.7 1 6 3" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
       </svg>
     );
   }

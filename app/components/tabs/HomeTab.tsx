@@ -1076,14 +1076,14 @@ export default function HomeTab({
                       onClick={onGoToSettings}
                       className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
                     >
-                      설정으로
+                      니케 추가
                     </button>
                   </div>
                 </div>
 
                 {effectiveSelectedNikkes.length === 0 ? (
                   <div className="mt-4 text-sm text-neutral-300">
-                    <span className="text-neutral-200">설정 탭</span>에서 최대 {maxSelected}개 선택 가능.
+                    <span className="text-neutral-200">니케 관리 탭</span>에서 최대 {maxSelected}개 선택 가능.
                   </div>
                 ) : (
                   <>
@@ -1128,14 +1128,14 @@ export default function HomeTab({
                     onClick={onGoToSettings}
                     className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
                   >
-                    설정으로
+                    니케 추가
                   </button>
                 </div>
               </div>
 
               {effectiveSelectedNikkes.length === 0 ? (
                 <div className="mt-3 text-sm text-neutral-300">
-                  <span className="text-neutral-200">설정 탭</span>에서 최대 {maxSelected}개 선택 가능.
+                  <span className="text-neutral-200">니케 관리 탭</span>에서 최대 {maxSelected}개 선택 가능.
                 </div>
               ) : (
                 <>

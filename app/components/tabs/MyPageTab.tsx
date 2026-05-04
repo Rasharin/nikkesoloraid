@@ -529,7 +529,7 @@ export default function MyPageTab({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium text-neutral-100">추천 니케</div>
-                  <div className="mt-1 text-xs text-neutral-400">설정 탭의 전체 니케 목록에서 사용하는 데이터와 연동됩니다.</div>
+                  <div className="mt-1 text-xs text-neutral-400">니케 관리 탭의 전체 니케 목록에서 사용하는 데이터와 연동됩니다.</div>
                 </div>
                 <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
                   {recommendedNikkes.length}개
