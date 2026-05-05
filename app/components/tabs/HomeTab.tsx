@@ -586,7 +586,7 @@ export default function HomeTab({
     return (
       <div key={deck.id} className={`rounded-2xl border border-neutral-800 bg-neutral-950/70 ${compact ? "p-2" : "p-2.5"}`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
-          <div className={`flex w-full min-w-0 items-start justify-between sm:w-auto sm:flex-none sm:justify-start ${compact ? "gap-1.5" : "gap-2"}`}>
+          <div className={`flex w-full min-w-0 items-start justify-between sm:w-auto sm:flex-none sm:justify-start ${compact ? "gap-1.5 2xl:gap-2" : "gap-2 2xl:gap-2.5"}`}>
             {deck.chars.map((name, slotIndex) => {
               const nikke = effectiveNikkeMap.get(name);
               const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
@@ -596,7 +596,7 @@ export default function HomeTab({
               return (
                 <div
                   key={`${deck.id}-${slotIndex}-${name}`}
-                  className={`min-w-0 shrink ${compact ? "w-[50px] sm:shrink-0" : "w-[58px] sm:shrink-0"}`}
+                  className={`min-w-0 shrink ${compact ? "w-[50px] sm:shrink-0 2xl:w-[62px]" : "w-[58px] sm:shrink-0 2xl:w-[72px]"}`}
                 >
                   <RecommendedDeckSlot
                     deckId={deck.id}

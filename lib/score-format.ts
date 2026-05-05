@@ -3,12 +3,13 @@ export type ScoreDisplayMode = "number" | "eok";
 const EOK_UNIT = 100_000_000;
 const MIN_EOK_DISPLAY = 10_000_000;
 const EOK_SUFFIX = "\uC5B5";
+const SCORE_GROUP_SEPARATOR_PATTERN = /[,，、]/g;
 
 export function parseScoreInput(input: string): number | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  const compact = trimmed.replaceAll(",", "").replace(/\s+/g, "");
+  const compact = trimmed.replace(SCORE_GROUP_SEPARATOR_PATTERN, "").replace(/\s+/g, "");
   if (!compact) return null;
 
   if (compact.includes(EOK_SUFFIX)) {
@@ -42,7 +43,7 @@ export function formatScore(score: number, mode: ScoreDisplayMode): string {
 export function formatPlainScoreText(input: string): string {
   if (input.includes(EOK_SUFFIX)) return input;
 
-  const withoutSpaces = input.replace(/\s+/g, "");
+  const withoutSpaces = input.replace(/\s+/g, "").replace(SCORE_GROUP_SEPARATOR_PATTERN, ",");
   if (/^[\d,]+(?:\.\d*)?$/.test(withoutSpaces) && withoutSpaces.endsWith(",")) {
     return withoutSpaces;
   }

@@ -96,7 +96,7 @@ function DeckBuilderSectionComponent({
                 onSaveDeck();
               }
             }}
-            placeholder="점수입력 (예: 6510755443 또는 23.3억)"
+            placeholder="점수입력 (예: 6,510,755,443 또는 23.3억)"
             className="w-full rounded-xl border border-[var(--border)] bg-[var(--theme-input)] px-3 py-2 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--theme-border-strong)]"
           />
         </div>

@@ -2246,14 +2246,27 @@ export default function Page() {
     if (offSeasonRaidKey && deckTabs.some((tab) => tab.key === offSeasonRaidKey)) {
       return offSeasonRaidKey;
     }
+    const firstLocalRaidKey = [...offSeasonDecks, ...decks].find((deck) => deckTabs.some((tab) => tab.key === deck.raidKey))?.raidKey;
+    if (firstLocalRaidKey) {
+      return firstLocalRaidKey;
+    }
     if (configuredActiveRaidKey && deckTabs.some((tab) => tab.key === configuredActiveRaidKey)) {
       return configuredActiveRaidKey;
     }
     return getNewestDeckTabKey(deckTabs) ?? DEFAULT_ACTIVE_RAID_KEY;
-  }, [activeRaidKey, configuredActiveRaidKey, deckTabs, offSeasonRaidKey, soloRaidActive]);
+  }, [activeRaidKey, configuredActiveRaidKey, deckTabs, decks, offSeasonDecks, offSeasonRaidKey, soloRaidActive]);
   const savedDeckSource = useMemo(() => {
     if (soloRaidActive) return decks;
-    return userId ? decks : offSeasonDecks;
+    if (!userId) {
+      const seen = new Set<string>();
+      return [...offSeasonDecks, ...decks].filter((deck) => {
+        const key = getDeckSignature(deck);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+    return offSeasonDecks;
   }, [decks, offSeasonDecks, soloRaidActive, userId]);
   const editableDecks = useMemo(() => (soloRaidActive ? decks : offSeasonDecks), [decks, offSeasonDecks, soloRaidActive]);
   const activeRaidDecks = useMemo(
@@ -2332,7 +2345,7 @@ export default function Page() {
     if (recommendedDecks.length > 0) return recommendedDecks;
     return [...(recommendedDeckSnapshots[currentDeckRaidKey]?.decks ?? [])].sort(compareRecommendedDecksByScore);
   }, [currentDeckRaidKey, recommendedDeckSnapshots, recommendedDecks]);
-  const best = useMemo(() => pickBest5(activeRaidDecks), [activeRaidDecks]);
+  const best = useMemo(() => pickBest5(activeRaidDecks, { minScore: 0 }), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
   const activeRaidLabel = useMemo(
     () => deckTabs.find((deckTab) => deckTab.key === currentDeckRaidKey)?.label ?? currentDeckRaidKey ?? "",
@@ -2646,11 +2659,6 @@ export default function Page() {
   }
 
   async function updateDeckScore(id: string, scoreText: string) {
-    if (!soloRaidActive) {
-      showToast("현재 진행 중인 솔로레이드가 없어");
-      return false;
-    }
-
     const sc = parseScoreInput(scoreText);
     if (sc === null || !Number.isFinite(sc) || sc <= 0) {
       showToast("점수는 숫자 또는 00.0억 형식으로 입력해줘.");
@@ -2883,17 +2891,12 @@ export default function Page() {
   async function submitDeckFromHome(payload: { draft: string[]; scoreText: string; editingId: string | null }) {
     const { draft, scoreText, editingId } = payload;
 
-    if (!soloRaidActive) {
-      showToast("현재 진행 중인 솔로레이드가 없어");
-      return false;
-    }
-
     if (draft.length !== MAX_DECK_CHARS) {
       showToast("니케 5명을 먼저 골라줘.");
       return false;
     }
     if (!currentDeckRaidKey) {
-      showToast("현재 진행 중인 솔로레이드가 없어");
+      showToast("저장할 레이드 탭을 찾을 수 없어");
       return false;
     }
 
@@ -2930,11 +2933,18 @@ export default function Page() {
         showToast("덱 저장 완료");
       } else if (editingId) {
         const updateLocalDecks = (prev: Deck[]) => {
-          const next = prev.map((deck) => (
-            deck.id === editingId
-              ? { ...deck, raidKey: currentDeckRaidKey, deckKey: buildDeckKey(draft), chars: [...draft], score: sc }
-              : deck
-          ));
+          const targetExists = prev.some((deck) => deck.id === editingId);
+          const updatedDeck: Deck = {
+            id: targetExists ? editingId : createLocalDeckId(),
+            raidKey: currentDeckRaidKey,
+            deckKey: buildDeckKey(draft),
+            chars: [...draft],
+            score: sc,
+            createdAt: targetExists ? prev.find((deck) => deck.id === editingId)?.createdAt ?? Date.now() : Date.now(),
+          };
+          const next = targetExists
+            ? prev.map((deck) => (deck.id === editingId ? updatedDeck : deck))
+            : [updatedDeck, ...prev];
           if (soloRaidActive) {
             saveLocalDecks(next);
           } else {
@@ -2985,11 +2995,6 @@ export default function Page() {
   }
 
   async function submitBulkFromHome(text: string) {
-    if (!soloRaidActive) {
-      showToast("현재 진행 중인 솔로레이드가 없어");
-      return false;
-    }
-
     const parsed = parseBulk(text)
       .map((entry) => {
         const chars = resolveDeckChars(entry.chars, nikkeNameLookup);
@@ -3002,7 +3007,7 @@ export default function Page() {
       return false;
     }
     if (!currentDeckRaidKey) {
-      showToast("현재 진행 중인 솔로레이드가 없어");
+      showToast("저장할 레이드 탭을 찾을 수 없어");
       return false;
     }
 
@@ -4244,7 +4249,7 @@ export default function Page() {
                 boss={boss}
                 bosses={bosses}
                 decksCount={activeRaidDecks.length}
-                canRecommend={soloRaidActive && canRecommend}
+                canRecommend={canRecommend}
                 best={best}
                 fmt={fmt}
                 getPublicUrl={getPublicUrl}

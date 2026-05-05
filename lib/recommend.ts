@@ -113,9 +113,13 @@ export async function getSubmasterDecks(userId: string, raidKey?: string | null)
 }
 
 /** Character-unique decks, maximizing total score for the largest possible count up to five. */
-export function pickBest5<T extends { chars: string[]; score: number }>(decks: readonly T[]): { picked: T[]; total: number } {
+export function pickBest5<T extends { chars: string[]; score: number }>(
+  decks: readonly T[],
+  options: { minScore?: number } = {}
+): { picked: T[]; total: number } {
+  const minScore = options.minScore ?? MIN_RECOMMENDED_DECK_SCORE;
   const clean = decks
-    .filter((deck) => deck.chars.length === MAX_DECK_CHARS && Number.isFinite(deck.score) && deck.score > MIN_RECOMMENDED_DECK_SCORE)
+    .filter((deck) => deck.chars.length === MAX_DECK_CHARS && Number.isFinite(deck.score) && deck.score > minScore)
     .map((deck) => ({ deck, set: deckCharSet(deck.chars) }))
     .sort((a, b) => b.deck.score - a.deck.score);
 
