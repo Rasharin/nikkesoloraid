@@ -65,6 +65,7 @@ type RecommendTabProps = {
   raidKey: string;
   deckTabs: readonly RecommendTabItem[];
   recommendDeckTab: string;
+  soloRaidActive: boolean;
   onRecommendDeckTabChange: (key: string) => void;
   recommendedDecks: RecommendedDeck[];
   loadingRecommendedDecks: boolean;
@@ -89,6 +90,7 @@ export default function RecommendTab({
   raidKey,
   deckTabs,
   recommendDeckTab,
+  soloRaidActive,
   onRecommendDeckTabChange,
   recommendedDecks,
   loadingRecommendedDecks,
@@ -238,6 +240,7 @@ export default function RecommendTab({
       <div className="order-1 space-y-2">
         <GiseonDeckSection
           raidKey={raidKey}
+          soloRaidActive={soloRaidActive}
           nikkeMap={nikkeMap}
           getPublicUrl={getPublicUrl}
           fmt={fmt}

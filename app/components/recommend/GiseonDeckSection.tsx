@@ -23,6 +23,7 @@ type RecommendedDeck = {
 
 type GiseonDeckSectionProps = {
   raidKey: string;
+  soloRaidActive: boolean;
   nikkeMap: Map<string, NikkeRow>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   fmt: (value: number) => string;
@@ -43,6 +44,7 @@ function toRecommendedDeck(deck: RecommendationSourceDeck): RecommendedDeck {
 
 export default function GiseonDeckSection({
   raidKey,
+  soloRaidActive,
   nikkeMap,
   getPublicUrl,
   fmt,
@@ -54,6 +56,12 @@ export default function GiseonDeckSection({
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
+    if (!soloRaidActive) {
+      setDecks([]);
+      setErrorMessage("");
+      setLoading(false);
+      return;
+    }
     if (!SUBMASTER_USER_ID) return;
     if (!raidKey.trim()) {
       setDecks([]);
@@ -86,10 +94,11 @@ export default function GiseonDeckSection({
     return () => {
       cancelled = true;
     };
-  }, [raidKey]);
+  }, [raidKey, soloRaidActive]);
 
   const best = useMemo(() => pickBest5(decks), [decks]);
 
+  if (!soloRaidActive) return null;
   if (!SUBMASTER_USER_ID) return null;
 
   return (

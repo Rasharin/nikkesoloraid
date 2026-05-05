@@ -4243,6 +4243,7 @@ export default function Page() {
               raidKey={currentDeckRaidKey ?? ""}
               deckTabs={savedDeckTabs}
               recommendDeckTab={currentDeckRaidKey ?? ""}
+              soloRaidActive={soloRaidActive}
               onRecommendDeckTabChange={(key) => {
                 if (soloRaidActive) {
                   setActiveRaidKey(key);
