@@ -93,7 +93,7 @@ export default function SavedTab({
             type="button"
             onClick={onDeleteAllDecks}
             disabled={readOnly || visibleSavedDecks.length === 0}
-            className="rounded-xl border border-red-800/60 px-3 py-1.5 text-xs text-red-300 active:scale-[0.99] disabled:opacity-50"
+            className="rounded-xl border border-red-800/60 px-3 py-1.5 text-xs text-red-300 transition hover:border-red-500 hover:bg-red-500/15 active:scale-[0.99] disabled:opacity-50"
           >
             전체 삭제
           </button>
@@ -214,20 +214,20 @@ export default function SavedTab({
                       setEditingScoreText(fmt(deck.score));
                     }}
                     disabled={readOnly}
-                    className="flex-1 rounded-2xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
+                    className="flex-1 rounded-2xl border border-neutral-700 px-3 py-2 text-sm transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
                   >
                     점수 수정
                   </button>
                   <button
                     onClick={() => onCopyDeckToBuilder(deck)}
-                    className="rounded-2xl border border-cyan-500/40 px-3 py-2 text-sm text-cyan-100 active:scale-[0.99]"
+                    className="rounded-2xl border border-cyan-500/40 px-3 py-2 text-sm text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
                   >
                     복사
                   </button>
                   <button
                     onClick={() => onDeleteDeck(deck.id)}
                     disabled={readOnly}
-                    className="rounded-2xl border border-red-800/60 px-3 py-2 text-sm text-red-300 active:scale-[0.99]"
+                    className="rounded-2xl border border-red-800/60 px-3 py-2 text-sm text-red-300 transition hover:border-red-500 hover:bg-red-500/15 active:scale-[0.99]"
                   >
                     삭제
                   </button>

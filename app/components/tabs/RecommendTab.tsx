@@ -392,7 +392,7 @@ export default function RecommendTab({
                     <button
                       type="button"
                       onClick={() => onCopyDeckToBuilder(deck)}
-                      className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
+                      className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-2 text-base font-medium leading-5 text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
                     >
                       복사
                     </button>
@@ -440,7 +440,7 @@ export default function RecommendTab({
         <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-neutral-100">솔레 팁</h3>
+              <h3 className="text-base font-semibold text-neutral-100">솔레 팁</h3>
               <div className="mt-1 text-xs text-neutral-400">{raidLabel} 팁 게시판</div>
             </div>
             <div className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">{tips.length}개 글</div>
@@ -469,7 +469,7 @@ export default function RecommendTab({
                 <button
                   type="button"
                   onClick={() => setShowWriteForm((prev) => !prev)}
-                  className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99]"
+                  className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
                 >
                   {showWriteForm ? "닫기" : "글쓰기"}
                 </button>

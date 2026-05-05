@@ -105,7 +105,7 @@ function DeckBuilderSectionComponent({
           <button
             type="button"
             onClick={onSaveDeck}
-            className="deck-save-button flex-1 rounded-xl border border-transparent bg-white px-4 py-1.5 text-sm font-semibold text-neutral-900 active:scale-[0.99] dark:border-transparent"
+            className="deck-save-button flex-1 rounded-xl border border-transparent bg-white px-4 py-1.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-200 active:scale-[0.99] dark:border-transparent"
           >
             덱 저장
           </button>
@@ -126,7 +126,7 @@ function DeckBuilderSectionComponent({
           <button
             type="button"
             onClick={onClearDraft}
-            className="rounded-xl border border-[var(--border)] px-4 py-1.5 text-sm text-[var(--text)] active:scale-[0.99]"
+            className="rounded-xl border border-[var(--border)] px-4 py-1.5 text-sm text-[var(--text)] transition hover:border-[var(--theme-border-strong)] hover:bg-[var(--card)] active:scale-[0.99]"
           >
             비우기
           </button>
@@ -134,7 +134,7 @@ function DeckBuilderSectionComponent({
             <button
               type="button"
               onClick={onDeleteDeck}
-              className="rounded-xl border border-red-500/40 px-4 py-1.5 text-sm text-[var(--text)] active:scale-[0.99]"
+              className="rounded-xl border border-red-500/40 px-4 py-1.5 text-sm text-[var(--text)] transition hover:border-red-400 hover:bg-red-500/15 active:scale-[0.99]"
             >
               삭제
             </button>

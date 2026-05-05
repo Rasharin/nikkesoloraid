@@ -662,7 +662,7 @@ export default function HomeTab({
           <h2 className="text-lg font-semibold">메모장</h2>
           <button
             onClick={clearMemo}
-            className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99]"
+            className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
           >
             비우기
           </button>
@@ -825,7 +825,7 @@ export default function HomeTab({
           </button>
           <button
             onClick={() => setBulkText("")}
-            className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
+            className="rounded-2xl border border-neutral-700 px-4 py-3 text-base transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
           >
             비우기
           </button>
@@ -999,7 +999,7 @@ export default function HomeTab({
               </button>
               <button
                 onClick={() => setBulkText("")}
-                className="rounded-2xl border border-neutral-700 px-4 py-3 text-base active:scale-[0.99]"
+                className="rounded-2xl border border-neutral-700 px-4 py-3 text-base transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
               >
                 비우기
               </button>
@@ -1067,7 +1067,7 @@ export default function HomeTab({
 
                     <button
                       onClick={onGoToSettings}
-                      className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
+                      className="rounded-xl border border-neutral-700 px-3 py-2 text-sm transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
                     >
                       니케 추가
                     </button>
@@ -1119,7 +1119,7 @@ export default function HomeTab({
 
                   <button
                     onClick={onGoToSettings}
-                    className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
+                    className="rounded-xl border border-neutral-700 px-3 py-2 text-sm transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
                   >
                     니케 추가
                   </button>

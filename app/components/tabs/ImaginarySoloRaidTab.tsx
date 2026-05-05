@@ -1464,7 +1464,7 @@ export default function ImaginarySoloRaidTab({
                   <button
                     type="button"
                     onClick={() => void handleSaveAllDecks()}
-                    className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-[var(--text)] active:scale-[0.99]"
+                    className="rounded-2xl border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
                   >
                     점수 반영
                   </button>
@@ -1474,7 +1474,7 @@ export default function ImaginarySoloRaidTab({
                 <button
                   type="button"
                   onClick={resetDeckBuilder}
-                  className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-[var(--text)] active:scale-[0.99]"
+                  className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:border-red-400 hover:bg-red-500/15 active:scale-[0.99]"
                 >
                   초기화
                 </button>
@@ -1483,7 +1483,7 @@ export default function ImaginarySoloRaidTab({
                 <button
                   type="button"
                   onClick={addDeckDraft}
-                  className="rounded-2xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text)] active:scale-[0.99]"
+                  className="rounded-2xl border border-[var(--border)] px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:border-[var(--theme-border-strong)] hover:bg-[var(--card)] active:scale-[0.99]"
                 >
                   덱 추가
                 </button>
@@ -1659,7 +1659,7 @@ export default function ImaginarySoloRaidTab({
               <button
                 type="button"
                 onClick={onGoToSettings}
-                className="rounded-xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
+                className="rounded-xl border border-neutral-700 px-3 py-2 text-sm transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
               >
                 니케 추가
               </button>

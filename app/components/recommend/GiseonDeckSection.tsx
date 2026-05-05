@@ -171,7 +171,7 @@ export default function GiseonDeckSection({
                   <button
                     type="button"
                     onClick={() => onCopyDeckToBuilder(toRecommendedDeck(deck))}
-                    className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-2 py-1 text-xs font-semibold text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
+                    className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1.5 text-sm font-medium leading-4 text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
                   >
                     복사
                   </button>
@@ -186,7 +186,7 @@ export default function GiseonDeckSection({
                 <button
                   type="button"
                   onClick={() => onCopyDecksToBuilder(best.picked.map(toRecommendedDeck))}
-                  className="mt-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
+                  className="mt-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-2 text-sm font-medium leading-4 text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
                 >
                   전체 복사
                 </button>
