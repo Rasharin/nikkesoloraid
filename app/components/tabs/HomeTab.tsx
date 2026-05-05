@@ -585,8 +585,8 @@ export default function HomeTab({
 
     return (
       <div key={deck.id} className={`rounded-2xl border border-neutral-800 bg-neutral-950/70 ${compact ? "p-2" : "p-2.5"}`}>
-        <div className="flex items-end justify-between gap-3">
-          <div className={`flex flex-none items-start ${compact ? "gap-1.5" : "gap-2"}`}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+          <div className={`flex w-full min-w-0 items-start justify-between sm:w-auto sm:flex-none sm:justify-start ${compact ? "gap-1.5" : "gap-2"}`}>
             {deck.chars.map((name, slotIndex) => {
               const nikke = effectiveNikkeMap.get(name);
               const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
@@ -594,7 +594,10 @@ export default function HomeTab({
                 hoveredRecommendedTarget?.deckId === deck.id && hoveredRecommendedTarget.slotIndex === slotIndex;
 
               return (
-                <div key={`${deck.id}-${slotIndex}-${name}`} className={`min-w-0 shrink-0 ${compact ? "w-[50px]" : "w-[58px]"}`}>
+                <div
+                  key={`${deck.id}-${slotIndex}-${name}`}
+                  className={`min-w-0 shrink ${compact ? "w-[50px] sm:shrink-0" : "w-[58px] sm:shrink-0"}`}
+                >
                   <RecommendedDeckSlot
                     deckId={deck.id}
                     slotIndex={slotIndex}
@@ -629,7 +632,7 @@ export default function HomeTab({
               style={{
                 width: compact ? "96px" : "120px",
               }}
-              className={`min-w-0 shrink self-center rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-right font-semibold tabular-nums text-neutral-100 outline-none ${getRecommendedScoreTextClass(
+              className={`ml-auto min-w-0 shrink self-end rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-right font-semibold tabular-nums text-neutral-100 outline-none sm:self-center ${getRecommendedScoreTextClass(
                 editingRecommendedScore || scoreText,
                 compact
               )}`}
@@ -641,7 +644,7 @@ export default function HomeTab({
                 setEditingRecommendedDeckId(deck.id);
                 setEditingRecommendedScore(fmt(deck.score));
               }}
-              className={`min-w-0 shrink self-center whitespace-nowrap text-right font-semibold tabular-nums text-neutral-100 ${scoreTextClass}`}
+              className={`ml-auto min-w-0 shrink self-end whitespace-nowrap text-right font-semibold tabular-nums text-neutral-100 sm:self-center ${scoreTextClass}`}
               title="더블 클릭해서 점수 수정"
             >
               {scoreText}
@@ -891,13 +894,8 @@ export default function HomeTab({
           <div className="mt-3 rounded-2xl bg-neutral-950/40 p-3">
             {canRecommend ? (
               <>
-                <div className="mb-3 flex items-start gap-3">
-                  <div className="w-[46%] max-w-[240px] shrink-0 whitespace-pre-line text-xs leading-5 text-neutral-400">
-                    니케 이미지 드래그로 위치 변경 가능{"\n"}
-                    니케 선택에서 드래그로 니케 변경 가능{"\n"}
-                    점수 더블클릭으로 수정 가능
-                  </div>
-                  <div className="min-w-0 flex-1 rounded-2xl border border-neutral-800 bg-neutral-900/70 px-3 py-2">
+                <div className="mb-3">
+                  <div className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/70 px-3 py-2">
                     <div className="flex items-center justify-between gap-3">
                       <div className="text-sm font-semibold text-neutral-300">총합</div>
                       <div className="text-2xl font-bold tabular-nums">{fmt(best.total)}</div>
@@ -1031,13 +1029,8 @@ export default function HomeTab({
                 <div className="mt-4 rounded-2xl bg-neutral-950/50 p-3">
                   {canRecommend ? (
                     <>
-                      <div className="mb-4 flex items-start gap-4">
-                        <div className="w-[42%] max-w-[300px] shrink-0 whitespace-pre-line text-sm leading-6 text-neutral-400">
-                          니케 이미지 드래그로 위치 변경 가능{"\n"}
-                          니케 선택에서 드래그로 니케 변경 가능{"\n"}
-                          점수 더블클릭으로 수정 가능
-                        </div>
-                        <div className="min-w-0 flex-1 rounded-2xl border border-neutral-800 bg-neutral-900/70 px-4 py-3">
+                      <div className="mb-4">
+                        <div className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/70 px-4 py-3">
                           <div className="flex items-center justify-between gap-4">
                             <div className="text-base font-semibold text-neutral-300">총합</div>
                             <div className="text-3xl font-bold tabular-nums">{fmt(best.total)}</div>

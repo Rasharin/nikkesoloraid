@@ -382,11 +382,11 @@ export default function RecommendTab({
                   })}
                 </div>
 
-                <div className="flex items-center justify-between gap-3 text-base sm:min-w-[150px] sm:flex-col sm:items-end sm:justify-center">
-                  <div className="text-neutral-300">사용 횟수 {deck.usedCount}회</div>
-                  <div className="flex items-center gap-2 sm:flex-col sm:items-end">
-                    <div className="whitespace-nowrap text-2xl font-semibold tabular-nums text-neutral-100">
-                      <span className="mr-1 text-sm text-neutral-400">평균</span>
+                <div className="flex items-center justify-between gap-2 text-sm sm:min-w-[150px] sm:flex-col sm:items-end sm:justify-center sm:gap-3 sm:text-base">
+                  <div className="shrink-0 whitespace-nowrap text-xs text-neutral-300 sm:text-base">사용 횟수 {deck.usedCount}회</div>
+                  <div className="flex min-w-0 items-center gap-2 sm:flex-col sm:items-end">
+                    <div className="min-w-0 whitespace-nowrap text-right text-base font-semibold tabular-nums text-neutral-100 sm:text-2xl">
+                      <span className="mr-1 text-xs text-neutral-400 sm:text-sm">평균</span>
                       {fmt(Math.round(deck.avgScore))}
                     </div>
                     <button

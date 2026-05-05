@@ -1418,21 +1418,21 @@ export default function ImaginarySoloRaidTab({
             <button
               type="button"
               onClick={() => setDeckOpen(true)}
-              className="flex min-h-[160px] w-full flex-col items-center justify-start gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-2 py-3 text-[var(--text)] transition hover:border-[var(--theme-border-strong)] active:scale-[0.99]"
+              className="flex min-h-[80px] w-full items-center justify-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-2 py-3 text-[var(--text)] transition hover:border-[var(--theme-border-strong)] active:scale-[0.99] lg:min-h-[160px] lg:flex-col lg:justify-start"
               aria-label="덱 만들기 펼치기"
             >
               <span className="text-base leading-none text-neutral-400">&lt;</span>
-              <span className="[writing-mode:vertical-rl] text-sm font-semibold tracking-normal">덱 만들기</span>
+              <span className="text-sm font-semibold tracking-normal lg:[writing-mode:vertical-rl]">덱 만들기</span>
             </button>
           ) : (
             <>
-          <div className="flex items-center gap-3">
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold">덱 만들기</h2>
-              <div className="mt-1 text-sm text-neutral-400">아래 덱은 기기에 저장됩니다 점수 반영을 누르면 서버에 반영됩니다.</div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="w-full min-w-0 sm:w-auto sm:flex-1">
+              <h2 className="whitespace-nowrap text-lg font-semibold">덱 만들기</h2>
+              <div className="mt-1 break-keep text-sm text-neutral-400 sm:break-normal">아래 덱은 기기에 저장됩니다 점수 반영을 누르면 서버에 반영됩니다.</div>
             </div>
 
-            <div className="ml-auto flex shrink-0 flex-col items-end gap-2">
+            <div className="flex shrink-0 flex-col items-end gap-2 sm:ml-auto">
               <div className="flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
