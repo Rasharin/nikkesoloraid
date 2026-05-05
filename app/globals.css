@@ -323,3 +323,27 @@ html[data-theme="light"] :where(.nikke-card-selected) {
   box-shadow: 0 0 0 1px rgb(100 185 178 / 0.52);
 }
 
+html[data-theme="light"] :where(.nikke-search-input) {
+  background-color: transparent !important;
+  color: var(--theme-text) !important;
+}
+
+html[data-theme="light"] :where(.nikke-search-shell) {
+  background-color: var(--theme-card) !important;
+}
+
+html[data-theme="light"] :where(.inactive-raid-tab) {
+  background-color: rgb(226 232 240 / 0.96) !important;
+  color: var(--theme-text-soft) !important;
+}
+
+html[data-theme="light"] :where(.inactive-sort-tab) {
+  background-color: rgb(226 232 240 / 0.96) !important;
+  color: var(--theme-text-soft) !important;
+}
+
+html[data-theme="light"] :where(.inactive-raid-tab:hover, .inactive-sort-tab:hover) {
+  background-color: rgb(255 255 255 / 0.98) !important;
+  color: #000000 !important;
+}
+

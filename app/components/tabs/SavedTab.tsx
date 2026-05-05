@@ -109,7 +109,7 @@ export default function SavedTab({
             className={`rounded-xl border px-3 py-1 text-sm transition ${
               savedDeckTab === tab.key
                 ? "border-white bg-white text-black"
-                : "border-neutral-700 bg-transparent text-neutral-200 hover:border-neutral-400"
+                : "inactive-raid-tab border-neutral-700 bg-neutral-950/40 text-neutral-200 hover:border-neutral-400"
             }`}
           >
             {tab.label}

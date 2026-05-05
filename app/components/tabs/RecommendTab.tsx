@@ -315,8 +315,8 @@ export default function RecommendTab({
                 onClick={() => setSortMode(option.key as RecommendedDeckSortMode)}
                 className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
                   sortMode === option.key
-                    ? "bg-neutral-100 text-neutral-950"
-                    : "text-neutral-300 hover:bg-neutral-800/80 hover:text-neutral-100"
+                    ? "border border-black bg-neutral-100 text-neutral-950"
+                    : "inactive-sort-tab text-neutral-300 hover:bg-neutral-800/80 hover:text-neutral-100"
                 }`}
               >
                 {option.label}
@@ -334,7 +334,7 @@ export default function RecommendTab({
               className={`rounded-xl border px-3 py-1 text-sm transition ${
                 recommendDeckTab === tab.key
                   ? "border-white bg-white text-black"
-                  : "border-neutral-700 bg-transparent text-neutral-200 hover:border-neutral-400"
+                  : "inactive-raid-tab border-neutral-700 bg-neutral-950/40 text-neutral-200 hover:border-neutral-400"
               }`}
             >
               {tab.label}
@@ -457,7 +457,7 @@ export default function RecommendTab({
                     className={`rounded-xl border px-3 py-1 text-sm transition ${
                       recommendDeckTab === tab.key
                         ? "border-white bg-white text-black"
-                        : "border-neutral-700 bg-transparent text-neutral-200 hover:border-neutral-400"
+                        : "inactive-raid-tab border-neutral-700 bg-neutral-950/40 text-neutral-200 hover:border-neutral-400"
                     }`}
                   >
                     {tab.label}

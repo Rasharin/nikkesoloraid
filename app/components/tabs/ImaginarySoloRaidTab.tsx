@@ -1597,7 +1597,7 @@ export default function ImaginarySoloRaidTab({
                   </button>
                 ) : null}
               </div>
-              <div className="mt-2 flex items-center rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4">
+              <div className="nikke-search-shell mt-2 flex items-center rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4">
                 <input
                   value={nikkeSearch}
                   onChange={(event) => setNikkeSearch(event.target.value)}
@@ -1608,7 +1608,7 @@ export default function ImaginarySoloRaidTab({
                     }
                   }}
                   placeholder="니케 이름 검색"
-                  className="flex-1 bg-transparent py-2.5 text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
+                  className="nikke-search-input flex-1 bg-transparent py-2.5 pl-1 text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
                 />
 
                 <button
@@ -1617,8 +1617,8 @@ export default function ImaginarySoloRaidTab({
                   aria-label="검색어 지우기"
                   disabled={!nikkeSearch}
                   style={{ borderRadius: "9999px" }}
-                  className={`ml-2 flex h-9 min-w-[36px] shrink-0 items-center justify-center appearance-none overflow-hidden border-0 p-0 transition active:scale-[0.98] ${
-                    nikkeSearch ? "bg-neutral-800 text-neutral-100 hover:bg-neutral-700" : "bg-neutral-900/70 text-neutral-600"
+                  className={`ml-2 flex h-9 min-w-[36px] shrink-0 items-center justify-center appearance-none overflow-hidden border-0 bg-transparent p-0 transition active:scale-[0.98] ${
+                    nikkeSearch ? "text-neutral-100 hover:bg-neutral-800/40" : "text-neutral-600"
                   }`}
                 >
                   <svg
