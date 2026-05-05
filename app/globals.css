@@ -317,3 +317,9 @@ html[data-theme="light"] :where(.score-mode-toggle-thumb) {
   background-color: #94a3b8 !important;
 }
 
+html[data-theme="light"] :where(.nikke-card-selected) {
+  border-color: #92b8b1 !important;
+  background-color: rgb(110 180 181 / 0.28) !important;
+  box-shadow: 0 0 0 1px rgb(100 185 178 / 0.52);
+}
+

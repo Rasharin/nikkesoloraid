@@ -2889,7 +2889,7 @@ export default function Page() {
   }
 
   async function submitDeckFromHome(payload: { draft: string[]; scoreText: string; editingId: string | null }) {
-    const { draft, scoreText, editingId } = payload;
+    const { draft, scoreText } = payload;
 
     if (draft.length !== MAX_DECK_CHARS) {
       showToast("니케 5명을 먼저 골라줘.");
@@ -2907,23 +2907,28 @@ export default function Page() {
     }
 
     try {
-      if (editingId && soloRaidActive && userId) {
+      const nextDeckKey = buildDeckKey(draft);
+      const duplicateCandidates =
+        soloRaidActive || userId ? editableDecks : [...offSeasonDecks, ...decks];
+      const existingDeck = duplicateCandidates.find((deck) => deck.raidKey === currentDeckRaidKey && deck.deckKey === nextDeckKey);
+
+      if (existingDeck && soloRaidActive && userId) {
         const { data, error } = await supabase
           .from("decks")
-          .update({ chars: [...draft], deck_key: buildDeckKey(draft), score: sc })
-          .eq("id", editingId)
+          .update({ score: sc })
+          .eq("id", existingDeck.id)
           .eq("user_id", userId)
           .select("id,user_id,raid_key,deck_key,chars,score,created_at")
           .single();
         if (error) throw error;
         const updated = mapDeckRow(data as DeckRow);
         if (!updated) throw new Error("Invalid deck row");
-        setDecks((prev) => prev.map((deck) => (deck.id === editingId ? updated : deck)));
-        showToast("덱 수정 저장 완료");
-      } else if (!editingId && soloRaidActive && userId) {
+        setDecks((prev) => prev.map((deck) => (deck.id === existingDeck.id ? updated : deck)));
+        showToast("동일 덱 점수 덮어쓰기 완료");
+      } else if (!existingDeck && soloRaidActive && userId) {
         const { data, error } = await supabase
           .from("decks")
-          .insert({ user_id: userId, raid_key: currentDeckRaidKey, deck_key: buildDeckKey(draft), chars: [...draft], score: sc })
+          .insert({ user_id: userId, raid_key: currentDeckRaidKey, deck_key: nextDeckKey, chars: [...draft], score: sc })
           .select("id,user_id,raid_key,deck_key,chars,score,created_at")
           .single();
         if (error) throw error;
@@ -2931,45 +2936,38 @@ export default function Page() {
         if (!inserted) throw new Error("Invalid deck row");
         setDecks((prev) => [inserted, ...prev]);
         showToast("덱 저장 완료");
-      } else if (editingId) {
-        const updateLocalDecks = (prev: Deck[]) => {
-          const targetExists = prev.some((deck) => deck.id === editingId);
-          const updatedDeck: Deck = {
-            id: targetExists ? editingId : createLocalDeckId(),
-            raidKey: currentDeckRaidKey,
-            deckKey: buildDeckKey(draft),
-            chars: [...draft],
-            score: sc,
-            createdAt: targetExists ? prev.find((deck) => deck.id === editingId)?.createdAt ?? Date.now() : Date.now(),
-          };
-          const next = targetExists
-            ? prev.map((deck) => (deck.id === editingId ? updatedDeck : deck))
-            : [updatedDeck, ...prev];
-          if (soloRaidActive) {
-            saveLocalDecks(next);
-          } else {
-            saveLocalOffSeasonDecks(next);
-          }
+      } else if (existingDeck) {
+        const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
+          const next = prev.map((deck) => (deck.id === existingDeck.id ? { ...deck, score: sc } : deck));
+          saveDecks(next);
           return next;
         };
 
+        const existingInPrimaryLocalDecks = decks.some((deck) => deck.id === existingDeck.id);
+
         if (soloRaidActive) {
-          setDecks(updateLocalDecks);
+          setDecks(updateLocalDecks(saveLocalDecks));
+        } else if (!userId && existingInPrimaryLocalDecks) {
+          setDecks(updateLocalDecks(saveLocalDecks));
         } else {
-          setOffSeasonDecks(updateLocalDecks);
+          setOffSeasonDecks(updateLocalDecks(saveLocalOffSeasonDecks));
         }
-        showToast("덱 수정 저장 완료");
+        showToast("동일 덱 점수 덮어쓰기 완료");
       } else {
         const inserted: Deck = {
           id: createLocalDeckId(),
           raidKey: currentDeckRaidKey,
-          deckKey: buildDeckKey(draft),
+          deckKey: nextDeckKey,
           chars: [...draft],
           score: sc,
           createdAt: Date.now(),
         };
         const updateLocalDecks = (prev: Deck[]) => {
-          const next = [inserted, ...prev];
+          const existingIndex = prev.findIndex((deck) => deck.raidKey === currentDeckRaidKey && deck.deckKey === nextDeckKey);
+          const next =
+            existingIndex >= 0
+              ? prev.map((deck, index) => (index === existingIndex ? { ...deck, score: sc } : deck))
+              : [inserted, ...prev];
           if (soloRaidActive) {
             saveLocalDecks(next);
           } else {

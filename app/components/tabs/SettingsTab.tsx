@@ -120,7 +120,7 @@ function NikkeCard({ nikke, selected, favorite, onSelect, onToggleFavorite, getP
         }
       }}
       className={`relative isolate min-w-0 overflow-hidden rounded-2xl border p-1 text-left active:scale-[0.99] ${
-        selected ? "border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
+        selected ? "nikke-card-selected border-white bg-neutral-900" : "border-neutral-800 bg-neutral-950/40"
       }`}
     >
       <button

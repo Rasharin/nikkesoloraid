@@ -962,7 +962,7 @@ export default function ImaginarySoloRaidTab({
           id: maxId + index + 1,
           draft: normalizeDraftSlots(deck.chars, MAX_DECK_CHARS),
           score: displayScore(deck.score),
-          editingId: deck.id,
+          editingId: null,
       }));
 
       return [...copiedDecks, ...prev];
@@ -1141,7 +1141,7 @@ export default function ImaginarySoloRaidTab({
     const target = deckDrafts[deckIndex];
     if (!target) return;
     const completeDraft = target.draft.filter((value): value is string => value !== null);
-    await onSubmitDeck({ draft: completeDraft, scoreText: target.score, editingId: target.editingId });
+    await onSubmitDeck({ draft: completeDraft, scoreText: target.score, editingId: null });
   }
 
   async function handleSaveAllDecks() {
@@ -1152,7 +1152,7 @@ export default function ImaginarySoloRaidTab({
       const completeDraft = deck.draft.filter((value): value is string => value !== null);
       const hasAnyValue = completeDraft.length > 0 || deck.score.trim().length > 0;
       if (!hasAnyValue) continue;
-      await onSubmitDeck({ draft: completeDraft, scoreText: deck.score, editingId: deck.editingId });
+      await onSubmitDeck({ draft: completeDraft, scoreText: deck.score, editingId: null });
     }
   }
 

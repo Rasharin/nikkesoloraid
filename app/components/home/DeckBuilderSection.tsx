@@ -107,7 +107,7 @@ function DeckBuilderSectionComponent({
             onClick={onSaveDeck}
             className="deck-save-button flex-1 rounded-xl border border-transparent bg-white px-4 py-1.5 text-sm font-semibold text-neutral-900 active:scale-[0.99] dark:border-transparent"
           >
-            {editingId ? "수정 저장" : "덱 저장"}
+            덱 저장
           </button>
           {onToggleSelected ? (
             <button
