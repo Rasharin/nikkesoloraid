@@ -1,0 +1,161 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { formatNikkeDisplayName } from "../../../lib/nikke-display";
+import { getSubmasterDecks, pickBest5, type RecommendationSourceDeck } from "../../../lib/recommend";
+
+type NikkeRow = {
+  id: string;
+  name: string;
+  image_path: string | null;
+  burst: number | null;
+  element: string | null;
+  role: string | null;
+  aliases?: string[];
+};
+
+type RecommendedDeck = {
+  deckKey: string;
+  chars: string[];
+  usedCount: number;
+  avgScore: number;
+};
+
+type GiseonDeckSectionProps = {
+  raidKey: string;
+  nikkeMap: Map<string, NikkeRow>;
+  getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
+  fmt: (value: number) => string;
+  onCopyDeckToBuilder: (deck: RecommendedDeck) => void;
+};
+
+const SUBMASTER_USER_ID = process.env.NEXT_PUBLIC_SUBMASTER_USER_ID?.trim() ?? "";
+
+function toRecommendedDeck(deck: RecommendationSourceDeck): RecommendedDeck {
+  return {
+    deckKey: deck.deckKey,
+    chars: deck.chars,
+    usedCount: 1,
+    avgScore: deck.score,
+  };
+}
+
+export default function GiseonDeckSection({
+  raidKey,
+  nikkeMap,
+  getPublicUrl,
+  fmt,
+  onCopyDeckToBuilder,
+}: GiseonDeckSectionProps) {
+  const [decks, setDecks] = useState<RecommendationSourceDeck[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    if (!SUBMASTER_USER_ID) return;
+
+    let cancelled = false;
+
+    async function loadDecks() {
+      setLoading(true);
+      setErrorMessage("");
+
+      try {
+        const nextDecks = await getSubmasterDecks(SUBMASTER_USER_ID, raidKey);
+        if (!cancelled) setDecks(nextDecks);
+      } catch (error) {
+        if (!cancelled) {
+          setDecks([]);
+          setErrorMessage(error instanceof Error ? error.message : "기션덱을 불러오지 못했습니다");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadDecks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [raidKey]);
+
+  const best = useMemo(() => pickBest5(decks), [decks]);
+
+  if (!SUBMASTER_USER_ID) return null;
+
+  return (
+    <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">기션덱</h2>
+          <div className="text-sm text-neutral-400">김기션의 사용덱과 딜량 입니다.</div>
+        </div>
+        <div className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-right">
+          <div className="text-[11px] text-neutral-500">총합 딜량</div>
+          <div className="text-sm font-semibold tabular-nums text-neutral-100">{fmt(best.total)}</div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        {loading ? (
+          <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-300">
+            기션덱을 불러오는 중입니다.
+          </div>
+        ) : errorMessage ? (
+          <div className="rounded-2xl border border-red-900/70 bg-red-950/20 p-4 text-sm text-red-200">{errorMessage}</div>
+        ) : best.picked.length === 0 ? (
+          <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-300">
+            등록된 기션덱이 없습니다.
+          </div>
+        ) : (
+          <>
+            {best.picked.length < 5 ? (
+              <div className="rounded-2xl border border-amber-800/70 bg-amber-950/20 p-3 text-sm text-amber-100">
+                추천 가능한 덱이 부족합니다
+              </div>
+            ) : null}
+
+            {best.picked.map((deck) => (
+              <article key={deck.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
+                <div className="grid max-w-[66%] grid-cols-5 gap-2">
+                  {deck.chars.map((name) => {
+                    const nikke = nikkeMap.get(name);
+                    const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+
+                    return (
+                      <div key={`${deck.id}-${name}`} className="min-w-0">
+                        <div className="aspect-square overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
+                          {imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
+                          )}
+                        </div>
+                        <div className="mt-1 text-center text-[11px] leading-4 text-neutral-200">
+                          {formatNikkeDisplayName(name)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-3 text-base">
+                  <div className="font-semibold tabular-nums text-neutral-100">{fmt(deck.score)}</div>
+                  <button
+                    type="button"
+                    onClick={() => onCopyDeckToBuilder(toRecommendedDeck(deck))}
+                    className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-sm font-semibold text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
+                  >
+                    복사
+                  </button>
+                </div>
+              </article>
+            ))}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}

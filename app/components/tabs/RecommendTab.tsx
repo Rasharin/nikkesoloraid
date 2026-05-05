@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
+import GiseonDeckSection from "../recommend/GiseonDeckSection";
 
 type NikkeRow = {
   id: string;
@@ -222,7 +223,16 @@ export default function RecommendTab({
 
   return (
     <div className="grid gap-2 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
-      <section className="order-2 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 lg:order-1">
+      <div className="order-1 space-y-2">
+        <GiseonDeckSection
+          raidKey={raidKey}
+          nikkeMap={nikkeMap}
+          getPublicUrl={getPublicUrl}
+          fmt={fmt}
+          onCopyDeckToBuilder={onCopyDeckToBuilder}
+        />
+
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">추천 조합</h2>
@@ -370,9 +380,10 @@ export default function RecommendTab({
             ))
           )}
         </div>
-      </section>
+        </section>
+      </div>
 
-      <div className="order-1 space-y-2 lg:order-2">
+      <div className="order-2 space-y-2">
         {videoEmbedUrl ? (
           <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
             <div className="mb-2 text-sm font-semibold text-neutral-100">추천 영상</div>

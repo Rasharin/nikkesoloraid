@@ -95,6 +95,7 @@ create index if not exists decks_raid_key_deck_key_idx
 alter table public.decks enable row level security;
 
 drop policy if exists "decks_select_own" on public.decks;
+drop policy if exists "decks_select_public" on public.decks;
 drop policy if exists "decks_insert_own" on public.decks;
 drop policy if exists "decks_update_own" on public.decks;
 drop policy if exists "decks_delete_own" on public.decks;
@@ -104,6 +105,12 @@ on public.decks
 for select
 to authenticated
 using (auth.uid() = user_id);
+
+create policy "decks_select_public"
+on public.decks
+for select
+to anon, authenticated
+using (user_id = '9101772f-b0ff-41dc-8b56-c1b019c0b339'::uuid);
 
 create policy "decks_insert_own"
 on public.decks

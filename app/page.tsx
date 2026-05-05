@@ -18,6 +18,7 @@ import PrivacyContent from "./components/PrivacyContent";
 import TermsContent from "./components/TermsContent";
 import type { ImageBlock, TextBlock, UsageBlock, UsageEditorBlock, UsagePost } from "./components/tabs/usage/types";
 import { supabase } from "../lib/supabase";
+import { MIN_RECOMMENDED_DECK_SCORE, pickBest5 } from "../lib/recommend";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
@@ -72,7 +73,6 @@ type RecommendationRecord = {
 };
 type ThemeMode = "dark" | "light";
 
-const MIN_RECOMMENDED_DECK_SCORE = 100_000_000;
 type RecommendationRow = {
   user_id: string;
   raid_key: string;
@@ -459,80 +459,6 @@ function compareNikkeNamePriority(a: NikkeRow, b: NikkeRow): number {
   }
 
   return a.name.localeCompare(b.name);
-}
-
-function deckCharSet(chars: string[]): Set<string> {
-  const set = new Set<string>();
-  for (const c of chars) set.add(normToken(c));
-  return set;
-}
-
-function hasOverlap(a: Set<string>, b: Set<string>) {
-  for (const x of a) if (b.has(x)) return true;
-  return false;
-}
-
-/** 중복 금지 + 5덱 + 합계 최대 (Branch & Bound) */
-function pickBest5(decks: Deck[]): { picked: Deck[]; total: number } {
-  const clean = decks
-    .filter((d) => d.chars.length === 5 && Number.isFinite(d.score) && d.score > MIN_RECOMMENDED_DECK_SCORE)
-    .map((d) => ({ ...d, _set: deckCharSet(d.chars) }));
-
-  clean.sort((a, b) => b.score - a.score);
-
-  const n = clean.length;
-  let bestTotal = -1;
-  let bestPickIdx: number[] = [];
-  const scores = clean.map((d) => d.score);
-
-  function upperBound(startIdx: number, need: number) {
-    let sum = 0;
-    for (let i = 0; i < need; i++) {
-      const idx = startIdx + i;
-      if (idx >= n) return -Infinity;
-      sum += scores[idx];
-    }
-    return sum;
-  }
-
-  function dfs(i: number, pickedIdx: number[], used: Set<string>, total: number) {
-    const need = 5 - pickedIdx.length;
-
-    if (need === 0) {
-      if (total > bestTotal) {
-        bestTotal = total;
-        bestPickIdx = [...pickedIdx];
-      }
-      return;
-    }
-    if (i >= n) return;
-
-    const ub = total + upperBound(i, need);
-    if (ub <= bestTotal) return;
-
-    const d = clean[i] as any as { score: number; _set: Set<string> };
-
-    // 선택
-    if (!hasOverlap(d._set, used)) {
-      const nextUsed = new Set(used);
-      for (const x of d._set) nextUsed.add(x);
-      pickedIdx.push(i);
-      dfs(i + 1, pickedIdx, nextUsed, total + d.score);
-      pickedIdx.pop();
-    }
-
-    // 미선택
-    dfs(i + 1, pickedIdx, used, total);
-  }
-
-  dfs(0, [], new Set<string>(), 0);
-
-  const picked = bestPickIdx.map((idx) => {
-    const { _set, ...rest } = clean[idx] as any;
-    return rest as Deck;
-  });
-
-  return { picked, total: Math.max(0, bestTotal) };
 }
 
 function getPublicUrl(bucket: "nikke-images" | "boss-images" | "usage-board-images", path: string) {
@@ -4073,12 +3999,7 @@ export default function Page() {
                 className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo-light.png" alt="니케 솔로레이드 덱 도우미" className="hidden h-16 w-auto object-contain dark:block lg:h-20" />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo-black.png" alt="니케 솔로레이드 덱 도우미" className="block h-16 w-auto object-contain dark:hidden lg:h-20" />
-                </div>
+                <img src="/logo-nideck.png" alt="니케 솔로레이드 덱 도우미" className="h-16 w-auto object-contain lg:h-20" />
               </Link>
               <h1 className="sr-only">니케 솔로레이드 덱 도우미 사이트</h1>
               <p className="sr-only">니케 솔로레이드 덱을 자동으로 계산하고 최적 조합을 추천하는 도우미입니다.</p>
