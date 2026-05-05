@@ -110,7 +110,7 @@ create policy "decks_select_public"
 on public.decks
 for select
 to anon, authenticated
-using (user_id = '9101772f-b0ff-41dc-8b56-c1b019c0b339'::uuid);
+using (user_id = '2d455703-52fd-4239-82f8-79c5e1856f30'::uuid);
 
 create policy "decks_insert_own"
 on public.decks

@@ -29,7 +29,8 @@ type GiseonDeckSectionProps = {
   onCopyDeckToBuilder: (deck: RecommendedDeck) => void;
 };
 
-const SUBMASTER_USER_ID = process.env.NEXT_PUBLIC_SUBMASTER_USER_ID?.trim() ?? "";
+const DEFAULT_SUBMASTER_USER_ID = "2d455703-52fd-4239-82f8-79c5e1856f30";
+const SUBMASTER_USER_ID = process.env.NEXT_PUBLIC_SUBMASTER_USER_ID?.trim() || DEFAULT_SUBMASTER_USER_ID;
 
 function toRecommendedDeck(deck: RecommendationSourceDeck): RecommendedDeck {
   return {
@@ -53,6 +54,12 @@ export default function GiseonDeckSection({
 
   useEffect(() => {
     if (!SUBMASTER_USER_ID) return;
+    if (!raidKey.trim()) {
+      setDecks([]);
+      setErrorMessage("");
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
 
