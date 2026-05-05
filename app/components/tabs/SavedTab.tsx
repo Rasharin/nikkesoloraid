@@ -36,6 +36,8 @@ type SavedTabProps = {
   onUpdateDeckScore: (id: string, scoreText: string) => Promise<boolean>;
   onUpdateDeckChars: (id: string, nextChars: string[]) => Promise<boolean>;
   onDeleteDeck: (id: string) => void;
+  onDeleteAllDecks: () => void;
+  onCopyDeckToBuilder: (deck: Deck) => void;
   allNikkeNames: string[];
   nikkeMap: Map<string, NikkeRow>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
@@ -51,6 +53,8 @@ export default function SavedTab({
   onUpdateDeckScore,
   onUpdateDeckChars,
   onDeleteDeck,
+  onDeleteAllDecks,
+  onCopyDeckToBuilder,
   allNikkeNames,
   nikkeMap,
   getPublicUrl,
@@ -83,7 +87,17 @@ export default function SavedTab({
     <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">저장된 덱</h2>
-        <div className="text-xs text-neutral-400">{visibleSavedDecks.length}개</div>
+        <div className="flex items-center gap-2">
+          <div className="text-xs text-neutral-400">{visibleSavedDecks.length}개</div>
+          <button
+            type="button"
+            onClick={onDeleteAllDecks}
+            disabled={readOnly || visibleSavedDecks.length === 0}
+            className="rounded-xl border border-red-800/60 px-3 py-1.5 text-xs text-red-300 active:scale-[0.99] disabled:opacity-50"
+          >
+            전체 삭제
+          </button>
+        </div>
       </div>
       <div className="mt-1 text-base text-neutral-400">이름을 클릭하여 니케 수정 가능</div>
 
@@ -203,6 +217,12 @@ export default function SavedTab({
                     className="flex-1 rounded-2xl border border-neutral-700 px-3 py-2 text-sm active:scale-[0.99]"
                   >
                     점수 수정
+                  </button>
+                  <button
+                    onClick={() => onCopyDeckToBuilder(deck)}
+                    className="rounded-2xl border border-cyan-500/40 px-3 py-2 text-sm text-cyan-100 active:scale-[0.99]"
+                  >
+                    복사
                   </button>
                   <button
                     onClick={() => onDeleteDeck(deck.id)}

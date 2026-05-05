@@ -343,6 +343,12 @@ function buildDeckKey(chars: readonly string[]) {
   return [...chars].map((char) => char.trim()).sort((a, b) => a.localeCompare(b)).join("|");
 }
 
+function getDraftDeckKey(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  const chars = value.filter((slot): slot is string => typeof slot === "string" && slot.trim().length > 0);
+  return chars.length === MAX_DECK_CHARS ? buildDeckKey(chars) : null;
+}
+
 function getRecommendedDeckSnapshotKey(raidKey: string) {
   return `${RECOMMENDED_DECK_SNAPSHOT_KEY_PREFIX}${raidKey.trim()}`;
 }
@@ -2505,7 +2511,7 @@ export default function Page() {
     const draft = deck.chars.slice(0, MAX_DECK_CHARS);
     if (draft.length !== MAX_DECK_CHARS) {
       showToast("복사할 추천 덱 정보가 부족해");
-      return;
+      return false;
     }
 
     try {
@@ -2539,6 +2545,13 @@ export default function Page() {
       });
 
       const nextId = deckDrafts.reduce((maxId, deckDraft) => Math.max(maxId, deckDraft.id), 0) + 1;
+      const existingDeckKeys = new Set(
+        deckDrafts.map((deckDraft) => getDraftDeckKey(deckDraft.draft)).filter((key): key is string => key !== null)
+      );
+      if (existingDeckKeys.has(buildDeckKey(draft)) && !window.confirm("동일한 조합이 있습니다 복사 하시겠습니까")) {
+        return false;
+      }
+
       deckDrafts.unshift({
         id: nextId,
         draft,
@@ -2568,9 +2581,20 @@ export default function Page() {
         })
       );
       showToast("복사 완료");
+      return true;
     } catch {
       showToast("복사 실패");
+      return false;
     }
+  }
+
+  function copySavedDeckToBuilder(deck: Deck) {
+    copyRecommendedDeckToBuilder({
+      deckKey: deck.deckKey,
+      chars: deck.chars,
+      usedCount: 1,
+      avgScore: deck.score,
+    });
   }
 
   function copyRecommendedDecksToBuilder(decks: RecommendedDeck[]) {
@@ -2616,9 +2640,17 @@ export default function Page() {
         };
       });
 
+      const existingDeckKeys = new Set(
+        deckDrafts.map((deckDraft) => getDraftDeckKey(deckDraft.draft)).filter((key): key is string => key !== null)
+      );
+      const filteredCopyTargets = copyTargets.filter((deck) => !existingDeckKeys.has(buildDeckKey(deck.draft)));
+      if (filteredCopyTargets.length === 0) {
+        return;
+      }
       const nextId = deckDrafts.reduce((maxId, deckDraft) => Math.max(maxId, deckDraft.id), 0) + 1;
+
       deckDrafts.unshift(
-        ...copyTargets.map((deck, index) => ({
+        ...filteredCopyTargets.map((deck, index) => ({
           id: nextId + index,
           draft: deck.draft,
           score: deck.score,
@@ -2647,7 +2679,7 @@ export default function Page() {
           savedAt: Date.now(),
         })
       );
-      showToast(`${copyTargets.length}개 덱 복사 완료`);
+      showToast(`${filteredCopyTargets.length}개 덱 복사 완료`);
     } catch {
       showToast("복사 실패");
     }
@@ -2665,7 +2697,8 @@ export default function Page() {
       return false;
     }
 
-    const targetDeck = editableDecks.find((deck) => deck.id === id);
+    const targetDeckSource = soloRaidActive || userId ? editableDecks : [...offSeasonDecks, ...decks];
+    const targetDeck = targetDeckSource.find((deck) => deck.id === id);
     if (!targetDeck) {
       showToast("덱을 찾을 수 없어");
       return false;
@@ -2686,20 +2719,18 @@ export default function Page() {
         if (!updated) throw new Error("Invalid deck row");
         setDecks((prev) => prev.map((deck) => (deck.id === id ? updated : deck)));
       } else {
-        const updateLocalDecks = (prev: Deck[]) => {
+        const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
           const next = prev.map((deck) => (deck.id === id ? { ...deck, score: sc } : deck));
-          if (soloRaidActive) {
-            saveLocalDecks(next);
-          } else {
-            saveLocalOffSeasonDecks(next);
-          }
+          saveDecks(next);
           return next;
         };
 
-        if (soloRaidActive) {
-          setDecks(updateLocalDecks);
+        const targetInPrimaryLocalDecks = decks.some((deck) => deck.id === id);
+
+        if (soloRaidActive || (!userId && targetInPrimaryLocalDecks)) {
+          setDecks(updateLocalDecks(saveLocalDecks));
         } else {
-          setOffSeasonDecks(updateLocalDecks);
+          setOffSeasonDecks(updateLocalDecks(saveLocalOffSeasonDecks));
         }
       }
 
@@ -2713,17 +2744,13 @@ export default function Page() {
   }
 
   async function updateDeckChars(id: string, nextChars: string[]) {
-    if (!soloRaidActive) {
-      showToast("현재 진행 중인 솔로레이드가 없어");
-      return false;
-    }
-
     if (nextChars.length !== MAX_DECK_CHARS || new Set(nextChars).size !== MAX_DECK_CHARS) {
       showToast("니케 5명을 중복 없이 맞춰줘.");
       return false;
     }
 
-    const targetDeck = editableDecks.find((deck) => deck.id === id);
+    const targetDeckSource = soloRaidActive || userId ? editableDecks : [...offSeasonDecks, ...decks];
+    const targetDeck = targetDeckSource.find((deck) => deck.id === id);
     if (!targetDeck) {
       showToast("덱을 찾을 수 없어");
       return false;
@@ -2744,22 +2771,20 @@ export default function Page() {
         if (!updated) throw new Error("Invalid deck row");
         setDecks((prev) => prev.map((deck) => (deck.id === id ? updated : deck)));
       } else {
-        const updateLocalDecks = (prev: Deck[]) => {
+        const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
           const next = prev.map((deck) =>
             deck.id === id ? { ...deck, deckKey: buildDeckKey(nextChars), chars: [...nextChars] } : deck
           );
-          if (soloRaidActive) {
-            saveLocalDecks(next);
-          } else {
-            saveLocalOffSeasonDecks(next);
-          }
+          saveDecks(next);
           return next;
         };
 
-        if (soloRaidActive) {
-          setDecks(updateLocalDecks);
+        const targetInPrimaryLocalDecks = decks.some((deck) => deck.id === id);
+
+        if (soloRaidActive || (!userId && targetInPrimaryLocalDecks)) {
+          setDecks(updateLocalDecks(saveLocalDecks));
         } else {
-          setOffSeasonDecks(updateLocalDecks);
+          setOffSeasonDecks(updateLocalDecks(saveLocalOffSeasonDecks));
         }
       }
 
@@ -2773,26 +2798,19 @@ export default function Page() {
   }
 
   async function deleteDeck(id: string) {
-    if (!soloRaidActive) {
-      showToast("현재 진행 중인 솔로레이드가 없어");
-      return;
-    }
-
     if (!soloRaidActive || !userId) {
-      const updateLocalDecks = (prev: Deck[]) => {
+      const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
         const next = prev.filter((d) => d.id !== id);
-        if (soloRaidActive) {
-          saveLocalDecks(next);
-        } else {
-          saveLocalOffSeasonDecks(next);
-        }
+        saveDecks(next);
         return next;
       };
 
-      if (soloRaidActive) {
-        setDecks(updateLocalDecks);
+      const targetInPrimaryLocalDecks = decks.some((deck) => deck.id === id);
+
+      if (soloRaidActive || (!userId && targetInPrimaryLocalDecks)) {
+        setDecks(updateLocalDecks(saveLocalDecks));
       } else {
-        setOffSeasonDecks(updateLocalDecks);
+        setOffSeasonDecks(updateLocalDecks(saveLocalOffSeasonDecks));
       }
       showToast("삭제 완료");
       return;
@@ -2812,6 +2830,48 @@ export default function Page() {
       showToast("덱 삭제 실패");
     }
   }
+
+  async function deleteAllVisibleSavedDecks() {
+    if (visibleSavedDecks.length === 0) return;
+    const targetIds = new Set(visibleSavedDecks.map((deck) => deck.id));
+
+    if (soloRaidActive && userId) {
+      try {
+        const { error } = await supabase
+          .from("decks")
+          .delete()
+          .in("id", Array.from(targetIds))
+          .eq("user_id", userId);
+        if (error) throw error;
+        setDecks((prev) => prev.filter((deck) => !targetIds.has(deck.id)));
+        showToast("전체 삭제 완료");
+      } catch (error) {
+        console.error(error);
+        showToast("전체 삭제 실패");
+      }
+      return;
+    }
+
+    const updatePrimaryLocalDecks = (prev: Deck[]) => {
+      const next = prev.filter((deck) => !targetIds.has(deck.id));
+      saveLocalDecks(next);
+      return next;
+    };
+    const updateOffSeasonDecks = (prev: Deck[]) => {
+      const next = prev.filter((deck) => !targetIds.has(deck.id));
+      saveLocalOffSeasonDecks(next);
+      return next;
+    };
+
+    if (soloRaidActive) {
+      setDecks(updatePrimaryLocalDecks);
+    } else {
+      setDecks(updatePrimaryLocalDecks);
+      setOffSeasonDecks(updateOffSeasonDecks);
+    }
+    showToast("전체 삭제 완료");
+  }
+
   function toggleSelect(name: string) {
     setSelectedNames((prev) => {
       if (prev.includes(name)) return prev.filter((x) => x !== name);
@@ -4273,7 +4333,7 @@ export default function Page() {
               visibleSavedDecks={visibleSavedDecks}
               deckTabs={savedDeckTabs}
               savedDeckTab={currentDeckRaidKey ?? ""}
-              readOnly={!soloRaidActive}
+              readOnly={false}
               onSavedDeckTabChange={(key) => {
                 if (soloRaidActive) {
                   setActiveRaidKey(key);
@@ -4284,6 +4344,8 @@ export default function Page() {
               onUpdateDeckScore={updateDeckScore}
               onUpdateDeckChars={updateDeckChars}
               onDeleteDeck={deleteDeck}
+              onDeleteAllDecks={deleteAllVisibleSavedDecks}
+              onCopyDeckToBuilder={copySavedDeckToBuilder}
               allNikkeNames={nikkes.map((nikke) => nikke.name)}
               nikkeMap={nikkeMap}
               getPublicUrl={getPublicUrl}

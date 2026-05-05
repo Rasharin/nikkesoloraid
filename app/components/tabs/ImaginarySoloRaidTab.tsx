@@ -19,6 +19,7 @@ import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordi
 import { CSS } from "@dnd-kit/utilities";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
+import { buildDeckKey } from "../../../lib/recommend";
 import { formatPlainScoreText, formatScore, parseScoreInput, type ScoreDisplayMode } from "../../../lib/score-format";
 import DeckBuilderSection, {
   getDroppedDeckSlotTarget,
@@ -957,8 +958,19 @@ export default function ImaginarySoloRaidTab({
     }
 
     setActiveDeckDrafts((prev) => {
+      const existingDeckKeys = new Set(
+        prev
+          .map((deck) => {
+            const chars = deck.draft.filter((slot): slot is string => typeof slot === "string" && slot.trim().length > 0);
+            return chars.length === MAX_DECK_CHARS ? buildDeckKey(chars) : null;
+          })
+          .filter((key): key is string => key !== null)
+      );
+      const filteredRecommendedDecks = recommendedDecks.filter((deck) => !existingDeckKeys.has(buildDeckKey(deck.chars)));
+      if (filteredRecommendedDecks.length === 0) return prev;
+
       const maxId = prev.reduce((currentMax, deck) => Math.max(currentMax, deck.id), 0);
-      const copiedDecks = recommendedDecks.map((deck, index) => ({
+      const copiedDecks = filteredRecommendedDecks.map((deck, index) => ({
           id: maxId + index + 1,
           draft: normalizeDraftSlots(deck.chars, MAX_DECK_CHARS),
           score: displayScore(deck.score),
@@ -968,7 +980,7 @@ export default function ImaginarySoloRaidTab({
       return [...copiedDecks, ...prev];
     });
     setDeckOpen(true);
-    onShowToast("추천 조합을 덱 만들기에 복사했어");
+    onShowToast("복사 완료");
   }
 
   function renderRecommendedDeckCard(deck: Deck) {
