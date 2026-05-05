@@ -2924,7 +2924,7 @@ export default function Page() {
         const updated = mapDeckRow(data as DeckRow);
         if (!updated) throw new Error("Invalid deck row");
         setDecks((prev) => prev.map((deck) => (deck.id === existingDeck.id ? updated : deck)));
-        showToast("동일 덱 점수 덮어쓰기 완료");
+        showToast("덱 저장 완료");
       } else if (!existingDeck && soloRaidActive && userId) {
         const { data, error } = await supabase
           .from("decks")
@@ -2952,7 +2952,7 @@ export default function Page() {
         } else {
           setOffSeasonDecks(updateLocalDecks(saveLocalOffSeasonDecks));
         }
-        showToast("동일 덱 점수 덮어쓰기 완료");
+        showToast("덱 저장 완료");
       } else {
         const inserted: Deck = {
           id: createLocalDeckId(),
