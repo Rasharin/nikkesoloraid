@@ -37,6 +37,7 @@ type SoloRaidTip = {
 type RecommendedDeckSortMode = "usedCount" | "score";
 
 const RECOMMENDED_DECK_SORT_MODE_KEY = "soloraid_recommended_deck_sort_mode_v1";
+const RECOMMENDED_DECK_PAGE_SIZE = 15;
 
 function compareRecommendedDecksByScore(a: RecommendedDeck, b: RecommendedDeck) {
   if (a.avgScore !== b.avgScore) return b.avgScore - a.avgScore;
@@ -116,6 +117,7 @@ export default function RecommendTab({
   const [deletingTipId, setDeletingTipId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [sortMode, setSortMode] = useState<RecommendedDeckSortMode>(() => readStoredRecommendedDeckSortMode());
+  const [visibleRecommendedDeckCount, setVisibleRecommendedDeckCount] = useState(RECOMMENDED_DECK_PAGE_SIZE);
 
   const tipDateFormatter = useMemo(
     () =>
@@ -151,11 +153,21 @@ export default function RecommendTab({
     return [...matchedDecks].sort(sortMode === "usedCount" ? compareRecommendedDecksByUsedCount : compareRecommendedDecksByScore);
   }, [nikkeMap, q, recommendedDecks, sortMode]);
 
+  const visibleRecommendedDecks = useMemo(
+    () => filteredRecommendedDecks.slice(0, visibleRecommendedDeckCount),
+    [filteredRecommendedDecks, visibleRecommendedDeckCount]
+  );
+  const hasMoreRecommendedDecks = visibleRecommendedDeckCount < filteredRecommendedDecks.length;
+
   useEffect(() => {
     try {
       localStorage.setItem(RECOMMENDED_DECK_SORT_MODE_KEY, sortMode);
     } catch { }
   }, [sortMode]);
+
+  useEffect(() => {
+    setVisibleRecommendedDeckCount(RECOMMENDED_DECK_PAGE_SIZE);
+  }, [q, recommendDeckTab, sortMode, recommendedDecks]);
 
   async function handleSubmitTip() {
     if (savingTip || !canWriteTips) return;
@@ -338,9 +350,10 @@ export default function RecommendTab({
               조건에 맞는 추천 조합이 없습니다.
             </div>
           ) : (
-            filteredRecommendedDecks.map((deck) => (
-              <article key={deck.deckKey} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
-                <div className="grid max-w-[66%] grid-cols-5 gap-2">
+            <>
+            {visibleRecommendedDecks.map((deck) => (
+              <article key={deck.deckKey} className="flex flex-col gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="grid w-full grid-cols-5 gap-2 sm:max-w-[66%] sm:flex-1">
                   {deck.chars.map((name) => {
                     const nikke = nikkeMap.get(name);
                     const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
@@ -355,7 +368,7 @@ export default function RecommendTab({
                             <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
                           )}
                         </div>
-                        <div className="mt-1 text-center text-[11px] leading-4 text-neutral-200">
+                        <div className="mt-1 truncate whitespace-nowrap text-center text-[11px] leading-4 text-neutral-200">
                           {formatNikkeDisplayName(name)}
                         </div>
                       </div>
@@ -363,10 +376,13 @@ export default function RecommendTab({
                   })}
                 </div>
 
-                <div className="mt-3 flex items-center justify-between text-base">
+                <div className="flex items-center justify-between gap-3 text-base sm:min-w-[150px] sm:flex-col sm:items-end sm:justify-center">
                   <div className="text-neutral-300">사용 횟수 {deck.usedCount}회</div>
-                  <div className="flex items-center gap-2">
-                    <div className="font-semibold text-neutral-100">평균 {fmt(Math.round(deck.avgScore))}</div>
+                  <div className="flex items-center gap-2 sm:flex-col sm:items-end">
+                    <div className="whitespace-nowrap text-2xl font-semibold tabular-nums text-neutral-100">
+                      <span className="mr-1 text-sm text-neutral-400">평균</span>
+                      {fmt(Math.round(deck.avgScore))}
+                    </div>
                     <button
                       type="button"
                       onClick={() => onCopyDeckToBuilder(deck)}
@@ -377,7 +393,18 @@ export default function RecommendTab({
                   </div>
                 </div>
               </article>
-            ))
+            ))}
+
+            {hasMoreRecommendedDecks ? (
+              <button
+                type="button"
+                onClick={() => setVisibleRecommendedDeckCount((count) => count + RECOMMENDED_DECK_PAGE_SIZE)}
+                className="rounded-2xl border border-neutral-700 bg-neutral-950/40 px-4 py-3 text-sm font-semibold text-neutral-100 transition hover:border-neutral-500 hover:bg-neutral-900 active:scale-[0.99]"
+              >
+                더보기 ({Math.min(RECOMMENDED_DECK_PAGE_SIZE, filteredRecommendedDecks.length - visibleRecommendedDeckCount)}개)
+              </button>
+            ) : null}
+            </>
           )}
         </div>
         </section>

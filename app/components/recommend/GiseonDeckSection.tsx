@@ -51,6 +51,7 @@ export default function GiseonDeckSection({
   const [decks, setDecks] = useState<RecommendationSourceDeck[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     if (!SUBMASTER_USER_ID) return;
@@ -98,13 +99,23 @@ export default function GiseonDeckSection({
           <h2 className="text-lg font-semibold">기션덱</h2>
           <div className="text-sm text-neutral-400">김기션의 사용덱과 딜량 입니다.</div>
         </div>
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-right">
-          <div className="text-[11px] text-neutral-500">총합 딜량</div>
-          <div className="text-sm font-semibold tabular-nums text-neutral-100">{fmt(best.total)}</div>
+        <div className="flex items-start gap-2">
+          <div className="min-w-[160px] rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-2 text-right sm:min-w-[190px]">
+            <div className="text-[11px] text-neutral-500">총합 딜량</div>
+            <div className="whitespace-nowrap text-2xl font-semibold tabular-nums text-neutral-100">{fmt(best.total)}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCollapsed((prev) => !prev)}
+            aria-label={collapsed ? "기션덱 펼치기" : "기션덱 접기"}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-neutral-800 bg-neutral-950/50 text-lg font-semibold text-neutral-100 transition hover:border-neutral-600 hover:bg-neutral-900 active:scale-[0.98]"
+          >
+            {collapsed ? "∨" : "^"}
+          </button>
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3">
+      {!collapsed ? <div className="mt-4 grid gap-3">
         {loading ? (
           <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-300">
             기션덱을 불러오는 중입니다.
@@ -124,8 +135,8 @@ export default function GiseonDeckSection({
             ) : null}
 
             {best.picked.map((deck) => (
-              <article key={deck.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
-                <div className="grid max-w-[66%] grid-cols-5 gap-2">
+              <article key={deck.id} className="flex flex-col gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="grid w-full grid-cols-5 gap-2 sm:max-w-[66%] sm:flex-1">
                   {deck.chars.map((name) => {
                     const nikke = nikkeMap.get(name);
                     const imageUrl = nikke?.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
@@ -140,7 +151,7 @@ export default function GiseonDeckSection({
                             <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
                           )}
                         </div>
-                        <div className="mt-1 text-center text-[11px] leading-4 text-neutral-200">
+                        <div className="mt-1 truncate whitespace-nowrap text-center text-[11px] leading-4 text-neutral-200">
                           {formatNikkeDisplayName(name)}
                         </div>
                       </div>
@@ -148,8 +159,8 @@ export default function GiseonDeckSection({
                   })}
                 </div>
 
-                <div className="mt-3 flex items-center justify-between gap-3 text-base">
-                  <div className="font-semibold tabular-nums text-neutral-100">{fmt(deck.score)}</div>
+                <div className="flex items-center justify-between gap-3 text-base sm:min-w-[150px] sm:flex-col sm:items-end sm:justify-center">
+                  <div className="whitespace-nowrap text-2xl font-semibold tabular-nums text-neutral-100">{fmt(deck.score)}</div>
                   <button
                     type="button"
                     onClick={() => onCopyDeckToBuilder(toRecommendedDeck(deck))}
@@ -162,7 +173,7 @@ export default function GiseonDeckSection({
             ))}
           </>
         )}
-      </div>
+      </div> : null}
     </section>
   );
 }
