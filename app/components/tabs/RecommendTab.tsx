@@ -80,6 +80,7 @@ type RecommendTabProps = {
   onUpdateTip: (payload: { id: string; content: string }) => Promise<boolean>;
   onDeleteTip: (id: string) => Promise<boolean>;
   onCopyDeckToBuilder: (deck: RecommendedDeck) => void;
+  onCopyDecksToBuilder: (decks: RecommendedDeck[]) => void;
   nikkeMap: Map<string, NikkeRow>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   fmt: (value: number) => string;
@@ -105,6 +106,7 @@ export default function RecommendTab({
   onUpdateTip,
   onDeleteTip,
   onCopyDeckToBuilder,
+  onCopyDecksToBuilder,
   nikkeMap,
   getPublicUrl,
   fmt,
@@ -245,6 +247,7 @@ export default function RecommendTab({
           getPublicUrl={getPublicUrl}
           fmt={fmt}
           onCopyDeckToBuilder={onCopyDeckToBuilder}
+          onCopyDecksToBuilder={onCopyDecksToBuilder}
         />
 
         <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">

@@ -2560,6 +2560,86 @@ export default function Page() {
     }
   }
 
+  function copyRecommendedDecksToBuilder(decks: RecommendedDeck[]) {
+    const copyTargets = decks
+      .map((deck) => ({
+        draft: deck.chars.slice(0, MAX_DECK_CHARS),
+        score: String(Math.round(deck.avgScore)),
+      }))
+      .filter((deck) => deck.draft.length === MAX_DECK_CHARS);
+
+    if (copyTargets.length === 0) {
+      showToast("복사할 추천 덱 정보가 부족해");
+      return;
+    }
+
+    try {
+      const rawDraft = localStorage.getItem(DECK_BUILDING_DRAFT_STORAGE_KEY);
+      const parsed = rawDraft
+        ? (JSON.parse(rawDraft) as { pages?: unknown; activePageId?: unknown; deckDrafts?: unknown; spareSlots?: unknown })
+        : null;
+      const savedPages = Array.isArray(parsed?.pages) && parsed.pages.length > 0 ? parsed.pages : null;
+      const activePageId =
+        typeof parsed?.activePageId === "number" && savedPages?.some((page) => page && typeof page === "object" && (page as { id?: unknown }).id === parsed.activePageId)
+          ? parsed.activePageId
+          : 1;
+      const activePage =
+        savedPages?.find((page) => page && typeof page === "object" && (page as { id?: unknown }).id === activePageId) ??
+        ({
+          id: activePageId,
+          deckDrafts: parsed?.deckDrafts,
+          spareSlots: parsed?.spareSlots,
+        } as { id: number; deckDrafts?: unknown; spareSlots?: unknown });
+      const savedDeckDrafts = Array.isArray((activePage as { deckDrafts?: unknown }).deckDrafts)
+        ? ((activePage as { deckDrafts?: unknown }).deckDrafts as unknown[])
+        : [];
+      const deckDrafts = Array.from({ length: Math.max(DECK_BUILDING_DRAFT_COUNT, savedDeckDrafts.length) }, (_, index) => {
+        const saved = savedDeckDrafts[index] as { id?: unknown; draft?: unknown; score?: unknown; editingId?: unknown } | undefined;
+        return {
+          id: typeof saved?.id === "number" && Number.isFinite(saved.id) ? saved.id : index + 1,
+          draft: Array.isArray(saved?.draft) ? saved.draft.slice(0, MAX_DECK_CHARS) : Array.from({ length: MAX_DECK_CHARS }, () => null),
+          score: typeof saved?.score === "string" ? saved.score : "",
+          editingId: typeof saved?.editingId === "string" ? saved.editingId : null,
+        };
+      });
+
+      const nextId = deckDrafts.reduce((maxId, deckDraft) => Math.max(maxId, deckDraft.id), 0) + 1;
+      deckDrafts.unshift(
+        ...copyTargets.map((deck, index) => ({
+          id: nextId + index,
+          draft: deck.draft,
+          score: deck.score,
+          editingId: null,
+        }))
+      );
+
+      const savedSpareSlots = (activePage as { spareSlots?: unknown }).spareSlots;
+      const spareSlots = Array.isArray(savedSpareSlots)
+        ? savedSpareSlots.slice(0, DECK_BUILDING_SPARE_SLOT_COUNT)
+        : Array.from({ length: DECK_BUILDING_SPARE_SLOT_COUNT }, () => null);
+      const nextActivePage = {
+        id: activePageId,
+        deckDrafts,
+        spareSlots,
+      };
+      const pages = savedPages
+        ? savedPages.map((page) => (page && typeof page === "object" && (page as { id?: unknown }).id === activePageId ? nextActivePage : page))
+        : [nextActivePage];
+
+      localStorage.setItem(
+        DECK_BUILDING_DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          pages,
+          activePageId,
+          savedAt: Date.now(),
+        })
+      );
+      showToast(`${copyTargets.length}개 덱 복사 완료`);
+    } catch {
+      showToast("복사 실패");
+    }
+  }
+
   function startEditDeck(d: Deck) {
     navigateToTab("home");
     setHomeEditRequest(d);
@@ -4264,6 +4344,7 @@ export default function Page() {
               onUpdateTip={updateSoloRaidTip}
               onDeleteTip={deleteSoloRaidTip}
               onCopyDeckToBuilder={copyRecommendedDeckToBuilder}
+              onCopyDecksToBuilder={copyRecommendedDecksToBuilder}
               nikkeMap={nikkeMap}
               getPublicUrl={getPublicUrl}
               fmt={fmt}
