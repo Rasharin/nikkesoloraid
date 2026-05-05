@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteName = "니케 솔로레이드 덱 도우미";
+const siteName = "NiDeck";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   alternates: {
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   },
   title: {
     default: siteName,
-    template: "%s | 니케 솔로레이드 덱 도우미",
+    template: "%s | NiDeck",
   },
   description: "니케 솔로레이드 덱 추천, 조합 계산, 점수 최적화 도우미",
   keywords: [
