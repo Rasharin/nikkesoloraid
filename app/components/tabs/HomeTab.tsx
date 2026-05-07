@@ -63,6 +63,7 @@ type HomeTabProps = {
   bosses: BossRow[];
   decksCount: number;
   canRecommend: boolean;
+  showMyRecommendation: boolean;
   best: {
     picked: Deck[];
     total: number;
@@ -176,6 +177,7 @@ export default function HomeTab({
   bosses,
   decksCount,
   canRecommend,
+  showMyRecommendation,
   best,
   fmt,
   getPublicUrl,
@@ -886,9 +888,10 @@ export default function HomeTab({
           ) : null}
         </section>
 
+        {showMyRecommendation ? (
         <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">추천 조합</h2>
+            <h2 className="text-base font-semibold">내 추천 조합</h2>
             <div className="text-xs text-neutral-400">{decksCount}개 덱</div>
           </div>
           <div className="mt-3 rounded-2xl bg-neutral-950/40 p-3">
@@ -912,12 +915,13 @@ export default function HomeTab({
             )}
           </div>
         </section>
+        ) : null}
       </div>
 
       <div className="hidden">
         <section className="flex self-start flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-lg font-semibold">추천 조합</h2>
+            <h2 className="text-lg font-semibold">내 추천 조합</h2>
             <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
               {decksCount}개 덱
             </div>
@@ -1019,9 +1023,10 @@ export default function HomeTab({
         {isDesktopDnd ? (
           <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.95fr)] xl:grid-cols-[minmax(0,1.25fr)_minmax(400px,0.95fr)]">
             <div className="space-y-5">
+              {showMyRecommendation ? (
               <section className="flex self-start flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
                 <div className="flex items-center justify-between gap-4">
-                  <h2 className="text-lg font-semibold">추천 조합</h2>
+                  <h2 className="text-lg font-semibold">내 추천 조합</h2>
                   <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
                     {decksCount}개 덱
                   </div>
@@ -1049,6 +1054,7 @@ export default function HomeTab({
                   )}
                 </div>
               </section>
+              ) : null}
 
               <section className="flex min-h-0 flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
                 <div className="flex flex-wrap items-center justify-between gap-3">

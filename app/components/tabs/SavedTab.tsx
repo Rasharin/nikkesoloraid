@@ -30,6 +30,7 @@ type SavedTabItem = {
 type SavedTabProps = {
   visibleSavedDecks: Deck[];
   deckTabs: readonly SavedTabItem[];
+  seasonOffTab?: SavedTabItem | null;
   savedDeckTab: string;
   readOnly: boolean;
   onSavedDeckTabChange: (key: string) => void;
@@ -47,6 +48,7 @@ type SavedTabProps = {
 export default function SavedTab({
   visibleSavedDecks,
   deckTabs,
+  seasonOffTab,
   savedDeckTab,
   readOnly,
   onSavedDeckTabChange,
@@ -115,6 +117,19 @@ export default function SavedTab({
             {tab.label}
           </button>
         ))}
+        {seasonOffTab ? (
+          <button
+            key={seasonOffTab.key}
+            onClick={() => onSavedDeckTabChange(seasonOffTab.key)}
+            className={`rounded-xl border px-3 py-1 text-sm transition ${
+              savedDeckTab === seasonOffTab.key
+                ? "border-white bg-white text-black"
+                : "inactive-raid-tab border-neutral-700 bg-neutral-950/40 text-neutral-200 hover:border-neutral-400"
+            }`}
+          >
+            {seasonOffTab.label}
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-2">

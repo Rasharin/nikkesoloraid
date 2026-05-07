@@ -57,6 +57,7 @@ type Deck = {
 type DeckBuildingTabProps = {
   decksCount: number;
   canRecommend: boolean;
+  showMyRecommendation: boolean;
   best: {
     picked: Deck[];
     total: number;
@@ -445,6 +446,7 @@ function canDropOnSpareSlot(index: number, activeDrag: DragItemData | null, spar
 export default function ImaginarySoloRaidTab({
   decksCount,
   canRecommend,
+  showMyRecommendation,
   best,
   scoreDisplayMode,
   onScoreDisplayModeChange,
@@ -1091,6 +1093,8 @@ export default function ImaginarySoloRaidTab({
   }
 
   function renderRecommendedDecksSection() {
+    if (!showMyRecommendation) return null;
+
     const topDecks = best.picked.slice(0, 3);
     const bottomDecks = best.picked.slice(3, 5);
 
@@ -1692,7 +1696,7 @@ export default function ImaginarySoloRaidTab({
 
           {nikkeOpen ? effectiveSelectedNikkes.length === 0 ? (
             <div className="mt-4 text-sm text-neutral-300">
-              <span className="text-neutral-200">니케 관리 탭</span>에서 최대 {maxSelected}개 선택 가능.
+              <span className="text-neutral-200">니케 관리</span>에서 최대 {maxSelected}개 선택 가능.
             </div>
           ) : filteredSelectedNikkes.length === 0 ? (
             <div className="mt-4 text-sm text-neutral-300">조건에 맞는 니케가 없습니다.</div>
