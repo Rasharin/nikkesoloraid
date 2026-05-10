@@ -1252,6 +1252,8 @@ export default function Page() {
   const [loadingRecommendedDeckSnapshots, setLoadingRecommendedDeckSnapshots] = useState(false);
   const [offSeasonDecks, setOffSeasonDecks] = useState<Deck[]>([]);
   const [offSeasonRaidKey, setOffSeasonRaidKey] = useState<string | null>(null);
+  const [recommendRaidKey, setRecommendRaidKey] = useState<string | null>(null);
+  const [tipRaidKey, setTipRaidKey] = useState<string | null>(null);
   const [soloRaidTips, setSoloRaidTips] = useState<SoloRaidTip[]>([]);
   const [loadingSoloRaidTips, setLoadingSoloRaidTips] = useState(false);
   const [contactInquiries, setContactInquiries] = useState<ContactInquiry[]>([]);
@@ -2335,14 +2337,30 @@ export default function Page() {
 	  }, [selectedNames, nikkeMap, nikkeNameLookup]);
 	  const soloRaidInProgress = soloRaidActive && Boolean(activeRaidKey);
 
-	  const currentDeckRaidKey = useMemo(() => {
-	    if (soloRaidInProgress) return activeRaidKey;
-	    if (offSeasonRaidKey === SEASON_OFF_RAID_KEY || (offSeasonRaidKey && deckTabs.some((tab) => tab.key === offSeasonRaidKey))) {
-	      return offSeasonRaidKey;
-	    }
-	    return SEASON_OFF_RAID_KEY;
-	  }, [activeRaidKey, deckTabs, offSeasonRaidKey, soloRaidInProgress]);
-	  const savedDeckSource = useMemo(() => {
+		  const currentDeckRaidKey = useMemo(() => {
+		    if (soloRaidInProgress) return activeRaidKey;
+		    if (offSeasonRaidKey === SEASON_OFF_RAID_KEY || (offSeasonRaidKey && deckTabs.some((tab) => tab.key === offSeasonRaidKey))) {
+		      return offSeasonRaidKey;
+		    }
+		    return SEASON_OFF_RAID_KEY;
+		  }, [activeRaidKey, deckTabs, offSeasonRaidKey, soloRaidInProgress]);
+  const defaultSelectableRaidKey = useMemo(
+    () =>
+      currentDeckRaidKey && currentDeckRaidKey !== SEASON_OFF_RAID_KEY
+        ? currentDeckRaidKey
+        : getNewestDeckTabKey(deckTabs) ?? null,
+    [currentDeckRaidKey, deckTabs]
+  );
+  const selectedRecommendRaidKey = useMemo(() => {
+    if (recommendRaidKey && deckTabs.some((deckTab) => deckTab.key === recommendRaidKey)) return recommendRaidKey;
+    return defaultSelectableRaidKey;
+  }, [defaultSelectableRaidKey, deckTabs, recommendRaidKey]);
+  const selectedTipRaidKey = useMemo(() => {
+    if (tipRaidKey && deckTabs.some((deckTab) => deckTab.key === tipRaidKey)) return tipRaidKey;
+    return defaultSelectableRaidKey;
+  }, [defaultSelectableRaidKey, deckTabs, tipRaidKey]);
+  const recommendDeckLoadRaidKey = tab === "recommend" ? selectedRecommendRaidKey : currentDeckRaidKey;
+		  const savedDeckSource = useMemo(() => {
 	    if (soloRaidInProgress) return decks;
 	    const seen = new Set<string>();
 	    return [...offSeasonDecks, ...decks].filter((deck) => {
@@ -2362,15 +2380,15 @@ export default function Page() {
 
 	    async function loadCommunityRaidDecks() {
 	      if (tab !== "home" && tab !== "recommend" && tab !== "imaginary") return;
-	      if (!currentDeckRaidKey || currentDeckRaidKey === SEASON_OFF_RAID_KEY) {
-	        setCommunityRaidDecks([]);
-	        setLoadingCommunityRaidDecks(false);
-	        return;
-	      }
+		      if (!recommendDeckLoadRaidKey || recommendDeckLoadRaidKey === SEASON_OFF_RAID_KEY) {
+		        setCommunityRaidDecks([]);
+		        setLoadingCommunityRaidDecks(false);
+		        return;
+		      }
 
       setLoadingCommunityRaidDecks(true);
       try {
-        const nextDecks = await fetchCommunityRaidDecks(currentDeckRaidKey);
+	        const nextDecks = await fetchCommunityRaidDecks(recommendDeckLoadRaidKey);
         if (!cancelled) {
           setCommunityRaidDecks(nextDecks);
         }
@@ -2392,7 +2410,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-	  }, [currentDeckRaidKey, tab]);
+		  }, [recommendDeckLoadRaidKey, tab]);
   const recommendedDecks = useMemo(() => {
     const grouped = new Map<string, { chars: string[]; totalScore: number; usedCount: number }>();
 
@@ -2425,10 +2443,10 @@ export default function Page() {
       .sort(compareRecommendedDecksByScore);
   }, [communityRaidDecks]);
 	  const displayedRecommendedDecks = useMemo(() => {
-	    if (!currentDeckRaidKey || currentDeckRaidKey === SEASON_OFF_RAID_KEY) return [];
+	    if (!selectedRecommendRaidKey || selectedRecommendRaidKey === SEASON_OFF_RAID_KEY) return [];
 	    if (recommendedDecks.length > 0) return recommendedDecks;
-	    return [...(recommendedDeckSnapshots[currentDeckRaidKey]?.decks ?? [])].sort(compareRecommendedDecksByScore);
-	  }, [currentDeckRaidKey, recommendedDeckSnapshots, recommendedDecks]);
+	    return [...(recommendedDeckSnapshots[selectedRecommendRaidKey]?.decks ?? [])].sort(compareRecommendedDecksByScore);
+	  }, [recommendedDeckSnapshots, recommendedDecks, selectedRecommendRaidKey]);
   const best = useMemo(() => pickBest5(activeRaidDecks, { minScore: 0 }), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
 	  const activeRaidLabel = useMemo(
@@ -2438,13 +2456,21 @@ export default function Page() {
 	        : deckTabs.find((deckTab) => deckTab.key === currentDeckRaidKey)?.label ?? currentDeckRaidKey ?? "",
 	    [currentDeckRaidKey, deckTabs]
 	  );
+  const recommendRaidLabel = useMemo(
+    () => deckTabs.find((deckTab) => deckTab.key === selectedRecommendRaidKey)?.label ?? selectedRecommendRaidKey ?? "",
+    [deckTabs, selectedRecommendRaidKey]
+  );
+  const tipRaidLabel = useMemo(
+    () => deckTabs.find((deckTab) => deckTab.key === selectedTipRaidKey)?.label ?? selectedTipRaidKey ?? "",
+    [deckTabs, selectedTipRaidKey]
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadSoloRaidTips() {
       if (tab !== "recommend") return;
-      if (!currentDeckRaidKey || currentDeckRaidKey === SEASON_OFF_RAID_KEY) {
+      if (!selectedTipRaidKey || selectedTipRaidKey === SEASON_OFF_RAID_KEY) {
         setSoloRaidTips([]);
         return;
       }
@@ -2452,7 +2478,7 @@ export default function Page() {
       setLoadingSoloRaidTips(true);
       try {
         const localTips = loadLocalTips()
-          .filter((tip) => tip.raidKey === currentDeckRaidKey)
+          .filter((tip) => tip.raidKey === selectedTipRaidKey)
           .sort((a, b) => b.createdAt - a.createdAt);
 
         if (process.env.NODE_ENV !== "production" && !userId) {
@@ -2462,7 +2488,7 @@ export default function Page() {
           return;
         }
 
-        const remoteTips = await fetchSoloRaidTips(currentDeckRaidKey);
+        const remoteTips = await fetchSoloRaidTips(selectedTipRaidKey);
         if (cancelled) return;
         setSoloRaidTips(process.env.NODE_ENV !== "production" ? [...localTips, ...remoteTips] : remoteTips);
       } catch (error) {
@@ -2470,7 +2496,7 @@ export default function Page() {
         if (!cancelled) {
           setSoloRaidTips(
             loadLocalTips()
-              .filter((tip) => tip.raidKey === currentDeckRaidKey)
+              .filter((tip) => tip.raidKey === selectedTipRaidKey)
               .sort((a, b) => b.createdAt - a.createdAt)
           );
           showToast("솔레 팁 불러오기 실패");
@@ -2487,7 +2513,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [currentDeckRaidKey, tab, userId]);
+  }, [selectedTipRaidKey, tab, userId]);
 
 	  const sortedDecks = useMemo(
 	    () =>
@@ -3783,7 +3809,7 @@ export default function Page() {
 
   async function submitSoloRaidTip(payload: { content: string }) {
     const trimmedContent = payload.content.trim();
-    const targetRaidKey = currentDeckRaidKey && currentDeckRaidKey !== SEASON_OFF_RAID_KEY ? currentDeckRaidKey : null;
+    const targetRaidKey = selectedTipRaidKey && selectedTipRaidKey !== SEASON_OFF_RAID_KEY ? selectedTipRaidKey : null;
 
     if (!targetRaidKey) {
       showToast("현재 솔로레이드가 없어");
@@ -4596,19 +4622,17 @@ export default function Page() {
 
         {tab === "recommend" && (
           <div className="mx-auto w-full lg:max-w-6xl">
-            <RecommendTab
-              raidLabel={activeRaidLabel}
-              raidKey={currentDeckRaidKey ?? ""}
-              deckTabs={savedDeckTabs}
-              recommendDeckTab={currentDeckRaidKey ?? ""}
-              soloRaidActive={soloRaidInProgress}
-              onRecommendDeckTabChange={(key) => {
-                if (soloRaidInProgress) {
-                  setActiveRaidKey(key);
-                } else {
-                  setOffSeasonRaidKey(key);
-                }
-              }}
+	            <RecommendTab
+	              raidLabel={recommendRaidLabel}
+	              raidKey={selectedRecommendRaidKey ?? ""}
+	              tipRaidLabel={tipRaidLabel}
+	              tipRaidKey={selectedTipRaidKey ?? ""}
+	              deckTabs={savedDeckTabs}
+	              recommendDeckTab={selectedRecommendRaidKey ?? ""}
+	              tipDeckTab={selectedTipRaidKey ?? ""}
+	              soloRaidActive={soloRaidInProgress}
+	              onRecommendDeckTabChange={(key) => setRecommendRaidKey(key)}
+	              onTipDeckTabChange={(key) => setTipRaidKey(key)}
               recommendedDecks={displayedRecommendedDecks}
               loadingRecommendedDecks={loadingCommunityRaidDecks || (!soloRaidInProgress && loadingRecommendedDeckSnapshots)}
               videoEmbedUrl={toYouTubeEmbedUrl(recommendedVideoUrl)}

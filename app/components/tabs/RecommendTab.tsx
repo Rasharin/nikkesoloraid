@@ -63,10 +63,14 @@ function readStoredRecommendedDeckSortMode(): RecommendedDeckSortMode {
 type RecommendTabProps = {
   raidLabel: string;
   raidKey: string;
+  tipRaidLabel: string;
+  tipRaidKey: string;
   deckTabs: readonly RecommendTabItem[];
   recommendDeckTab: string;
+  tipDeckTab: string;
   soloRaidActive: boolean;
   onRecommendDeckTabChange: (key: string) => void;
+  onTipDeckTabChange: (key: string) => void;
   recommendedDecks: RecommendedDeck[];
   loadingRecommendedDecks: boolean;
   videoEmbedUrl: string | null;
@@ -89,10 +93,14 @@ type RecommendTabProps = {
 export default function RecommendTab({
   raidLabel,
   raidKey,
+  tipRaidLabel,
+  tipRaidKey,
   deckTabs,
   recommendDeckTab,
+  tipDeckTab,
   soloRaidActive,
   onRecommendDeckTabChange,
+  onTipDeckTabChange,
   recommendedDecks,
   loadingRecommendedDecks,
   videoEmbedUrl,
@@ -441,7 +449,7 @@ export default function RecommendTab({
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold text-neutral-100">솔레 팁</h3>
-              <div className="mt-1 text-xs text-neutral-400">{raidLabel} 팁 게시판</div>
+              <div className="mt-1 text-xs text-neutral-400">{tipRaidLabel} 팁 게시판</div>
             </div>
             <div className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">{tips.length}개 글</div>
           </div>
@@ -453,9 +461,9 @@ export default function RecommendTab({
                   <button
                     key={`tip-${tab.key}`}
                     type="button"
-                    onClick={() => onRecommendDeckTabChange(tab.key)}
+                    onClick={() => onTipDeckTabChange(tab.key)}
                     className={`rounded-xl border px-3 py-1 text-sm transition ${
-                      recommendDeckTab === tab.key
+                      tipDeckTab === tab.key
                         ? "border-white bg-white text-black"
                         : "inactive-raid-tab border-neutral-700 bg-neutral-950/40 text-neutral-200 hover:border-neutral-400"
                     }`}
@@ -487,7 +495,7 @@ export default function RecommendTab({
                     <textarea
                       value={tipContent}
                       onChange={(event) => setTipContent(event.target.value)}
-                      placeholder={`${raidKey} 기준 공략, 조합, 팁을 적어주세요.`}
+                      placeholder={`${tipRaidKey} 기준 공략, 조합, 팁을 적어주세요.`}
                       disabled={savingTip}
                       className="h-32 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/60 px-4 py-3 text-sm outline-none disabled:opacity-60"
                     />
