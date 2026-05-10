@@ -1809,52 +1809,6 @@ export default function Page() {
   }, [isLegalPage, tab]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadSoloRaidTips() {
-      if (tab !== "recommend") return;
-      if (!activeRaidKey) {
-        setSoloRaidTips([]);
-        return;
-      }
-
-      setLoadingSoloRaidTips(true);
-      try {
-        const localTips = loadLocalTips()
-          .filter((tip) => tip.raidKey === activeRaidKey)
-          .sort((a, b) => b.createdAt - a.createdAt);
-
-        if (process.env.NODE_ENV !== "production" && !userId) {
-          if (!cancelled) {
-            setSoloRaidTips(localTips);
-          }
-          return;
-        }
-
-        const remoteTips = await fetchSoloRaidTips(activeRaidKey);
-        if (cancelled) return;
-        setSoloRaidTips(process.env.NODE_ENV !== "production" ? [...localTips, ...remoteTips] : remoteTips);
-      } catch (error) {
-        console.error(error);
-        if (!cancelled) {
-          setSoloRaidTips(loadLocalTips().filter((tip) => tip.raidKey === activeRaidKey).sort((a, b) => b.createdAt - a.createdAt));
-          showToast("솔레 팁 불러오기 실패");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingSoloRaidTips(false);
-        }
-      }
-    }
-
-    void loadSoloRaidTips();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeRaidKey, tab, userId]);
-
-  useEffect(() => {
     if (!authResolved) return;
 
     if (!userId) {
@@ -2484,6 +2438,57 @@ export default function Page() {
 	        : deckTabs.find((deckTab) => deckTab.key === currentDeckRaidKey)?.label ?? currentDeckRaidKey ?? "",
 	    [currentDeckRaidKey, deckTabs]
 	  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSoloRaidTips() {
+      if (tab !== "recommend") return;
+      if (!currentDeckRaidKey || currentDeckRaidKey === SEASON_OFF_RAID_KEY) {
+        setSoloRaidTips([]);
+        return;
+      }
+
+      setLoadingSoloRaidTips(true);
+      try {
+        const localTips = loadLocalTips()
+          .filter((tip) => tip.raidKey === currentDeckRaidKey)
+          .sort((a, b) => b.createdAt - a.createdAt);
+
+        if (process.env.NODE_ENV !== "production" && !userId) {
+          if (!cancelled) {
+            setSoloRaidTips(localTips);
+          }
+          return;
+        }
+
+        const remoteTips = await fetchSoloRaidTips(currentDeckRaidKey);
+        if (cancelled) return;
+        setSoloRaidTips(process.env.NODE_ENV !== "production" ? [...localTips, ...remoteTips] : remoteTips);
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setSoloRaidTips(
+            loadLocalTips()
+              .filter((tip) => tip.raidKey === currentDeckRaidKey)
+              .sort((a, b) => b.createdAt - a.createdAt)
+          );
+          showToast("솔레 팁 불러오기 실패");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingSoloRaidTips(false);
+        }
+      }
+    }
+
+    void loadSoloRaidTips();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentDeckRaidKey, tab, userId]);
+
 	  const sortedDecks = useMemo(
 	    () =>
 	      savedDeckSource
@@ -3778,8 +3783,9 @@ export default function Page() {
 
   async function submitSoloRaidTip(payload: { content: string }) {
     const trimmedContent = payload.content.trim();
+    const targetRaidKey = currentDeckRaidKey && currentDeckRaidKey !== SEASON_OFF_RAID_KEY ? currentDeckRaidKey : null;
 
-    if (!activeRaidKey) {
+    if (!targetRaidKey) {
       showToast("현재 솔로레이드가 없어");
       return false;
     }
@@ -3792,7 +3798,7 @@ export default function Page() {
     if (process.env.NODE_ENV !== "production" && !userId) {
       const nextTip: SoloRaidTip = {
         id: createLocalTipId(),
-        raidKey: activeRaidKey,
+        raidKey: targetRaidKey,
         content: trimmedContent,
         userId: DEV_LOCAL_TIP_USER_ID,
         createdAt: Date.now(),
@@ -3816,7 +3822,7 @@ export default function Page() {
       const { data, error } = await supabase
         .from(SOLO_RAID_TIPS_TABLE)
         .insert({
-          raid_key: activeRaidKey,
+          raid_key: targetRaidKey,
           content: trimmedContent,
           user_id: currentUserId,
         })
