@@ -1,2 +1,0 @@
--- Included in supabase/decks.sql.
--- Keep this file as a no-op so older references do not apply a conflicting migration twice.

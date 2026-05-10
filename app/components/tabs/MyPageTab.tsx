@@ -16,6 +16,13 @@ type RecommendationRecord = {
   decks: RecommendationDeck[];
   updatedAt: number;
 };
+type BossUserStat = {
+  raidKey: string;
+  raidLabel: string;
+  userCount: number;
+  active: boolean;
+  endedAt: number | null;
+};
 
 type DeckTabItem = {
   readonly key: string;
@@ -53,6 +60,10 @@ type MyPageTabProps = {
   isMaster: boolean;
   showBossManagement: boolean;
   recommendationHistory: Record<string, RecommendationRecord>;
+  onlineUserCount: number;
+  totalUserCount: number;
+  bossUserStats: readonly BossUserStat[];
+  loadingUserStats: boolean;
   soloRaidActive: boolean;
   onSyncNikkes: () => Promise<void>;
   syncingNikkes: boolean;
@@ -101,6 +112,10 @@ export default function MyPageTab({
   isMaster,
   showBossManagement,
   recommendationHistory,
+  onlineUserCount,
+  totalUserCount,
+  bossUserStats,
+  loadingUserStats,
   soloRaidActive,
   onSyncNikkes,
   syncingNikkes,
@@ -165,6 +180,24 @@ export default function MyPageTab({
     () => nikkes.filter((nikke) => recommendedNameSet.has(nikke.name)),
     [nikkes, recommendedNameSet]
   );
+  const bossUserStatsByKey = useMemo(() => new Map(bossUserStats.map((stat) => [stat.raidKey, stat])), [bossUserStats]);
+  const displayBossUserStats = useMemo(() => {
+    const fromTabs = deckTabs.map((tab) => {
+      const saved = bossUserStatsByKey.get(tab.key);
+      return (
+        saved ?? {
+          raidKey: tab.key,
+          raidLabel: tab.label,
+          userCount: 0,
+          active: soloRaidActive,
+          endedAt: null,
+        }
+      );
+    });
+
+    const tabKeys = new Set(deckTabs.map((tab) => tab.key));
+    return [...fromTabs, ...bossUserStats.filter((stat) => !tabKeys.has(stat.raidKey))];
+  }, [bossUserStats, bossUserStatsByKey, deckTabs, soloRaidActive]);
 
   useEffect(() => {
     if (!deckTabs.some((tab) => tab.key === openRaidKey)) {
@@ -721,6 +754,47 @@ export default function MyPageTab({
               </div>
             </div>
           ) : null}
+        </section>
+      ) : null}
+
+      {showBossManagement ? (
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+              <div className="text-xs text-neutral-400">현재 접속자</div>
+              <div className="mt-1 text-2xl font-semibold tabular-nums text-neutral-100">{onlineUserCount}</div>
+            </div>
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+              <div className="text-xs text-neutral-400">누적 이용자</div>
+              <div className="mt-1 text-2xl font-semibold tabular-nums text-neutral-100">
+                {loadingUserStats ? "..." : totalUserCount}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+            <div className="mb-2 text-xs text-neutral-400">보스별 이용자</div>
+            <div className="flex flex-wrap gap-2">
+              {displayBossUserStats.length === 0 ? (
+                <div className="text-sm text-neutral-500">0</div>
+              ) : (
+                displayBossUserStats.map((stat) => (
+                  <button
+                    key={stat.raidKey}
+                    type="button"
+                    className={`rounded-2xl border px-3 py-2 text-left transition active:scale-[0.99] ${
+                      stat.active
+                        ? "border-sky-500/50 bg-sky-500/10 text-sky-100"
+                        : "border-neutral-700 bg-neutral-950/30 text-neutral-200"
+                    }`}
+                  >
+                    <span className="mr-2 text-sm font-medium">{stat.raidLabel}</span>
+                    <span className="text-sm tabular-nums text-neutral-400">{stat.userCount}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
         </section>
       ) : null}
 

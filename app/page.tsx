@@ -143,6 +143,13 @@ type AppConfigRow = {
   solo_raid_active: boolean | null;
   solo_raid_tabs: unknown;
 };
+type BossUserStat = {
+  raidKey: string;
+  raidLabel: string;
+  userCount: number;
+  active: boolean;
+  endedAt: number | null;
+};
 type DeckTabItem = {
   key: string;
   label: string;
@@ -281,6 +288,10 @@ const LOCAL_CONTACT_INQUIRIES_KEY = "soloraid_local_contact_inquiries_v1";
 const SCORE_DISPLAY_MODE_KEY = "soloraid_score_display_mode_v1";
 const USAGE_POSTS_TABLE = "usage_posts";
 const NOTICE_POSTS_TABLE = "notice_posts";
+const USER_STATS_TABLE = "site_user_stats";
+const RAID_USER_STATS_TABLE = "raid_user_stats";
+const RAID_USER_ARCHIVES_TABLE = "raid_user_archives";
+const USER_STATS_CLIENT_ID_KEY = "soloraid_stats_client_id_v1";
 const SUPABASE_DATA_CACHE_KEY = "soloraid_supabase_data_cache_v1";
 const SUPABASE_DATA_CACHE_TTL = 1000 * 60 * 10;
 const USER_DECKS_CACHE_KEY = "soloraid_user_decks_cache_v1";
@@ -319,6 +330,24 @@ const MAX_DECK_CHARS = 5;
 
 function createLocalTipId() {
   return `local-tip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getStatsClientId() {
+  if (typeof window === "undefined") return "";
+
+  try {
+    const saved = localStorage.getItem(USER_STATS_CLIENT_ID_KEY);
+    if (saved) return saved;
+
+    const next =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `client-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(USER_STATS_CLIENT_ID_KEY, next);
+    return next;
+  } catch {
+    return "";
+  }
 }
 
 function slugifyRaidLabel(label: string) {
@@ -1235,6 +1264,10 @@ export default function Page() {
   const [loadingNoticePosts, setLoadingNoticePosts] = useState(false);
   const [savingNoticePost, setSavingNoticePost] = useState(false);
   const [deletingNoticePostId, setDeletingNoticePostId] = useState<string | null>(null);
+  const [onlineUserCount, setOnlineUserCount] = useState(1);
+  const [totalUserCount, setTotalUserCount] = useState(0);
+  const [bossUserStats, setBossUserStats] = useState<BossUserStat[]>([]);
+  const [loadingUserStats, setLoadingUserStats] = useState(false);
   const [termsText, setTermsText] = useState("");
   const [privacyText, setPrivacyText] = useState("");
   const [savingLegalTextKey, setSavingLegalTextKey] = useState<string | null>(null);
@@ -1295,6 +1328,104 @@ export default function Page() {
 
     if (error) throw error;
     return ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
+  }
+
+  async function trackSiteUser(clientId: string) {
+    if (!clientId) return;
+
+    const { error } = await supabase.from(USER_STATS_TABLE).upsert(
+      {
+        client_id: clientId,
+        user_id: userId,
+        last_seen: new Date().toISOString(),
+      },
+      { onConflict: "client_id" }
+    );
+
+    if (error) {
+      console.warn("[stats] site user tracking skipped", error.message);
+    }
+  }
+
+  async function trackRaidUser(clientId: string, raidKey: string, raidLabel: string) {
+    if (!clientId || !raidKey) return;
+
+    const { error } = await supabase.from(RAID_USER_STATS_TABLE).upsert(
+      {
+        raid_key: raidKey,
+        raid_label: raidLabel,
+        client_id: clientId,
+        user_id: userId,
+        last_seen: new Date().toISOString(),
+        ended_at: null,
+      },
+      { onConflict: "raid_key,client_id" }
+    );
+
+    if (error) {
+      console.warn("[stats] raid user tracking skipped", error.message);
+    }
+  }
+
+  async function refreshUserStats() {
+    setLoadingUserStats(true);
+    try {
+      const [totalResult, activeResult, archiveResult] = await Promise.all([
+        supabase.from(USER_STATS_TABLE).select("client_id", { count: "exact", head: true }),
+        supabase.from(RAID_USER_STATS_TABLE).select("raid_key,raid_label,ended_at"),
+        supabase.from(RAID_USER_ARCHIVES_TABLE).select("raid_key,raid_label,user_count,ended_at"),
+      ]);
+
+      if (totalResult.error) throw totalResult.error;
+      if (activeResult.error) throw activeResult.error;
+      if (archiveResult.error) throw archiveResult.error;
+
+      const byRaid = new Map<string, BossUserStat>();
+      for (const row of (activeResult.data ?? []) as Array<{ raid_key: string | null; raid_label: string | null; ended_at: string | null }>) {
+        if (!row.raid_key) continue;
+        const existing = byRaid.get(row.raid_key);
+        byRaid.set(row.raid_key, {
+          raidKey: row.raid_key,
+          raidLabel: row.raid_label?.trim() || row.raid_key,
+          userCount: (existing?.userCount ?? 0) + 1,
+          active: Boolean(existing?.active) || !row.ended_at,
+          endedAt: Math.max(existing?.endedAt ?? 0, row.ended_at ? Date.parse(row.ended_at) : 0) || null,
+        });
+      }
+
+      for (const row of (archiveResult.data ?? []) as Array<{
+        raid_key: string | null;
+        raid_label: string | null;
+        user_count: number | string | null;
+        ended_at: string | null;
+      }>) {
+        if (!row.raid_key) continue;
+        const archivedCount = Number(row.user_count);
+        if (!Number.isFinite(archivedCount)) continue;
+        const existing = byRaid.get(row.raid_key);
+        byRaid.set(row.raid_key, {
+          raidKey: row.raid_key,
+          raidLabel: row.raid_label?.trim() || existing?.raidLabel || row.raid_key,
+          userCount: Math.max(existing?.userCount ?? 0, archivedCount),
+          active: existing?.active ?? false,
+          endedAt: row.ended_at ? Date.parse(row.ended_at) : existing?.endedAt ?? null,
+        });
+      }
+
+      setTotalUserCount(totalResult.count ?? 0);
+      setBossUserStats(
+        Array.from(byRaid.values()).sort((a, b) => {
+          if (a.active !== b.active) return a.active ? -1 : 1;
+          return (b.endedAt ?? 0) - (a.endedAt ?? 0);
+        })
+      );
+    } catch (error) {
+      console.warn("[stats] user stats loading skipped", error);
+      setTotalUserCount(0);
+      setBossUserStats([]);
+    } finally {
+      setLoadingUserStats(false);
+    }
   }
 
   async function fetchFavoriteNames(currentUserId: string) {
@@ -2375,6 +2506,52 @@ export default function Page() {
   const shouldShowCalculator = canAccessCalculator;
   const canManageBosses = isMaster || process.env.NODE_ENV !== "production";
 
+  useEffect(() => {
+    const clientId = getStatsClientId();
+    if (!clientId) return;
+
+    void trackSiteUser(clientId);
+    const intervalId = window.setInterval(() => {
+      void trackSiteUser(clientId);
+    }, 1000 * 60);
+
+    const channel = supabase.channel("site-online-users", {
+      config: {
+        presence: {
+          key: clientId,
+        },
+      },
+    });
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        setOnlineUserCount(Object.keys(channel.presenceState()).length || 1);
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({ online_at: new Date().toISOString() });
+        }
+      });
+
+    return () => {
+      window.clearInterval(intervalId);
+      void supabase.removeChannel(channel);
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!soloRaidInProgress || !currentDeckRaidKey || currentDeckRaidKey === SEASON_OFF_RAID_KEY) return;
+    const clientId = getStatsClientId();
+    if (!clientId) return;
+
+    void trackRaidUser(clientId, currentDeckRaidKey, activeRaidLabel || currentDeckRaidKey);
+  }, [activeRaidLabel, currentDeckRaidKey, soloRaidInProgress, userId]);
+
+  useEffect(() => {
+    if (!canManageBosses) return;
+    void refreshUserStats();
+  }, [canManageBosses, tab, onlineUserCount, soloRaidInProgress, currentDeckRaidKey]);
+
 	  useEffect(() => {
 	    if (soloRaidInProgress) return;
 	    if (offSeasonRaidKey === SEASON_OFF_RAID_KEY || (offSeasonRaidKey && deckTabs.some((tab) => tab.key === offSeasonRaidKey))) return;
@@ -3342,9 +3519,9 @@ export default function Page() {
         ? [...finalLocalDecks, ...offSeasonDecks.filter((deck) => deck.raidKey !== finalRaidKey)]
         : offSeasonDecks;
 
-      if (currentUserId && finalRaidKey) {
-        await persistRecommendedDeckSnapshot(currentUserId, finalRaidKey, activeRaidLabel, recommendedDecks);
-        if (canRecommend) {
+	      if (currentUserId && finalRaidKey) {
+	        await persistRecommendedDeckSnapshot(currentUserId, finalRaidKey, activeRaidLabel, recommendedDecks);
+	        if (canRecommend) {
           const finalRecord: RecommendationRecord = {
             raidKey: finalRaidKey,
             raidLabel: activeRaidLabel,
@@ -3359,11 +3536,38 @@ export default function Page() {
           setRecommendationHistory((prev) => ({
             ...prev,
             [finalRaidKey]: finalRecord,
-          }));
-        }
-      }
+	          }));
+	        }
+	      }
 
-      const { data, error } = await supabase
+      if (finalRaidKey) {
+        const endedAt = new Date().toISOString();
+        const { count, error: countError } = await supabase
+          .from(RAID_USER_STATS_TABLE)
+          .select("client_id", { count: "exact", head: true })
+          .eq("raid_key", finalRaidKey);
+        if (countError) throw countError;
+
+        const { error: archiveError } = await supabase.from(RAID_USER_ARCHIVES_TABLE).upsert(
+          {
+            raid_key: finalRaidKey,
+            raid_label: activeRaidLabel || finalRaidKey,
+            user_count: count ?? 0,
+            ended_at: endedAt,
+          },
+          { onConflict: "raid_key" }
+        );
+        if (archiveError) throw archiveError;
+
+        const { error: closeStatsError } = await supabase
+          .from(RAID_USER_STATS_TABLE)
+          .update({ ended_at: endedAt })
+          .eq("raid_key", finalRaidKey)
+          .is("ended_at", null);
+        if (closeStatsError) throw closeStatsError;
+      }
+	
+	      const { data, error } = await supabase
         .from("app_config")
         .update({
           solo_raid_active: false,
@@ -4480,6 +4684,10 @@ export default function Page() {
             isMaster={isMaster}
             showBossManagement={canManageBosses}
             recommendationHistory={recommendationHistory}
+            onlineUserCount={onlineUserCount}
+            totalUserCount={totalUserCount}
+            bossUserStats={bossUserStats}
+            loadingUserStats={loadingUserStats}
             soloRaidActive={soloRaidActive}
             onSyncNikkes={onSyncBucket}
             syncingNikkes={syncing}
