@@ -296,6 +296,7 @@ const SUPABASE_DATA_CACHE_KEY = "soloraid_supabase_data_cache_v1";
 const SUPABASE_DATA_CACHE_TTL = 1000 * 60 * 10;
 const USER_DECKS_CACHE_KEY = "soloraid_user_decks_cache_v1";
 const USER_DECKS_CACHE_TTL = 1000 * 60 * 5;
+const STORAGE_IMAGE_CACHE_CONTROL_SECONDS = "31536000";
 const THEME_MODE_KEY = "soloraid_theme_mode_v1";
 
 function readStoredScoreDisplayMode(): ScoreDisplayMode {
@@ -3415,7 +3416,7 @@ export default function Page() {
       const { error: uploadError } = await supabase.storage
         .from("boss-images")
         .upload(imagePath, imageFile, {
-          cacheControl: "3600",
+          cacheControl: STORAGE_IMAGE_CACHE_CONTROL_SECONDS,
           upsert: false,
         });
 
@@ -3496,7 +3497,7 @@ export default function Page() {
       const { error: uploadError } = await supabase.storage
         .from("nikke-images")
         .upload(imagePath, imageFile, {
-          cacheControl: "3600",
+          cacheControl: STORAGE_IMAGE_CACHE_CONTROL_SECONDS,
           upsert: true,
         });
 
@@ -4129,7 +4130,7 @@ export default function Page() {
           const { error: uploadError } = await supabase.storage
             .from("usage-board-images")
             .upload(imagePath, block.file, {
-              cacheControl: "3600",
+              cacheControl: STORAGE_IMAGE_CACHE_CONTROL_SECONDS,
               upsert: false,
             });
 
