@@ -500,6 +500,10 @@ function compareNikkeNamePriority(a: NikkeRow, b: NikkeRow): number {
 }
 
 function getPublicUrl(bucket: "nikke-images" | "boss-images" | "usage-board-images", path: string) {
+  if (bucket === "nikke-images") {
+    return `/nikke-images/${path}`;
+  }
+
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }
