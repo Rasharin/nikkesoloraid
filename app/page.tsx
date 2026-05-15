@@ -3534,6 +3534,41 @@ export default function Page() {
     }
   }
 
+  async function updateNikke(payload: {
+    id: string;
+    name: string;
+    image_path: string | null;
+    burst: number | null;
+    aliases: string[];
+    role: NikkeRole;
+  }) {
+    if (!isMasterUser) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+    try {
+      const { error } = await supabase
+        .from("nikkes")
+        .update({
+          name: payload.name,
+          image_path: payload.image_path,
+          burst: payload.burst,
+          aliases: payload.aliases,
+          role: payload.role,
+        })
+        .eq("id", payload.id);
+
+      if (error) throw error;
+      await refreshSupabase();
+      showToast("니케 수정 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("니케 수정 실패");
+      return false;
+    }
+  }
+
   async function endSoloRaid() {
     if (!canManageBosses) {
       showToast("마스터 계정만 가능");
@@ -4729,6 +4764,7 @@ export default function Page() {
             onSyncNikkes={onSyncBucket}
             syncingNikkes={syncing}
             onAddNikke={addNikke}
+            onUpdateNikke={updateNikke}
             nikkes={nikkes}
             recommendedNikkeNames={recommendedNikkeNames}
             onSaveRecommendedNikkes={saveRecommendedNikkes}

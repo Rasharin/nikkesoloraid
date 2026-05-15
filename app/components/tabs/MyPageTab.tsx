@@ -76,6 +76,14 @@ type MyPageTabProps = {
     aliases: string[];
     imageFile: File | null;
   }) => Promise<boolean>;
+  onUpdateNikke: (payload: {
+    id: string;
+    name: string;
+    image_path: string | null;
+    burst: number | null;
+    aliases: string[];
+    role: NikkeRoleValue;
+  }) => Promise<boolean>;
   nikkes: NikkeRow[];
   recommendedNikkeNames: string[];
   onSaveRecommendedNikkes: (names: string[]) => Promise<boolean>;
@@ -121,6 +129,7 @@ export default function MyPageTab({
   onSyncNikkes,
   syncingNikkes,
   onAddNikke,
+  onUpdateNikke,
   nikkes,
   recommendedNikkeNames,
   onSaveRecommendedNikkes,
@@ -176,6 +185,16 @@ export default function MyPageTab({
   const [nikkeImageFile, setNikkeImageFile] = useState<File | null>(null);
   const [nikkeImageInputKey, setNikkeImageInputKey] = useState(0);
   const [savingNikke, setSavingNikke] = useState(false);
+  const [selectedNikkeForEdit, setSelectedNikkeForEdit] = useState<NikkeRow | null>(null);
+  const [editingNikkeValues, setEditingNikkeValues] = useState<{
+    name: string;
+    image_path: string;
+    burst: string;
+    aliases: string;
+    role: string;
+  } | null>(null);
+  const [editingNikkeField, setEditingNikkeField] = useState<string | null>(null);
+  const [savingNikkeEdit, setSavingNikkeEdit] = useState(false);
   const recommendedNameSet = useMemo(() => new Set(recommendedNikkeNames), [recommendedNikkeNames]);
   const recommendedNikkes = useMemo(
     () => nikkes.filter((nikke) => recommendedNameSet.has(nikke.name)),
@@ -258,6 +277,43 @@ export default function MyPageTab({
       setNikkeImageInputKey((prev) => prev + 1);
     } finally {
       setSavingNikke(false);
+    }
+  }
+
+  async function handleSaveNikkeEdit() {
+    if (!selectedNikkeForEdit || !editingNikkeValues || savingNikkeEdit) return;
+    setSavingNikkeEdit(true);
+    try {
+      const burstNum = parseInt(editingNikkeValues.burst);
+      const aliases = editingNikkeValues.aliases
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+      const ok = await onUpdateNikke({
+        id: selectedNikkeForEdit.id,
+        name: editingNikkeValues.name.trim(),
+        image_path: editingNikkeValues.image_path.trim() || null,
+        burst: isNaN(burstNum) ? null : burstNum,
+        aliases,
+        role: (editingNikkeValues.role || null) as NikkeRoleValue,
+      });
+      if (ok) {
+        setSelectedNikkeForEdit((prev) =>
+          prev
+            ? {
+                ...prev,
+                name: editingNikkeValues.name.trim(),
+                image_path: editingNikkeValues.image_path.trim() || null,
+                burst: isNaN(burstNum) ? null : burstNum,
+                aliases,
+                role: (editingNikkeValues.role || null) as NikkeRoleValue,
+              }
+            : null
+        );
+        setEditingNikkeField(null);
+      }
+    } finally {
+      setSavingNikkeEdit(false);
     }
   }
 
@@ -583,6 +639,173 @@ export default function MyPageTab({
                   </div>
                 </div>
               </div>
+
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+              <div className="text-sm font-medium text-neutral-100">3. 니케 목록 및 수정</div>
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                <section className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
+                  <div className="mb-2 text-sm font-semibold text-neutral-100">전체 니케 목록</div>
+                  <div className="max-h-[480px] overflow-y-auto pr-1">
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {nikkes.map((nikke) =>
+                        renderAdminNikkeTile(nikke, {
+                          selected: selectedNikkeForEdit?.id === nikke.id,
+                          onClick: () => {
+                            setSelectedNikkeForEdit(nikke);
+                            setEditingNikkeValues({
+                              name: nikke.name,
+                              image_path: nikke.image_path ?? "",
+                              burst: nikke.burst ? String(nikke.burst) : "",
+                              aliases: nikke.aliases.join(", "),
+                              role: nikke.role ?? "",
+                            });
+                            setEditingNikkeField(null);
+                          },
+                        })
+                      )}
+                    </div>
+                  </div>
+                </section>
+
+                <section className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
+                  {selectedNikkeForEdit && editingNikkeValues ? (
+                    <>
+                      <div className="mb-1 text-sm font-semibold text-neutral-100">니케 정보 수정</div>
+                      <div className="mb-3 text-xs text-neutral-400">항목을 더블클릭하여 수정</div>
+                      <div className="space-y-2">
+                        <div>
+                          <div className="mb-1 text-xs text-neutral-400">이름</div>
+                          {editingNikkeField === "name" ? (
+                            <input
+                              autoFocus
+                              value={editingNikkeValues.name}
+                              onChange={(e) => setEditingNikkeValues((prev) => prev ? { ...prev, name: e.target.value } : prev)}
+                              onBlur={() => setEditingNikkeField(null)}
+                              className="w-full rounded-lg border border-sky-500/50 bg-neutral-950/50 px-3 py-2 text-sm outline-none"
+                            />
+                          ) : (
+                            <div
+                              onDoubleClick={() => setEditingNikkeField("name")}
+                              className="cursor-pointer rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2 text-sm text-neutral-100 hover:border-neutral-600"
+                              title="더블클릭하여 수정"
+                            >
+                              {editingNikkeValues.name || <span className="text-neutral-500">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="mb-1 text-xs text-neutral-400">이미지명</div>
+                          {editingNikkeField === "image_path" ? (
+                            <input
+                              autoFocus
+                              value={editingNikkeValues.image_path}
+                              onChange={(e) => setEditingNikkeValues((prev) => prev ? { ...prev, image_path: e.target.value } : prev)}
+                              onBlur={() => setEditingNikkeField(null)}
+                              className="w-full rounded-lg border border-sky-500/50 bg-neutral-950/50 px-3 py-2 text-sm outline-none"
+                            />
+                          ) : (
+                            <div
+                              onDoubleClick={() => setEditingNikkeField("image_path")}
+                              className="cursor-pointer rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2 text-sm text-neutral-100 hover:border-neutral-600"
+                              title="더블클릭하여 수정"
+                            >
+                              {editingNikkeValues.image_path || <span className="text-neutral-500">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="mb-1 text-xs text-neutral-400">버스트</div>
+                          {editingNikkeField === "burst" ? (
+                            <select
+                              autoFocus
+                              value={editingNikkeValues.burst}
+                              onChange={(e) => setEditingNikkeValues((prev) => prev ? { ...prev, burst: e.target.value } : prev)}
+                              onBlur={() => setEditingNikkeField(null)}
+                              className="w-full rounded-lg border border-sky-500/50 bg-neutral-950/50 px-3 py-2 text-sm outline-none"
+                            >
+                              <option value="">-</option>
+                              <option value="1">I</option>
+                              <option value="2">II</option>
+                              <option value="3">III</option>
+                            </select>
+                          ) : (
+                            <div
+                              onDoubleClick={() => setEditingNikkeField("burst")}
+                              className="cursor-pointer rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2 text-sm text-neutral-100 hover:border-neutral-600"
+                              title="더블클릭하여 수정"
+                            >
+                              {editingNikkeValues.burst === "1" ? "I" : editingNikkeValues.burst === "2" ? "II" : editingNikkeValues.burst === "3" ? "III" : <span className="text-neutral-500">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="mb-1 text-xs text-neutral-400">별칭 (aliases, 쉼표 구분)</div>
+                          {editingNikkeField === "aliases" ? (
+                            <input
+                              autoFocus
+                              value={editingNikkeValues.aliases}
+                              onChange={(e) => setEditingNikkeValues((prev) => prev ? { ...prev, aliases: e.target.value } : prev)}
+                              onBlur={() => setEditingNikkeField(null)}
+                              className="w-full rounded-lg border border-sky-500/50 bg-neutral-950/50 px-3 py-2 text-sm outline-none"
+                            />
+                          ) : (
+                            <div
+                              onDoubleClick={() => setEditingNikkeField("aliases")}
+                              className="cursor-pointer rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2 text-sm text-neutral-100 hover:border-neutral-600"
+                              title="더블클릭하여 수정"
+                            >
+                              {editingNikkeValues.aliases || <span className="text-neutral-500">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="mb-1 text-xs text-neutral-400">역할</div>
+                          {editingNikkeField === "role" ? (
+                            <select
+                              autoFocus
+                              value={editingNikkeValues.role}
+                              onChange={(e) => setEditingNikkeValues((prev) => prev ? { ...prev, role: e.target.value } : prev)}
+                              onBlur={() => setEditingNikkeField(null)}
+                              className="w-full rounded-lg border border-sky-500/50 bg-neutral-950/50 px-3 py-2 text-sm outline-none"
+                            >
+                              <option value="">-</option>
+                              {roles.map((r) => (
+                                <option key={r.v} value={r.v}>{r.label}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div
+                              onDoubleClick={() => setEditingNikkeField("role")}
+                              className="cursor-pointer rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2 text-sm text-neutral-100 hover:border-neutral-600"
+                              title="더블클릭하여 수정"
+                            >
+                              {roles.find((r) => r.v === editingNikkeValues.role)?.label ?? <span className="text-neutral-500">-</span>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveNikkeEdit()}
+                        disabled={savingNikkeEdit}
+                        className="mt-4 w-full rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-sm font-semibold text-sky-100 active:scale-[0.99] disabled:opacity-50"
+                      >
+                        {savingNikkeEdit ? "수정 중..." : "수정하기"}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex min-h-[200px] items-center justify-center text-sm text-neutral-500">
+                      왼쪽 목록에서 니케를 선택하세요
+                    </div>
+                  )}
+                </section>
+              </div>
+            </div>
             </div>
           ) : null}
 
