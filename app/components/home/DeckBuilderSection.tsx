@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import Image from "next/image";
 import type { DragEndEvent, DragOverEvent } from "@dnd-kit/core";
 import { memo, useMemo, type Ref } from "react";
 import { rectSortingStrategy, SortableContext, arrayMove } from "@dnd-kit/sortable";
@@ -204,10 +205,9 @@ export function renderDragOverlayCard(nikke: NikkeRow | undefined, imageUrl: str
       className="pointer-events-none relative z-[80] origin-center scale-[1.03] cursor-grabbing rounded-2xl border border-cyan-200/70 bg-[var(--theme-panel)] p-1.5 shadow-[0_28px_70px_rgba(0,0,0,0.5)] ring-2 ring-cyan-300/45"
       style={{ width: width ? `${Math.round(width)}px` : "88px" }}
     >
-      <div className="aspect-square overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+      <div className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]">
         {imageUrl ? (
-          <img src={imageUrl} alt={nikke.name} draggable={false} className="h-full w-full object-cover" />
+          <Image fill src={imageUrl} alt={nikke.name} draggable={false} className="object-cover" sizes="(max-width: 640px) 20vw, 100px" />
         ) : (
           <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
         )}

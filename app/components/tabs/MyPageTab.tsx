@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
 import type { ScoreDisplayMode } from "../../../lib/score-format";
@@ -367,10 +368,9 @@ export default function MyPageTab({
           </button>
         ) : null}
 
-        <div className="aspect-square w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
+        <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
           {url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={url} alt={displayName} className="h-full w-full object-cover" />
+            <Image fill src={url} alt={displayName} className="object-cover" sizes="(max-width: 640px) 25vw, 128px" />
           ) : (
             <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
           )}

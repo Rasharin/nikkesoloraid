@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import Image from "next/image";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { memo } from "react";
@@ -84,13 +85,12 @@ function DraggableNikkeCardComponent({
       )}
 
       <div
-        className={`aspect-square w-full overflow-hidden rounded-xl border bg-[var(--card)] transition ${
+        className={`relative aspect-square w-full overflow-hidden rounded-xl border bg-[var(--card)] transition ${
           isDragging || inDeck ? "border-[var(--theme-border-strong)] shadow-[0_0_0_1px_rgba(255,255,255,0.55)]" : "border-[var(--border)]"
         }`}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         {imageUrl ? (
-          <img src={imageUrl} alt={nikke.name} draggable={false} className="h-full w-full object-cover pointer-events-none" />
+          <Image fill src={imageUrl} alt={nikke.name} draggable={false} className="object-cover pointer-events-none" sizes="(max-width: 640px) 20vw, 100px" />
         ) : (
           <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
         )}

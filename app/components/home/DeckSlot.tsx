@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import Image from "next/image";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
@@ -76,8 +77,7 @@ export default function DeckSlot({
             {...attributes}
             {...listeners}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt={displayName} draggable={false} className="pointer-events-none h-full w-full object-cover" />
+            <Image fill src={imageUrl} alt={displayName} draggable={false} className="pointer-events-none object-cover" sizes="(max-width: 640px) 20vw, 100px" />
           </button>
         ) : (
           <div className="grid h-full w-full place-items-center text-lg text-neutral-600">+</div>

@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { getSubmasterDecks, pickBest5, type RecommendationSourceDeck } from "../../../lib/recommend";
@@ -150,10 +151,9 @@ export default function GiseonDeckSection({
 
                     return (
                       <div key={`${deck.id}-${name}`} className="min-w-0">
-                        <div className="aspect-square w-full overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900">
+                        <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900">
                           {imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
+                            <Image fill src={imageUrl} alt={name} className="object-cover" sizes="(max-width: 640px) 20vw, 100px" />
                           ) : (
                             <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
                           )}

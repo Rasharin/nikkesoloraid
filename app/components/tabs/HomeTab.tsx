@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import Image from "next/image";
 import {
   closestCenter,
   DndContext,
@@ -126,15 +127,14 @@ function RecommendedDeckSlot({ deckId, slotIndex, name, imageUrl, highlighted, c
       <div
         ref={setRefs}
         style={style}
-        className={`aspect-square overflow-hidden rounded-lg border bg-neutral-900 transition-all duration-150 ${
+        className={`relative aspect-square overflow-hidden rounded-lg border bg-neutral-900 transition-all duration-150 ${
           isDragging ? "opacity-35" : ""
         } ${stateClass}`}
         {...attributes}
         {...listeners}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         {imageUrl ? (
-          <img src={imageUrl} alt={name} draggable={false} className="h-full w-full object-cover" />
+          <Image fill src={imageUrl} alt={name} draggable={false} className="object-cover" sizes="(max-width: 640px) 20vw, 100px" />
         ) : (
           <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
         )}

@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import Image from "next/image";
 import {
   closestCenter,
   DndContext,
@@ -414,8 +415,7 @@ function SpareSlot({ index, name, nikke, imageUrl, activeDrag, hovered, canDrop,
             {...attributes}
             {...listeners}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imageUrl} alt={displayName} draggable={false} className="pointer-events-none h-full w-full object-cover" />
+            <Image fill src={imageUrl} alt={displayName} draggable={false} className="pointer-events-none object-cover" sizes="(max-width: 640px) 20vw, 100px" />
           </button>
         ) : (
           <div className="grid h-full w-full place-items-center text-lg text-neutral-600">+</div>
@@ -995,10 +995,9 @@ export default function ImaginarySoloRaidTab({
 
             return (
               <div key={`${deck.id}-${slotIndex}-${name}`} className="min-w-0">
-                <div className="aspect-square overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div className="relative aspect-square overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900">
                   {imageUrl ? (
-                    <img src={imageUrl} alt={name} draggable={false} className="h-full w-full object-cover" />
+                    <Image fill src={imageUrl} alt={name} draggable={false} className="object-cover" sizes="(max-width: 640px) 20vw, 100px" />
                   ) : (
                     <div className="grid h-full w-full place-items-center text-[10px] text-neutral-600">no image</div>
                   )}
@@ -1068,10 +1067,9 @@ export default function ImaginarySoloRaidTab({
 
             return (
               <div key={`${deck.id}-${index}-${name ?? "empty"}`} className="min-w-0">
-                <div className="aspect-square overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]">
+                <div className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]">
                   {imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={imageUrl} alt={name ?? ""} draggable={false} className="h-full w-full object-cover" />
+                    <Image fill src={imageUrl} alt={name ?? ""} draggable={false} className="object-cover" sizes="(max-width: 640px) 20vw, 100px" />
                   ) : (
                     <div className="grid h-full w-full place-items-center text-lg text-neutral-600">+</div>
                   )}
