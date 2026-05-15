@@ -2383,9 +2383,8 @@ export default function Page() {
   useEffect(() => {
     let cancelled = false;
 
-	    async function loadCommunityRaidDecks() {
-	      if (tab !== "home" && tab !== "recommend" && tab !== "imaginary") return;
-		      if (!recommendDeckLoadRaidKey || recommendDeckLoadRaidKey === SEASON_OFF_RAID_KEY) {
+    async function loadCommunityRaidDecks() {
+      if (!recommendDeckLoadRaidKey || recommendDeckLoadRaidKey === SEASON_OFF_RAID_KEY) {
 		        setCommunityRaidDecks([]);
 		        setLoadingCommunityRaidDecks(false);
 		        return;
@@ -2415,7 +2414,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-		  }, [recommendDeckLoadRaidKey, tab]);
+	  }, [recommendDeckLoadRaidKey]);
   const recommendedDecks = useMemo(() => {
     const grouped = new Map<string, { chars: string[]; totalScore: number; usedCount: number }>();
 
@@ -2926,6 +2925,7 @@ export default function Page() {
         const updated = mapDeckRow(data as DeckRow);
         if (!updated) throw new Error("Invalid deck row");
         setDecks((prev) => prev.map((deck) => (deck.id === id ? updated : deck)));
+        setCommunityRaidDecks((prev) => prev.map((d) => (d.id === id ? updated : d)));
       } else {
         const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
           const next = prev.map((deck) => (deck.id === id ? { ...deck, score: sc } : deck));
@@ -3198,6 +3198,7 @@ export default function Page() {
         if (!updated) throw new Error("Invalid deck row");
         setDecks((prev) => prev.map((deck) => (deck.id === existingDeck.id ? updated : deck)));
         showToast("덱 저장 완료");
+        setCommunityRaidDecks((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
 	      } else if (!existingDeck && soloRaidInProgress && userId) {
         const { data, error } = await supabase
           .from("decks")
@@ -3208,6 +3209,7 @@ export default function Page() {
         const inserted = mapDeckRow(data as DeckRow);
         if (!inserted) throw new Error("Invalid deck row");
         setDecks((prev) => [inserted, ...prev]);
+        setCommunityRaidDecks((prev) => [inserted, ...prev]);
         showToast("덱 저장 완료");
       } else if (existingDeck) {
         const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
