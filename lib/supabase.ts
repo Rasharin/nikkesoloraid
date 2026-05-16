@@ -29,5 +29,11 @@ export const supabase = createBrowserClient(
         });
       },
     },
+    auth: {
+      persistSession: true,
+      detectSessionInUrl: true,
+      flowType: "implicit",
+      storage: typeof window !== "undefined" ? window.localStorage : undefined,
+    },
   }
 );
