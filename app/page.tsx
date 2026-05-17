@@ -17,7 +17,7 @@ import NoticeContent, { type NoticePost } from "./components/NoticeContent";
 import PrivacyContent from "./components/PrivacyContent";
 import TermsContent from "./components/TermsContent";
 import type { ImageBlock, TextBlock, UsageBlock, UsageEditorBlock, UsagePost } from "./components/tabs/usage/types";
-import { supabase } from "../lib/supabase";
+import { supabase, migrateAuthCookies } from "../lib/supabase";
 import { MIN_RECOMMENDED_DECK_SCORE, pickBest5 } from "../lib/recommend";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
 const btnClass = (selected: boolean) =>
@@ -1556,27 +1556,7 @@ export default function Page() {
       localStorage.setItem(PERSIST_SESSION_KEY, String(persist));
     } catch { }
 
-    if (typeof window === "undefined") return;
-
-    if (persist) {
-      const keys = Object.keys(sessionStorage).filter((k) => k.startsWith("sb-") && k.includes("auth"));
-      keys.forEach((key) => {
-        const value = sessionStorage.getItem(key);
-        if (value) {
-          localStorage.setItem(key, value);
-          sessionStorage.removeItem(key);
-        }
-      });
-    } else {
-      const keys = Object.keys(localStorage).filter((k) => k.startsWith("sb-") && k.includes("auth"));
-      keys.forEach((key) => {
-        const value = localStorage.getItem(key);
-        if (value) {
-          sessionStorage.setItem(key, value);
-          localStorage.removeItem(key);
-        }
-      });
-    }
+    migrateAuthCookies(persist);
   };
 
   useEffect(() => {
@@ -1591,27 +1571,7 @@ export default function Page() {
   }, [themeMode]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    if (persistSessionState) {
-      const keys = Object.keys(sessionStorage).filter((k) => k.startsWith("sb-") && k.includes("auth"));
-      keys.forEach((key) => {
-        const value = sessionStorage.getItem(key);
-        if (value) {
-          localStorage.setItem(key, value);
-          sessionStorage.removeItem(key);
-        }
-      });
-    } else {
-      const keys = Object.keys(localStorage).filter((k) => k.startsWith("sb-") && k.includes("auth"));
-      keys.forEach((key) => {
-        const value = localStorage.getItem(key);
-        if (value) {
-          sessionStorage.setItem(key, value);
-          localStorage.removeItem(key);
-        }
-      });
-    }
+    migrateAuthCookies(persistSessionState);
   }, [persistSessionState]);
 
   // 로그인 유저 추적

@@ -2,6 +2,8 @@ import { createBrowserClient } from "@supabase/ssr";
 import { parse, serialize } from "cookie";
 
 const PERSIST_SESSION_KEY = "soloraid_persist_session_v1";
+// @supabase/ssr DEFAULT_COOKIE_OPTIONS.maxAge
+const SUPABASE_COOKIE_MAX_AGE = 34560000;
 
 function shouldPersistSession(): boolean {
   if (typeof window === "undefined") return true;
@@ -12,49 +14,24 @@ function shouldPersistSession(): boolean {
   }
 }
 
-// 설정값을 매 접근마다 읽어 localStorage/sessionStorage를 동적으로 선택
-const dynamicAuthStorage = {
-  get length() {
-    if (typeof window === "undefined") return 0;
-    return window.localStorage.length;
-  },
-  clear() {
-    if (typeof window === "undefined") return;
-    window.localStorage.clear();
-    window.sessionStorage.clear();
-  },
-  key(index: number) {
-    if (typeof window === "undefined") return null;
-    return window.localStorage.key(index);
-  },
-  getItem(key: string): string | null {
-    if (typeof window === "undefined") return null;
-    try {
-      return window.localStorage.getItem(key) ?? window.sessionStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  },
-  setItem(key: string, value: string): void {
-    if (typeof window === "undefined") return;
-    try {
-      if (shouldPersistSession()) {
-        window.sessionStorage.removeItem(key);
-        window.localStorage.setItem(key, value);
-      } else {
-        window.localStorage.removeItem(key);
-        window.sessionStorage.setItem(key, value);
-      }
-    } catch {}
-  },
-  removeItem(key: string): void {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.removeItem(key);
-      window.sessionStorage.removeItem(key);
-    } catch {}
-  },
-};
+// 설정 변경 시 기존 Supabase 인증 쿠키를 즉시 업데이트
+export function migrateAuthCookies(persist: boolean) {
+  if (typeof document === "undefined") return;
+  const isSecure = typeof window !== "undefined" && window.location.protocol === "https:";
+  const allCookies = parse(document.cookie);
+
+  Object.entries(allCookies).forEach(([name, value]) => {
+    if (!name.startsWith("sb-") || !name.includes("auth")) return;
+    if (!value) return;
+
+    const opts: Record<string, unknown> = { path: "/", sameSite: "lax" };
+    if (isSecure) opts.secure = true;
+    if (persist) opts.maxAge = SUPABASE_COOKIE_MAX_AGE;
+    // persist=false: maxAge 없음 → 세션 쿠키 → 브라우저 종료 시 삭제
+
+    document.cookie = serialize(name, value, opts as Parameters<typeof serialize>[2]);
+  });
+}
 
 export function createSupabaseClient(persistSession: boolean = true) {
   return createBrowserClient(
@@ -78,12 +55,6 @@ export function createSupabaseClient(persistSession: boolean = true) {
             document.cookie = serialize(name, value, opts);
           });
         },
-      },
-      auth: {
-        persistSession,
-        detectSessionInUrl: true,
-        flowType: "implicit",
-        storage: persistSession && typeof window !== "undefined" ? window.localStorage : (typeof window !== "undefined" ? window.sessionStorage : undefined),
       },
     }
   );
@@ -111,12 +82,6 @@ export const supabase = createBrowserClient(
           document.cookie = serialize(name, value, opts);
         });
       },
-    },
-    auth: {
-      persistSession: true,
-      detectSessionInUrl: true,
-      flowType: "implicit",
-      storage: dynamicAuthStorage,
     },
   }
 );
