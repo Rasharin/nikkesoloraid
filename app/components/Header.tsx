@@ -158,8 +158,8 @@ function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick 
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-nideck.png" alt="니케 솔로레이드 덱 도우미" className="h-16 w-auto object-contain lg:h-20" />
           </Link>
-          <h1 className="sr-only">니케 솔로레이드 덱 도우미 사이트</h1>
-          <p className="sr-only">니케 솔로레이드 덱을 자동으로 계산하고 최적 조합을 추천하는 도우미입니다.</p>
+          <h1 className="sr-only">니케(NIKKE) 솔로레이드(솔레) 덱</h1>
+          <p className="sr-only">덱 조합, 추천, 기록, 솔로레이드 시즌별 기록, 솔레 팁</p>
         </div>
 
         <div className={`grid gap-1.5 px-1 lg:mx-auto lg:w-full ${shouldShowCalculator ? "grid-cols-8 lg:max-w-5xl" : "grid-cols-7 lg:max-w-4xl"}`}>

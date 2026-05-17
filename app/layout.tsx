@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     default: siteName,
     template: "%s | NiDeck",
   },
-  description: "니케 솔로레이드 덱 추천, 조합 계산, 점수 최적화 도우미",
+  description: "니케(NIKKE) 솔로레이드(솔레) 덱 조합, 추천, 기록, 솔로레이드 시즌별 기록, 솔레 팁.",
   keywords: [
     "니케 솔레",
     "니케 덱",
