@@ -4387,7 +4387,7 @@ export default function Page() {
           </div>
         )}
 
-        {isLegalPage ? (
+        {isLegalPage && tab !== "mypage" ? (
           isNoticePage ? (
             <NoticeContent
               posts={noticePosts}

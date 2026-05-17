@@ -1,16 +1,6 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { parse, serialize } from "cookie";
 
-function normalizeCookieOptions(value: string, options: Record<string, unknown>) {
-  const next = { ...options } as Record<string, unknown>;
-  const isDeleteCookie = value === "" || options.maxAge === 0;
-  if (!isDeleteCookie) {
-    delete next.maxAge;
-    delete next.expires;
-  }
-  return next;
-}
-
 export function createSupabaseClient(persistSession: boolean = true) {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,8 +15,13 @@ export function createSupabaseClient(persistSession: boolean = true) {
         setAll(cookiesToSet) {
           if (typeof document === "undefined") return;
           cookiesToSet.forEach(({ name, value, options }) => {
-            const normalized = normalizeCookieOptions(value, (options ?? {}) as Record<string, unknown>);
-            document.cookie = serialize(name, value, normalized);
+            const opts = { ...(options ?? {}) } as Record<string, unknown>;
+            // persistSession=false: 만료시간 제거 → 세션 쿠키 → 브라우저 종료 시 삭제
+            if (!persistSession && value !== "" && opts.maxAge !== 0) {
+              delete opts.maxAge;
+              delete opts.expires;
+            }
+            document.cookie = serialize(name, value, opts);
           });
         },
       },
