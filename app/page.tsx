@@ -298,6 +298,7 @@ const USER_DECKS_CACHE_KEY = "soloraid_user_decks_cache_v1";
 const USER_DECKS_CACHE_TTL = 1000 * 60 * 5;
 const STORAGE_IMAGE_CACHE_CONTROL_SECONDS = "31536000";
 const THEME_MODE_KEY = "soloraid_theme_mode_v1";
+const PERSIST_SESSION_KEY = "soloraid_persist_session_v1";
 
 function readStoredScoreDisplayMode(): ScoreDisplayMode {
   if (typeof window === "undefined") return "number";
@@ -318,6 +319,17 @@ function readStoredThemeMode(): ThemeMode {
     return rawMode === "light" || rawMode === "dark" ? rawMode : "dark";
   } catch {
     return "dark";
+  }
+}
+
+function readStoredPersistSession(): boolean {
+  if (typeof window === "undefined") return true;
+
+  try {
+    const rawValue = window.localStorage.getItem(PERSIST_SESSION_KEY);
+    return rawValue === "false" ? false : true;
+  } catch {
+    return true;
   }
 }
 const DECK_BUILDING_DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
@@ -1170,6 +1182,7 @@ export default function Page() {
   const [savingLegalTextKey, setSavingLegalTextKey] = useState<string | null>(null);
   const [scoreDisplayMode, setScoreDisplayModeState] = useState<ScoreDisplayMode>(() => readStoredScoreDisplayMode());
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredThemeMode());
+  const [persistSessionState, setPersistSessionState] = useState<boolean>(() => readStoredPersistSession());
   const isLicensePage = pathname === "/license";
   const isNoticePage = pathname === "/notice";
   const isPrivacyPage = pathname === "/privacy";
@@ -1535,6 +1548,29 @@ export default function Page() {
     } catch { }
   };
 
+  const updatePersistSession = (persist: boolean) => {
+    setPersistSessionState(persist);
+
+    try {
+      localStorage.setItem(PERSIST_SESSION_KEY, String(persist));
+    } catch { }
+
+    if (typeof window === "undefined") return;
+
+    const authTokenKeys = Object.keys(localStorage).filter((key) => key.startsWith("sb-") && key.includes("auth"));
+    authTokenKeys.forEach((key) => {
+      const value = localStorage.getItem(key);
+      if (value) {
+        if (persist) {
+          localStorage.setItem(key, value);
+        } else {
+          sessionStorage.setItem(key, value);
+          localStorage.removeItem(key);
+        }
+      }
+    });
+  };
+
   useEffect(() => {
     document.documentElement.dataset.theme = themeMode;
     document.body.dataset.theme = themeMode;
@@ -1545,6 +1581,23 @@ export default function Page() {
     document.body.classList.toggle("theme-light", themeMode === "light");
     document.body.classList.toggle("theme-dark", themeMode === "dark");
   }, [themeMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const authTokenKeys = Object.keys(localStorage).filter((key) => key.startsWith("sb-") && key.includes("auth"));
+    authTokenKeys.forEach((key) => {
+      const value = localStorage.getItem(key);
+      if (value) {
+        if (persistSessionState) {
+          localStorage.setItem(key, value);
+        } else {
+          sessionStorage.setItem(key, value);
+          localStorage.removeItem(key);
+        }
+      }
+    });
+  }, [persistSessionState]);
 
   // 로그인 유저 추적
   useEffect(() => {
@@ -4568,6 +4621,8 @@ export default function Page() {
             onScoreDisplayModeChange={updateScoreDisplayMode}
             themeMode={themeMode}
             onThemeModeChange={updateThemeMode}
+            persistSession={persistSessionState}
+            onPersistSessionChange={updatePersistSession}
           />
         )}
           </>

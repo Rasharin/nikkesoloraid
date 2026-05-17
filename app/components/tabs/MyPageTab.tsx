@@ -108,6 +108,8 @@ type MyPageTabProps = {
   onScoreDisplayModeChange: (mode: ScoreDisplayMode) => void;
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
+  persistSession: boolean;
+  onPersistSessionChange: (persist: boolean) => void;
 };
 
 function adminTabClass(active: boolean) {
@@ -150,6 +152,8 @@ export default function MyPageTab({
   onScoreDisplayModeChange,
   themeMode,
   onThemeModeChange,
+  persistSession,
+  onPersistSessionChange,
 }: MyPageTabProps) {
   const [openRaidKey, setOpenRaidKey] = useState<string>("");
   const [adminSection, setAdminSection] = useState<AdminSectionKey>("nikkes");
@@ -501,6 +505,30 @@ export default function MyPageTab({
               className={adminTabClass(themeMode === "dark")}
             >
               Dark
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+          <div>
+            <div className="text-sm font-medium text-neutral-100">상시 로그인</div>
+            <div className="mt-1 text-xs text-neutral-400">On: 창을 닫아도 로그인 유지 | Off: 창 닫으면 로그아웃</div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onPersistSessionChange(true)}
+              className={adminTabClass(persistSession === true)}
+            >
+              On
+            </button>
+            <button
+              type="button"
+              onClick={() => onPersistSessionChange(false)}
+              className={adminTabClass(persistSession === false)}
+            >
+              Off
             </button>
           </div>
         </div>

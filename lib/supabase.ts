@@ -11,29 +11,33 @@ function normalizeCookieOptions(value: string, options: Record<string, unknown>)
   return next;
 }
 
-export const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    cookies: {
-      getAll() {
-        if (typeof document === "undefined") return [];
-        const parsed = parse(document.cookie ?? "");
-        return Object.entries(parsed).map(([name, value]) => ({ name, value: value ?? "" }));
+export function createSupabaseClient(persistSession: boolean = true) {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          if (typeof document === "undefined") return [];
+          const parsed = parse(document.cookie ?? "");
+          return Object.entries(parsed).map(([name, value]) => ({ name, value: value ?? "" }));
+        },
+        setAll(cookiesToSet) {
+          if (typeof document === "undefined") return;
+          cookiesToSet.forEach(({ name, value, options }) => {
+            const normalized = normalizeCookieOptions(value, (options ?? {}) as Record<string, unknown>);
+            document.cookie = serialize(name, value, normalized);
+          });
+        },
       },
-      setAll(cookiesToSet) {
-        if (typeof document === "undefined") return;
-        cookiesToSet.forEach(({ name, value, options }) => {
-          const normalized = normalizeCookieOptions(value, (options ?? {}) as Record<string, unknown>);
-          document.cookie = serialize(name, value, normalized);
-        });
+      auth: {
+        persistSession,
+        detectSessionInUrl: true,
+        flowType: "implicit",
+        storage: persistSession && typeof window !== "undefined" ? window.localStorage : (typeof window !== "undefined" ? window.sessionStorage : undefined),
       },
-    },
-    auth: {
-      persistSession: true,
-      detectSessionInUrl: true,
-      flowType: "implicit",
-      storage: typeof window !== "undefined" ? window.localStorage : undefined,
-    },
-  }
-);
+    }
+  );
+}
+
+export const supabase = createSupabaseClient(true);
