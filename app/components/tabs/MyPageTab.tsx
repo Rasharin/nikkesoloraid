@@ -512,7 +512,7 @@ export default function MyPageTab({
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
           <div>
             <div className="text-sm font-medium text-neutral-100">상시 로그인</div>
-            <div className="mt-1 text-xs text-neutral-400">On: 창을 닫아도 로그인 유지 | Off: 창 닫으면 로그아웃</div>
+            <div className="mt-1 text-xs text-neutral-400">브라우저 종료시 로그인 상태를 유지하거나 로그아웃 할 수 있습니다.</div>
           </div>
 
           <div className="flex flex-wrap gap-2">
