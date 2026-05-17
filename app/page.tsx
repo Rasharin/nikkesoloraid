@@ -1,7 +1,7 @@
 ﻿"use client";
 import Link from "next/link";
 import Header from "./components/Header";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import HomeTab from "./components/tabs/HomeTab";
 import MyPageTab from "./components/tabs/MyPageTab";
@@ -1109,6 +1109,8 @@ function normalizeRecommendedNikkeNames(value: unknown): string[] {
 export default function Page() {
   const pathname = usePathname();
   const router = useRouter();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const [tab, setTab] = useState<TabKey>(() => PATH_TAB_MAP[pathname] ?? "home");
   const [usageBoardTab, setUsageBoardTab] = useState<UsageBoardCategoryKey>("home");
   const [deckTabs, setDeckTabs] = useState<DeckTabItem[]>(DEFAULT_DECK_TABS);
@@ -1556,18 +1558,25 @@ export default function Page() {
 
     if (typeof window === "undefined") return;
 
-    const authTokenKeys = Object.keys(localStorage).filter((key) => key.startsWith("sb-") && key.includes("auth"));
-    authTokenKeys.forEach((key) => {
-      const value = localStorage.getItem(key);
-      if (value) {
-        if (persist) {
+    if (persist) {
+      const keys = Object.keys(sessionStorage).filter((k) => k.startsWith("sb-") && k.includes("auth"));
+      keys.forEach((key) => {
+        const value = sessionStorage.getItem(key);
+        if (value) {
           localStorage.setItem(key, value);
-        } else {
+          sessionStorage.removeItem(key);
+        }
+      });
+    } else {
+      const keys = Object.keys(localStorage).filter((k) => k.startsWith("sb-") && k.includes("auth"));
+      keys.forEach((key) => {
+        const value = localStorage.getItem(key);
+        if (value) {
           sessionStorage.setItem(key, value);
           localStorage.removeItem(key);
         }
-      }
-    });
+      });
+    }
   };
 
   useEffect(() => {
@@ -1584,18 +1593,25 @@ export default function Page() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const authTokenKeys = Object.keys(localStorage).filter((key) => key.startsWith("sb-") && key.includes("auth"));
-    authTokenKeys.forEach((key) => {
-      const value = localStorage.getItem(key);
-      if (value) {
-        if (persistSessionState) {
+    if (persistSessionState) {
+      const keys = Object.keys(sessionStorage).filter((k) => k.startsWith("sb-") && k.includes("auth"));
+      keys.forEach((key) => {
+        const value = sessionStorage.getItem(key);
+        if (value) {
           localStorage.setItem(key, value);
-        } else {
+          sessionStorage.removeItem(key);
+        }
+      });
+    } else {
+      const keys = Object.keys(localStorage).filter((k) => k.startsWith("sb-") && k.includes("auth"));
+      keys.forEach((key) => {
+        const value = localStorage.getItem(key);
+        if (value) {
           sessionStorage.setItem(key, value);
           localStorage.removeItem(key);
         }
-      }
-    });
+      });
+    }
   }, [persistSessionState]);
 
   // 로그인 유저 추적
@@ -2647,13 +2663,15 @@ export default function Page() {
     };
 	  }, [activeRaidLabel, best, canRecommend, currentDeckRaidKey, recommendationHistory, recommendationLoaded, soloRaidInProgress, userId]);
 
-  function navigateToTab(nextTab: Exclude<TabKey, "mypage">) {
+  const navigateToTab = useCallback((nextTab: Exclude<TabKey, "mypage">) => {
     const nextPath = TAB_ROUTE_MAP[nextTab];
     setTab(nextTab);
-    if (pathname !== nextPath) {
+    if (pathnameRef.current !== nextPath) {
       router.push(nextPath);
     }
-  }
+  }, [router]);
+
+  const handleProfileClick = useCallback(() => setTab("mypage"), []);
 
   function copyRecommendedDeckToBuilder(deck: RecommendedDeck) {
     const draft = deck.chars.slice(0, MAX_DECK_CHARS);
@@ -4357,8 +4375,8 @@ export default function Page() {
         <Header
           tab={tab}
           shouldShowCalculator={shouldShowCalculator}
-          onTabChange={setTab}
-          onProfileClick={() => setTab("mypage")}
+          onTabChange={navigateToTab}
+          onProfileClick={handleProfileClick}
         />
 
         {/* Toast */}

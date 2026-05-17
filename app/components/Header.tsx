@@ -2,21 +2,9 @@
 
 import { memo } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
 import LoginButton from "./LoginButton";
 
 type TabKey = "home" | "saved" | "recommend" | "imaginary" | "usage" | "calculator" | "settings" | "contact" | "mypage";
-
-const TAB_ROUTE_MAP: Record<Exclude<TabKey, "mypage">, string> = {
-  home: "/",
-  saved: "/saved-deck",
-  recommend: "/deck-recommend",
-  imaginary: "/deck-building",
-  usage: "/usage",
-  calculator: "/calculator",
-  settings: "/deck-setting",
-  contact: "/faq",
-};
 
 type HeaderProps = {
   tab: TabKey;
@@ -135,24 +123,13 @@ function UsageIcon() {
 }
 
 function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick }: HeaderProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const navigateToTab = (nextTab: Exclude<TabKey, "mypage">) => {
-    const nextPath = TAB_ROUTE_MAP[nextTab];
-    onTabChange(nextTab);
-    if (pathname !== nextPath) {
-      router.push(nextPath);
-    }
-  };
-
   return (
     <div className="sticky top-0 z-10 -mx-4 mb-4 bg-[var(--bg)] px-4 py-3.5 backdrop-blur lg:-mx-8 lg:px-8 lg:py-4">
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-6">
         <div className="flex flex-col items-start">
           <Link
             href="/"
-            onClick={() => navigateToTab("home")}
+            onClick={() => onTabChange("home")}
             className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -164,7 +141,7 @@ function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick 
 
         <div className={`grid gap-1.5 px-1 lg:mx-auto lg:w-full ${shouldShowCalculator ? "grid-cols-8 lg:max-w-5xl" : "grid-cols-7 lg:max-w-4xl"}`}>
           <button
-            onClick={() => navigateToTab("home")}
+            onClick={() => onTabChange("home")}
             className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
               tab === "home" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
@@ -174,7 +151,7 @@ function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick 
           </button>
 
           <button
-            onClick={() => navigateToTab("saved")}
+            onClick={() => onTabChange("saved")}
             className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
               tab === "saved" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
@@ -184,7 +161,7 @@ function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick 
           </button>
 
           <button
-            onClick={() => navigateToTab("recommend")}
+            onClick={() => onTabChange("recommend")}
             className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
               tab === "recommend" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
@@ -194,7 +171,7 @@ function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick 
           </button>
 
           <button
-            onClick={() => navigateToTab("imaginary")}
+            onClick={() => onTabChange("imaginary")}
             className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
               tab === "imaginary" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
@@ -204,7 +181,7 @@ function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick 
           </button>
 
           <button
-            onClick={() => navigateToTab("usage")}
+            onClick={() => onTabChange("usage")}
             className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
               tab === "usage" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
@@ -215,7 +192,7 @@ function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick 
 
           {shouldShowCalculator && (
             <button
-              onClick={() => navigateToTab("calculator")}
+              onClick={() => onTabChange("calculator")}
               className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
                 tab === "calculator" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
               }`}
@@ -226,7 +203,7 @@ function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick 
           )}
 
           <button
-            onClick={() => navigateToTab("settings")}
+            onClick={() => onTabChange("settings")}
             className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
               tab === "settings" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
@@ -236,7 +213,7 @@ function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick 
           </button>
 
           <button
-            onClick={() => navigateToTab("contact")}
+            onClick={() => onTabChange("contact")}
             className={`flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2 text-[11px] transition active:scale-[0.99] lg:text-xs ${
               tab === "contact" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
