@@ -1189,9 +1189,8 @@ export default function Page() {
   const isTermsPage = pathname === "/terms";
   const isLegalPage = isLicensePage || isNoticePage || isPrivacyPage || isTermsPage;
   const showInitialDataLoading = !isLegalPage && loadingData && nikkes.length === 0 && bosses.length === 0;
-  const canAccessCalculator = isMasterUser || process.env.NODE_ENV !== "production";
-  const calculatorAccessResolved =
-    process.env.NODE_ENV !== "production" || (authResolved && (!userId || masterUserChecked));
+  const canAccessCalculator = process.env.NODE_ENV !== "production";
+  const calculatorAccessResolved = true;
 
   useEffect(() => {
     if (!calculatorAccessResolved) return;
