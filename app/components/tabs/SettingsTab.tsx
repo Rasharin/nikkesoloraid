@@ -419,6 +419,28 @@ export default function SettingsTab({
               </button>
             </div>
           </section>
+
+          <section className="mt-2 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
+            <h4 className="mb-2 text-sm font-semibold text-neutral-200">바로가기</h4>
+            <a
+              href="https://www.blablalink.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-xl border border-neutral-700 bg-neutral-950/50 px-3 py-2 transition hover:border-neutral-500 hover:bg-neutral-800/60 active:scale-[0.99]"
+            >
+              <Image
+                src="/blablalink-icon.png"
+                alt="Blablalink"
+                width={32}
+                height={32}
+                className="rounded-lg"
+              />
+              <div>
+                <div className="text-sm font-medium text-neutral-100">Blablalink</div>
+                <div className="text-xs text-neutral-400">www.blablalink.com</div>
+              </div>
+            </a>
+          </section>
         </aside>
       </div>
     </section>
