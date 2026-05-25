@@ -629,24 +629,25 @@ export default function ImaginarySoloRaidTab({
     if (previousMode === scoreDisplayMode) return;
 
     const scoreByDeckId = new Map(best.picked.map((deck) => [deck.id, deck.score]));
-    if (scoreByDeckId.size > 0) {
-      setDeckPages((prev) =>
-        prev.map((page) => ({
-          ...page,
-          deckDrafts: page.deckDrafts.map((deck) => {
-            if (!deck.editingId) return deck;
 
+    setDeckPages((prev) =>
+      prev.map((page) => ({
+        ...page,
+        deckDrafts: page.deckDrafts.map((deck) => {
+          if (deck.editingId) {
             const numericScore = scoreByDeckId.get(deck.editingId);
             if (typeof numericScore !== "number") return deck;
-
             const previousDisplay = formatScore(numericScore, previousMode);
             if (deck.score !== previousDisplay) return deck;
-
             return { ...deck, score: formatScore(numericScore, scoreDisplayMode) };
-          }),
-        }))
-      );
-    }
+          }
+
+          const numericScore = parseScoreInput(deck.score);
+          if (numericScore === null) return deck;
+          return { ...deck, score: formatScore(numericScore, scoreDisplayMode) };
+        }),
+      }))
+    );
 
     previousScoreDisplayModeRef.current = scoreDisplayMode;
   }, [best.picked, scoreDisplayMode]);
