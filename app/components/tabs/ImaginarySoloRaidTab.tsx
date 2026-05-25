@@ -1395,6 +1395,16 @@ export default function ImaginarySoloRaidTab({
 
         <div className={wideLayoutGridClass}>
         <div className={wideDeckLayout ? "order-1 flex flex-wrap items-center justify-end gap-2 lg:col-span-2" : "order-1 flex flex-wrap items-center justify-end gap-2"}>
+          <a
+            href="https://www.blablalink.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 transition hover:border-[var(--theme-border-strong)] active:scale-[0.99]"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/blablalink-icon.png" alt="blablalink" className="h-6 w-6 rounded-full object-contain" />
+            <span className="whitespace-nowrap text-xs font-bold text-[var(--theme-text-soft)] sm:text-sm">Blablalink</span>
+          </a>
           <div className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 text-xs font-medium text-[var(--theme-text-soft)] sm:text-sm">
             <span className="whitespace-nowrap text-neutral-400">점수 표기</span>
             <span className={`whitespace-nowrap ${scoreDisplayMode === "eok" ? "text-neutral-100" : "text-neutral-500"}`}>
