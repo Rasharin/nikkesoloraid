@@ -138,6 +138,12 @@ const ELEMENTS = [
   { v: "electric", label: "전격" },
 ] as const;
 
+const BURSTS = [
+  { n: 1, label: "I" },
+  { n: 2, label: "II" },
+  { n: 3, label: "III" },
+] as const;
+
 const DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
 const LAYOUT_STORAGE_KEY = "soloraid_deck_building_wide_layout_v1";
 const RECOMMENDED_OPEN_STORAGE_KEY = "soloraid_deck_building_recommended_open_v1";
@@ -490,6 +496,7 @@ export default function ImaginarySoloRaidTab({
   const [editingRecommendedScore, setEditingRecommendedScore] = useState("");
   const [nikkeSearch, setNikkeSearch] = useState("");
   const [selectedElementFilter, setSelectedElementFilter] = useState<Set<string>>(new Set());
+  const [selectedBurstFilter, setSelectedBurstFilter] = useState<Set<number>>(new Set());
   const [selectedDeckDraftIds, setSelectedDeckDraftIds] = useState<Set<number>>(new Set());
   const scoreRefs = useRef<Array<HTMLInputElement | null>>([]);
   const deckSectionRef = useRef<HTMLElement | null>(null);
@@ -729,9 +736,13 @@ export default function ImaginarySoloRaidTab({
         if (!matchesName && !matchesAlias) return false;
       }
       if (selectedElementFilter.size > 0 && (!nikke.element || !selectedElementFilter.has(nikke.element))) return false;
+      if (selectedBurstFilter.size > 0) {
+        const burst = nikke.burst ?? -1;
+        if (!selectedBurstFilter.has(burst)) return false;
+      }
       return true;
     });
-  }, [effectiveSelectedNikkes, nikkeSearch, selectedElementFilter]);
+  }, [effectiveSelectedNikkes, nikkeSearch, selectedElementFilter, selectedBurstFilter]);
 
   const selectedNikkesByBurst = useMemo(() => {
     const groups = [
@@ -1715,7 +1726,7 @@ export default function ImaginarySoloRaidTab({
           </div>
 
           {nikkeOpen && effectiveSelectedNikkes.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-3 flex items-center gap-1">
               {ELEMENTS.map((el) => (
                 <button
                   key={el.v}
@@ -1727,13 +1738,34 @@ export default function ImaginarySoloRaidTab({
                       return next;
                     })
                   }
-                  className={`rounded-lg border px-2 py-0.5 text-xs transition ${
+                  className={`whitespace-nowrap rounded-lg border px-2 py-0.5 text-xs transition ${
                     selectedElementFilter.has(el.v)
                       ? "border-white bg-white text-black"
                       : "border-neutral-700 bg-transparent text-neutral-200 hover:border-neutral-400"
                   }`}
                 >
                   {el.label}
+                </button>
+              ))}
+              <div className="mx-0.5 h-4 w-px bg-neutral-700" />
+              {BURSTS.map((burst) => (
+                <button
+                  key={burst.n}
+                  type="button"
+                  onClick={() =>
+                    setSelectedBurstFilter((prev) => {
+                      const next = new Set(prev);
+                      next.has(burst.n) ? next.delete(burst.n) : next.add(burst.n);
+                      return next;
+                    })
+                  }
+                  className={`whitespace-nowrap rounded-lg border px-2 py-0.5 text-xs transition ${
+                    selectedBurstFilter.has(burst.n)
+                      ? "border-white bg-white text-black"
+                      : "border-neutral-700 bg-transparent text-neutral-200 hover:border-neutral-400"
+                  }`}
+                >
+                  {burst.label}
                 </button>
               ))}
             </div>

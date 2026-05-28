@@ -142,7 +142,7 @@ function NikkeCard({ nikke, selected, favorite, onSelect, onToggleFavorite, getP
 
       <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/40">
         {url ? (
-          <Image fill src={url} alt={nikke.name} className="object-cover" sizes="(max-width: 640px) 25vw, 128px" />
+          <Image fill src={url} alt={nikke.name} className="object-cover" sizes="(max-width: 640px) 25vw, (max-width: 1280px) 128px, (max-width: 1536px) 11vw, 128px" />
         ) : (
           <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
         )}
@@ -247,7 +247,7 @@ export default function SettingsTab({
     }
 
     return (
-      <div className="grid grid-cols-4 gap-2 overflow-x-hidden sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
+      <div className="grid grid-cols-4 gap-2 overflow-x-hidden sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-9 2xl:grid-cols-7">
         {list.map((nikke) => (
           <NikkeCard
             key={nikke.id}
