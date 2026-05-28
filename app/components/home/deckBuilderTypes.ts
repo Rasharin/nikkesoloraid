@@ -9,6 +9,7 @@ export type NikkeRow = {
   name: string;
   image_path: string | null;
   burst?: number | null;
+  element?: string | null;
   aliases?: string[];
 };
 

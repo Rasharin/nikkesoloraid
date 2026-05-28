@@ -130,6 +130,14 @@ function SortableDeckDraft({ deck, deckIndex, children }: SortableDeckDraftProps
   );
 }
 
+const ELEMENTS = [
+  { v: "iron", label: "철갑" },
+  { v: "fire", label: "작열" },
+  { v: "wind", label: "풍압" },
+  { v: "water", label: "수냉" },
+  { v: "electric", label: "전격" },
+] as const;
+
 const DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
 const LAYOUT_STORAGE_KEY = "soloraid_deck_building_wide_layout_v1";
 const RECOMMENDED_OPEN_STORAGE_KEY = "soloraid_deck_building_recommended_open_v1";
@@ -481,6 +489,7 @@ export default function ImaginarySoloRaidTab({
   const [editingRecommendedDeckId, setEditingRecommendedDeckId] = useState<string | null>(null);
   const [editingRecommendedScore, setEditingRecommendedScore] = useState("");
   const [nikkeSearch, setNikkeSearch] = useState("");
+  const [selectedElementFilter, setSelectedElementFilter] = useState<Set<string>>(new Set());
   const [selectedDeckDraftIds, setSelectedDeckDraftIds] = useState<Set<number>>(new Set());
   const scoreRefs = useRef<Array<HTMLInputElement | null>>([]);
   const deckSectionRef = useRef<HTMLElement | null>(null);
@@ -713,14 +722,16 @@ export default function ImaginarySoloRaidTab({
 
   const filteredSelectedNikkes = useMemo(() => {
     const query = nikkeSearch.trim().toLowerCase();
-    if (!query) return effectiveSelectedNikkes;
-
     return effectiveSelectedNikkes.filter((nikke) => {
-      const matchesName = nikke.name.toLowerCase().includes(query);
-      const matchesAlias = nikke.aliases?.some((alias) => alias.toLowerCase().includes(query)) ?? false;
-      return matchesName || matchesAlias;
+      if (query) {
+        const matchesName = nikke.name.toLowerCase().includes(query);
+        const matchesAlias = nikke.aliases?.some((alias) => alias.toLowerCase().includes(query)) ?? false;
+        if (!matchesName && !matchesAlias) return false;
+      }
+      if (selectedElementFilter.size > 0 && (!nikke.element || !selectedElementFilter.has(nikke.element))) return false;
+      return true;
     });
-  }, [effectiveSelectedNikkes, nikkeSearch]);
+  }, [effectiveSelectedNikkes, nikkeSearch, selectedElementFilter]);
 
   const selectedNikkesByBurst = useMemo(() => {
     const groups = [
@@ -1702,6 +1713,31 @@ export default function ImaginarySoloRaidTab({
               </div>
             </div>
           </div>
+
+          {nikkeOpen && effectiveSelectedNikkes.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {ELEMENTS.map((el) => (
+                <button
+                  key={el.v}
+                  type="button"
+                  onClick={() =>
+                    setSelectedElementFilter((prev) => {
+                      const next = new Set(prev);
+                      next.has(el.v) ? next.delete(el.v) : next.add(el.v);
+                      return next;
+                    })
+                  }
+                  className={`rounded-lg border px-2 py-0.5 text-xs transition ${
+                    selectedElementFilter.has(el.v)
+                      ? "border-white bg-white text-black"
+                      : "border-neutral-700 bg-transparent text-neutral-200 hover:border-neutral-400"
+                  }`}
+                >
+                  {el.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {nikkeOpen ? effectiveSelectedNikkes.length === 0 ? (
             <div className="mt-4 text-sm text-neutral-300">
