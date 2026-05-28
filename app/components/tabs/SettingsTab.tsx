@@ -131,7 +131,7 @@ function NikkeCard({ nikke, selected, favorite, onSelect, onToggleFavorite, getP
           event.stopPropagation();
           void onToggleFavorite(nikke.name);
         }}
-        className={`absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border transition ${
+        className={`absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-full border transition ${
           favorite
             ? "border-yellow-500/70 bg-yellow-500/20 text-yellow-300"
             : "border-neutral-700 bg-neutral-950/80 text-neutral-500 hover:border-neutral-500 hover:text-neutral-300"
