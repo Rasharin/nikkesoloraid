@@ -1424,8 +1424,7 @@ export default function ImaginarySoloRaidTab({
             rel="noopener noreferrer"
             className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 transition hover:border-[var(--theme-border-strong)] active:scale-[0.99]"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/blablalink-icon.png" alt="blablalink" className="h-6 w-6 rounded-full object-contain" />
+            <Image src="/blablalink-icon.png" alt="blablalink" width={24} height={24} className="h-6 w-6 rounded-full object-contain" />
             <span className="whitespace-nowrap text-xs font-bold text-[var(--theme-text-soft)] sm:text-sm">Blablalink</span>
           </a>
           <div className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 text-xs font-medium text-[var(--theme-text-soft)] sm:text-sm">

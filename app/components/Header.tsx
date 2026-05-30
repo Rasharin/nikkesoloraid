@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import LoginButton from "./LoginButton";
 
@@ -132,8 +133,7 @@ function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick 
             onClick={() => onTabChange("home")}
             className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-nideck.png" alt="니케 솔로레이드 덱 도우미" className="h-16 w-auto object-contain lg:h-20" />
+            <Image src="/logo-nideck.png" alt="니케 솔로레이드 덱 도우미" width={320} height={80} className="h-16 w-auto object-contain lg:h-20" style={{ width: "auto" }} />
           </Link>
           <h1 className="sr-only">니케(NIKKE) 솔로레이드(솔레) 덱</h1>
           <p className="sr-only">덱 조합, 추천, 기록, 솔로레이드 시즌별 기록, 솔레 팁</p>
