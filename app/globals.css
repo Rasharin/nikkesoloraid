@@ -247,16 +247,17 @@ html[data-theme="light"] {
 
 html[data-theme="light"] :where(input, select, textarea),
 .theme-light :where(input, select, textarea) {
-  background-color: var(--theme-input) !important;
-  color: var(--theme-text) !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
 }
 
 .theme-dark :where(input, select, textarea) {
   color: #ffffff;
 }
 
+html[data-theme="light"] :where(input::placeholder, textarea::placeholder),
 .theme-light :where(input::placeholder, textarea::placeholder) {
-  color: var(--theme-placeholder) !important;
+  color: #94a3b8 !important;
   opacity: 1;
 }
 
