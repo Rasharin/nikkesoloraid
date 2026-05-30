@@ -347,3 +347,17 @@ html[data-theme="light"] :where(.inactive-raid-tab:hover, .inactive-sort-tab:hov
   color: #000000 !important;
 }
 
+/* 마이페이지 추천 니케 필터 버튼 - 라이트 모드 활성 상태 */
+.theme-light .rec-filter-btn-active {
+  background-color: #EBF5FB !important;
+  border-color: #85C1E9 !important;
+  color: #0f172a !important;
+}
+
+/* 니케 관리 탭 필터 버튼 - 라이트 모드 활성 상태 */
+.theme-light .settings-filter-btn-active {
+  background-color: #EBF5FB !important;
+  border-color: #85C1E9 !important;
+  color: #0f172a !important;
+}
+

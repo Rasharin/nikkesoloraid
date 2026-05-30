@@ -23,7 +23,7 @@ import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/scor
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
    ${selected
-    ? "bg-white text-black border-white"
+    ? "settings-filter-btn-active bg-white text-black border-white"
     : "bg-transparent text-neutral-200 border-neutral-700 hover:border-neutral-400"
   }`
 
@@ -287,6 +287,7 @@ const CONTACT_INQUIRIES_TABLE = "contact_inquiries";
 const LOCAL_CONTACT_INQUIRIES_KEY = "soloraid_local_contact_inquiries_v1";
 const SCORE_DISPLAY_MODE_KEY = "soloraid_score_display_mode_v1";
 const USAGE_POSTS_TABLE = "usage_posts";
+const PEAK_USER_COUNT_KEY = "peak_user_count";
 const NOTICE_POSTS_TABLE = "notice_posts";
 const USER_STATS_TABLE = "site_user_stats";
 const RAID_USER_STATS_TABLE = "raid_user_stats";
@@ -1281,10 +1282,11 @@ export default function Page() {
   async function refreshUserStats() {
     setLoadingUserStats(true);
     try {
-      const [totalResult, activeResult, archiveResult] = await Promise.all([
+      const [totalResult, activeResult, archiveResult, peakResult] = await Promise.all([
         supabase.from(USER_STATS_TABLE).select("client_id", { count: "exact", head: true }),
         supabase.from(RAID_USER_STATS_TABLE).select("raid_key,raid_label,ended_at"),
         supabase.from(RAID_USER_ARCHIVES_TABLE).select("raid_key,raid_label,user_count,ended_at"),
+        supabase.from(SITE_SETTINGS_TABLE).select("key,value").eq("key", PEAK_USER_COUNT_KEY).limit(1).maybeSingle(),
       ]);
 
       if (totalResult.error) throw totalResult.error;
@@ -1323,7 +1325,18 @@ export default function Page() {
         });
       }
 
-      setTotalUserCount(totalResult.count ?? 0);
+      const currentCount = totalResult.count ?? 0;
+      const storedPeak = parseInt((peakResult.data as SiteSettingRow | null)?.value ?? "0") || 0;
+      const displayCount = Math.max(currentCount, storedPeak);
+      setTotalUserCount(displayCount);
+      if (currentCount > storedPeak) {
+        void supabase.from(SITE_SETTINGS_TABLE).upsert(
+          { key: PEAK_USER_COUNT_KEY, value: String(currentCount), updated_at: new Date().toISOString() },
+          { onConflict: "key" }
+        ).then(({ error }) => {
+          if (error) console.warn("[stats] peak user count update failed", error.message);
+        });
+      }
       setBossUserStats(
         Array.from(byRaid.values()).sort((a, b) => {
           if (a.active !== b.active) return a.active ? -1 : 1;
@@ -1332,8 +1345,6 @@ export default function Page() {
       );
     } catch (error) {
       console.warn("[stats] user stats loading skipped", error);
-      setTotalUserCount(0);
-      setBossUserStats([]);
     } finally {
       setLoadingUserStats(false);
     }

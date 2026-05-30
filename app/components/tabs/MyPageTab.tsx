@@ -118,6 +118,12 @@ function adminTabClass(active: boolean) {
     : "rounded-2xl border border-neutral-700 px-3 py-2 text-sm text-neutral-200";
 }
 
+function recFilterBtnClass(active: boolean) {
+  return active
+    ? "rec-filter-btn-active rounded-2xl border border-white bg-white px-3 py-2 text-sm font-medium text-black"
+    : "rounded-2xl border border-neutral-700 px-3 py-2 text-sm text-neutral-200";
+}
+
 export default function MyPageTab({
   deckTabs,
   isMaster,
@@ -901,7 +907,7 @@ export default function MyPageTab({
                             return next;
                           })
                         }
-                        className={adminTabClass(recListFilterBursts.has(burst.n))}
+                        className={recFilterBtnClass(recListFilterBursts.has(burst.n))}
                       >
                         {burst.label}
                       </button>
@@ -917,7 +923,7 @@ export default function MyPageTab({
                             return next;
                           })
                         }
-                        className={adminTabClass(recListFilterElements.has(el.v))}
+                        className={recFilterBtnClass(recListFilterElements.has(el.v))}
                       >
                         {el.label}
                       </button>
@@ -926,7 +932,7 @@ export default function MyPageTab({
                       <button
                         type="button"
                         onClick={() => { setRecListFilterBursts(new Set()); setRecListFilterElements(new Set()); }}
-                        className="rounded-2xl border border-red-800/60 bg-red-950/40 px-3 py-2 text-sm text-red-300"
+                        className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:border-red-400 hover:bg-red-500/15 active:scale-[0.99]"
                       >
                         초기화
                       </button>
@@ -974,7 +980,7 @@ export default function MyPageTab({
                             return next;
                           })
                         }
-                        className={adminTabClass(recFilterBursts.has(burst.n))}
+                        className={recFilterBtnClass(recFilterBursts.has(burst.n))}
                       >
                         {burst.label}
                       </button>
@@ -990,7 +996,7 @@ export default function MyPageTab({
                             return next;
                           })
                         }
-                        className={adminTabClass(recFilterElements.has(el.v))}
+                        className={recFilterBtnClass(recFilterElements.has(el.v))}
                       >
                         {el.label}
                       </button>
@@ -999,7 +1005,7 @@ export default function MyPageTab({
                       <button
                         type="button"
                         onClick={() => { setRecFilterBursts(new Set()); setRecFilterElements(new Set()); }}
-                        className="rounded-2xl border border-red-800/60 bg-red-950/40 px-3 py-2 text-sm text-red-300"
+                        className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:border-red-400 hover:bg-red-500/15 active:scale-[0.99]"
                       >
                         초기화
                       </button>
