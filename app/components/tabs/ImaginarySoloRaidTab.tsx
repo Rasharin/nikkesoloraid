@@ -1740,7 +1740,7 @@ export default function ImaginarySoloRaidTab({
                   }
                   className={`whitespace-nowrap rounded-lg border px-2 py-0.5 text-xs transition ${
                     selectedElementFilter.has(el.v)
-                      ? "border-white bg-white text-black"
+                      ? "settings-filter-btn-active border-white bg-white text-black"
                       : "border-neutral-700 bg-transparent text-neutral-200 hover:border-neutral-400"
                   }`}
                 >
@@ -1761,7 +1761,7 @@ export default function ImaginarySoloRaidTab({
                   }
                   className={`whitespace-nowrap rounded-lg border px-2 py-0.5 text-xs transition ${
                     selectedBurstFilter.has(burst.n)
-                      ? "border-white bg-white text-black"
+                      ? "settings-filter-btn-active border-white bg-white text-black"
                       : "border-neutral-700 bg-transparent text-neutral-200 hover:border-neutral-400"
                   }`}
                 >
