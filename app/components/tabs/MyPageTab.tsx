@@ -168,6 +168,10 @@ export default function MyPageTab({
   const [savingVideo, setSavingVideo] = useState(false);
   const [selectedRecommendedCandidates, setSelectedRecommendedCandidates] = useState<Set<string>>(new Set());
   const [savingRecommendedNikkes, setSavingRecommendedNikkes] = useState(false);
+  const [recFilterBursts, setRecFilterBursts] = useState<Set<number>>(new Set());
+  const [recFilterElements, setRecFilterElements] = useState<Set<string>>(new Set());
+  const [recListFilterBursts, setRecListFilterBursts] = useState<Set<number>>(new Set());
+  const [recListFilterElements, setRecListFilterElements] = useState<Set<string>>(new Set());
   const [deletingInquiryId, setDeletingInquiryId] = useState<string | null>(null);
   const inquiryDateFormatter = useMemo(
     () =>
@@ -204,6 +208,30 @@ export default function MyPageTab({
     () => nikkes.filter((nikke) => recommendedNameSet.has(nikke.name)),
     [nikkes, recommendedNameSet]
   );
+  const recFilteredNikkes = useMemo(() => {
+    return nikkes.filter((nikke) => {
+      if (recFilterBursts.size > 0) {
+        const burst = nikke.burst ?? -1;
+        if (!recFilterBursts.has(burst)) return false;
+      }
+      if (recFilterElements.size > 0) {
+        if (!nikke.element || !recFilterElements.has(nikke.element)) return false;
+      }
+      return true;
+    });
+  }, [nikkes, recFilterBursts, recFilterElements]);
+  const recListFiltered = useMemo(() => {
+    return recommendedNikkes.filter((nikke) => {
+      if (recListFilterBursts.size > 0) {
+        const burst = nikke.burst ?? -1;
+        if (!recListFilterBursts.has(burst)) return false;
+      }
+      if (recListFilterElements.size > 0) {
+        if (!nikke.element || !recListFilterElements.has(nikke.element)) return false;
+      }
+      return true;
+    });
+  }, [recommendedNikkes, recListFilterBursts, recListFilterElements]);
   const bossUserStatsByKey = useMemo(() => new Map(bossUserStats.map((stat) => [stat.raidKey, stat])), [bossUserStats]);
   const displayBossUserStats = useMemo(() => {
     const fromTabs = deckTabs.map((tab) => {
@@ -392,7 +420,7 @@ export default function MyPageTab({
     }
   }
 
-  function renderAdminNikkeTile(nikke: NikkeRow, options?: { selected?: boolean; removable?: boolean; onClick?: () => void; onRemove?: () => void }) {
+  function renderAdminNikkeTile(nikke: NikkeRow, options?: { selected?: boolean; removable?: boolean; dimmed?: boolean; onClick?: () => void; onRemove?: () => void }) {
     const url = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
     const displayName = formatNikkeDisplayName(nikke.name);
 
@@ -410,7 +438,11 @@ export default function MyPageTab({
           }
         }}
         className={`relative isolate min-w-0 overflow-hidden rounded-2xl border p-1 text-left active:scale-[0.99] ${
-          options?.selected ? "border-sky-300 bg-sky-500/10" : "border-neutral-800 bg-neutral-950/40"
+          options?.dimmed
+            ? "border-neutral-800 bg-neutral-800/20 opacity-40"
+            : options?.selected
+            ? "border-sky-300 bg-sky-500/10"
+            : "border-neutral-800 bg-neutral-950/40"
         }`}
       >
         {options?.removable ? (
@@ -852,14 +884,67 @@ export default function MyPageTab({
               <div className="mt-3 grid gap-3 lg:grid-cols-2">
                 <section className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
                   <div className="mb-2 text-sm font-semibold text-neutral-100">추천 니케</div>
+
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {[
+                      { n: 1, label: "I" },
+                      { n: 2, label: "II" },
+                      { n: 3, label: "III" },
+                    ].map((burst) => (
+                      <button
+                        key={burst.n}
+                        type="button"
+                        onClick={() =>
+                          setRecListFilterBursts((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(burst.n)) next.delete(burst.n); else next.add(burst.n);
+                            return next;
+                          })
+                        }
+                        className={adminTabClass(recListFilterBursts.has(burst.n))}
+                      >
+                        {burst.label}
+                      </button>
+                    ))}
+                    {elements.map((el) => (
+                      <button
+                        key={el.v}
+                        type="button"
+                        onClick={() =>
+                          setRecListFilterElements((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(el.v)) next.delete(el.v); else next.add(el.v);
+                            return next;
+                          })
+                        }
+                        className={adminTabClass(recListFilterElements.has(el.v))}
+                      >
+                        {el.label}
+                      </button>
+                    ))}
+                    {(recListFilterBursts.size > 0 || recListFilterElements.size > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => { setRecListFilterBursts(new Set()); setRecListFilterElements(new Set()); }}
+                        className="rounded-2xl border border-red-800/60 bg-red-950/40 px-3 py-2 text-sm text-red-300"
+                      >
+                        초기화
+                      </button>
+                    )}
+                  </div>
+
                   <div className="max-h-[520px] overflow-y-auto pr-1">
                     {recommendedNikkes.length === 0 ? (
                       <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
                         추천 니케가 없습니다.
                       </div>
+                    ) : recListFiltered.length === 0 ? (
+                      <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
+                        해당 필터에 맞는 니케가 없습니다.
+                      </div>
                     ) : (
                       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-5">
-                        {recommendedNikkes.map((nikke) =>
+                        {recListFiltered.map((nikke) =>
                           renderAdminNikkeTile(nikke, {
                             removable: true,
                             onRemove: () => void handleRemoveRecommendedNikke(nikke.name),
@@ -872,19 +957,70 @@ export default function MyPageTab({
 
                 <section className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
                   <div className="mb-2 text-sm font-semibold text-neutral-100">전체 니케 목록</div>
+
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {[
+                      { n: 1, label: "I" },
+                      { n: 2, label: "II" },
+                      { n: 3, label: "III" },
+                    ].map((burst) => (
+                      <button
+                        key={burst.n}
+                        type="button"
+                        onClick={() =>
+                          setRecFilterBursts((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(burst.n)) next.delete(burst.n); else next.add(burst.n);
+                            return next;
+                          })
+                        }
+                        className={adminTabClass(recFilterBursts.has(burst.n))}
+                      >
+                        {burst.label}
+                      </button>
+                    ))}
+                    {elements.map((el) => (
+                      <button
+                        key={el.v}
+                        type="button"
+                        onClick={() =>
+                          setRecFilterElements((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(el.v)) next.delete(el.v); else next.add(el.v);
+                            return next;
+                          })
+                        }
+                        className={adminTabClass(recFilterElements.has(el.v))}
+                      >
+                        {el.label}
+                      </button>
+                    ))}
+                    {(recFilterBursts.size > 0 || recFilterElements.size > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => { setRecFilterBursts(new Set()); setRecFilterElements(new Set()); }}
+                        className="rounded-2xl border border-red-800/60 bg-red-950/40 px-3 py-2 text-sm text-red-300"
+                      >
+                        초기화
+                      </button>
+                    )}
+                  </div>
+
                   <div className="max-h-[520px] overflow-y-auto pr-1">
-                    {nikkes.length === 0 ? (
+                    {recFilteredNikkes.length === 0 ? (
                       <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
                         표시할 니케가 없습니다.
                       </div>
                     ) : (
                       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-5">
-                        {nikkes.map((nikke) =>
-                          renderAdminNikkeTile(nikke, {
-                            selected: selectedRecommendedCandidates.has(nikke.name),
-                            onClick: () => toggleRecommendedCandidate(nikke.name),
-                          })
-                        )}
+                        {recFilteredNikkes.map((nikke) => {
+                          const isDimmed = recommendedNameSet.has(nikke.name);
+                          return renderAdminNikkeTile(nikke, {
+                            selected: !isDimmed && selectedRecommendedCandidates.has(nikke.name),
+                            dimmed: isDimmed,
+                            onClick: isDimmed ? undefined : () => toggleRecommendedCandidate(nikke.name),
+                          });
+                        })}
                       </div>
                     )}
                   </div>
@@ -1018,7 +1154,7 @@ export default function MyPageTab({
             <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
               <div className="text-xs text-neutral-400">누적 이용자</div>
               <div className="mt-1 text-2xl font-semibold tabular-nums text-neutral-100">
-                {loadingUserStats ? "..." : totalUserCount}
+                {loadingUserStats ? "..." : Math.max(totalUserCount, onlineUserCount)}
               </div>
             </div>
           </div>
