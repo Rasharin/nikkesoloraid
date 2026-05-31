@@ -1245,6 +1245,13 @@ export default function Page() {
   async function trackSiteUser(clientId: string) {
     if (!clientId) return;
 
+    // 새 사용자인지 먼저 확인 (누적 카운터 정확도를 위해)
+    const { data: existing } = await supabase
+      .from(USER_STATS_TABLE)
+      .select("client_id")
+      .eq("client_id", clientId)
+      .maybeSingle();
+
     const { error } = await supabase.from(USER_STATS_TABLE).upsert(
       {
         client_id: clientId,
@@ -1256,6 +1263,26 @@ export default function Page() {
 
     if (error) {
       console.warn("[stats] site user tracking skipped", error.message);
+      return;
+    }
+
+    // 새 사용자라면 누적 카운터 즉시 증가 (refreshUserStats 호출 없이도 보존)
+    if (!existing) {
+      const { data: peakRow } = await supabase
+        .from(SITE_SETTINGS_TABLE)
+        .select("value")
+        .eq("key", PEAK_USER_COUNT_KEY)
+        .maybeSingle();
+      const prev = parseInt((peakRow as SiteSettingRow | null)?.value ?? "0") || 0;
+      void supabase
+        .from(SITE_SETTINGS_TABLE)
+        .upsert(
+          { key: PEAK_USER_COUNT_KEY, value: String(prev + 1), updated_at: new Date().toISOString() },
+          { onConflict: "key" }
+        )
+        .then(({ error: upsertErr }) => {
+          if (upsertErr) console.warn("[stats] cumulative count update failed", upsertErr.message);
+        });
     }
   }
 
@@ -1292,8 +1319,12 @@ export default function Page() {
       if (totalResult.error) throw totalResult.error;
       if (activeResult.error) throw activeResult.error;
       if (archiveResult.error) throw archiveResult.error;
+      if (peakResult.error) console.warn("[stats] peak count fetch failed", peakResult.error.message);
 
       const byRaid = new Map<string, BossUserStat>();
+
+      // Step 1: raid_user_stats에서 기간 동안 고유 접속자 수 카운트
+      // (각 row = 고유 client_id, ended_at 여부 관계없이 기간 내 접속 이력)
       for (const row of (activeResult.data ?? []) as Array<{ raid_key: string | null; raid_label: string | null; ended_at: string | null }>) {
         if (!row.raid_key) continue;
         const existing = byRaid.get(row.raid_key);
@@ -1306,6 +1337,9 @@ export default function Page() {
         });
       }
 
+      // Step 2: 아카이브(종료 시점 스냅샷)와 실시간 count 중 큰 값 사용
+      // - 종료된 레이드: 두 값이 같거나 아카이브가 더 클 수 있음 (데이터 불일치 보정)
+      // - 아카이브만 있고 raid_user_stats가 없는 레이드도 표시
       for (const row of (archiveResult.data ?? []) as Array<{
         raid_key: string | null;
         raid_label: string | null;
@@ -1314,19 +1348,20 @@ export default function Page() {
       }>) {
         if (!row.raid_key) continue;
         const archivedCount = Number(row.user_count);
-        if (!Number.isFinite(archivedCount)) continue;
+        if (!Number.isFinite(archivedCount) || archivedCount < 0) continue;
         const existing = byRaid.get(row.raid_key);
         byRaid.set(row.raid_key, {
           raidKey: row.raid_key,
           raidLabel: row.raid_label?.trim() || existing?.raidLabel || row.raid_key,
           userCount: Math.max(existing?.userCount ?? 0, archivedCount),
           active: existing?.active ?? false,
-          endedAt: row.ended_at ? Date.parse(row.ended_at) : existing?.endedAt ?? null,
+          endedAt: row.ended_at ? Date.parse(row.ended_at) : (existing?.endedAt ?? null),
         });
       }
 
       const currentCount = totalResult.count ?? 0;
       const storedPeak = parseInt((peakResult.data as SiteSettingRow | null)?.value ?? "0") || 0;
+      // site_user_stats count가 RLS 등으로 줄어들어도 저장된 peak 이하로 내려가지 않음
       const displayCount = Math.max(currentCount, storedPeak);
       setTotalUserCount(displayCount);
       if (currentCount > storedPeak) {
