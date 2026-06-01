@@ -7,7 +7,10 @@
       "Bash(node -e \"const pkg = require\\('./node_modules/@supabase/ssr/package.json'\\); console.log\\(pkg.version\\);\")",
       "Bash(node -e \"const fs=require\\('fs'\\); const src=fs.readFileSync\\('./node_modules/@supabase/ssr/dist/cjs/createBrowserClient.js','utf8'\\); console.log\\(src.substring\\(0,3000\\)\\);\")",
       "Bash(node -e \"const {DEFAULT_COOKIE_OPTIONS}=require\\('@supabase/ssr'\\); console.log\\(JSON.stringify\\(DEFAULT_COOKIE_OPTIONS, null, 2\\)\\);\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(Select-Object Name)",
+      "Bash(grep -c \"\\\\.png$\")",
+      "Bash(grep -c \"\\\\.webp$\")"
     ]
   }
 }
