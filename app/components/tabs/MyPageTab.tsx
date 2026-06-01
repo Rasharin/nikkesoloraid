@@ -74,7 +74,7 @@ type MyPageTabProps = {
     element: NikkeElementValue;
     role: NikkeRoleValue;
     aliases: string[];
-    imageFile: File | null;
+    imagePath: string;
   }) => Promise<boolean>;
   onUpdateNikke: (payload: {
     id: string;
@@ -196,8 +196,7 @@ export default function MyPageTab({
   const [nikkeElement, setNikkeElement] = useState<NikkeElementValue>(null);
   const [nikkeRole, setNikkeRole] = useState<NikkeRoleValue>(null);
   const [nikkeAliases, setNikkeAliases] = useState("");
-  const [nikkeImageFile, setNikkeImageFile] = useState<File | null>(null);
-  const [nikkeImageInputKey, setNikkeImageInputKey] = useState(0);
+  const [nikkeImageFileName, setNikkeImageFileName] = useState("");
   const [savingNikke, setSavingNikke] = useState(false);
   const [selectedNikkeForEdit, setSelectedNikkeForEdit] = useState<NikkeRow | null>(null);
   const [editingNikkeValues, setEditingNikkeValues] = useState<{
@@ -303,7 +302,7 @@ export default function MyPageTab({
           .split(",")
           .map((alias) => alias.trim())
           .filter((alias, index, list) => alias.length > 0 && list.indexOf(alias) === index),
-        imageFile: nikkeImageFile,
+        imagePath: nikkeImageFileName.trim(),
       });
       if (!saved) return;
       setNikkeName("");
@@ -311,7 +310,7 @@ export default function MyPageTab({
       setNikkeElement(null);
       setNikkeRole(null);
       setNikkeAliases("");
-      setNikkeImageFile(null);
+      setNikkeImageFileName("");
       setNikkeImageInputKey((prev) => prev + 1);
     } finally {
       setSavingNikke(false);
@@ -683,16 +682,16 @@ export default function MyPageTab({
                   </div>
 
                   <input
-                    key={nikkeImageInputKey}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(event) => setNikkeImageFile(event.target.files?.[0] ?? null)}
-                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none file:mr-3 file:rounded-xl file:border-0 file:bg-neutral-800 file:px-3 file:py-2 file:text-sm file:text-neutral-100"
+                    type="text"
+                    placeholder="파일명.webp (예: alice.webp)"
+                    value={nikkeImageFileName}
+                    onChange={(event) => setNikkeImageFileName(event.target.value)}
+                    className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                   />
 
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-xs text-neutral-400">
-                      {nikkeImageFile ? `선택된 이미지: ${nikkeImageFile.name}` : "니케 이미지 파일을 선택해주세요"}
+                      public/nikke-images/에 WebP 파일을 먼저 추가하고 배포하세요
                     </div>
                     <button
                       type="button"

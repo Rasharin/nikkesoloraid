@@ -278,7 +278,7 @@ export default function SettingsTab({
             <button
               type="button"
               onClick={() => setSelectedNames([])}
-              className="rounded-2xl border border-red-800/60 bg-red-950/40 px-4 py-2 text-sm text-red-300 active:scale-[0.99]"
+              className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-[var(--theme-text)] transition hover:border-red-400 hover:bg-red-500/15 active:scale-[0.99] dark:border-red-800/60 dark:bg-red-950/40 dark:text-red-300"
             >
               전체 해제
             </button>
@@ -413,7 +413,7 @@ export default function SettingsTab({
               <button
                 type="button"
                 onClick={onResetFilters}
-                className="mt-1 rounded-2xl border border-red-800/60 bg-red-950/40 px-4 py-2 text-sm text-red-300 active:scale-[0.99]"
+                className="mt-1 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-[var(--theme-text)] transition hover:border-red-400 hover:bg-red-500/15 active:scale-[0.99] dark:border-red-800/60 dark:bg-red-950/40 dark:text-red-300"
               >
                 필터 초기화
               </button>

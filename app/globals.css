@@ -1,6 +1,7 @@
 ﻿@import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
 
 :root {
   --background: #0a0a0a;
@@ -42,6 +43,7 @@ body[data-theme="light"] {
   background-color: var(--theme-page);
   color: var(--theme-text);
 }
+
 
 html[data-theme="dark"],
 body[data-theme="dark"] {

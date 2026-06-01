@@ -174,7 +174,7 @@ type AddNikkePayload = {
   element: NikkeElement;
   role: NikkeRole;
   aliases: string[];
-  imageFile: File | null;
+  imagePath: string;
 };
 type AddUsagePostPayload = {
   categoryKey: string;
@@ -3432,7 +3432,7 @@ export default function Page() {
   async function addNikke(payload: AddNikkePayload) {
     const trimmedName = payload.name.trim();
     const aliases = Array.from(new Set(payload.aliases.map((alias) => alias.trim()).filter(Boolean)));
-    const imageFile = payload.imageFile;
+    const imagePath = payload.imagePath.trim();
 
     if (!isMaster) {
       showToast("마스터 계정만 가능");
@@ -3455,26 +3455,12 @@ export default function Page() {
       return false;
     }
 
-    if (!imageFile) {
-      showToast("니케 이미지를 선택해줘");
+    if (!imagePath) {
+      showToast("파일명을 입력해줘 (예: alice.webp)");
       return false;
     }
 
-    const extension = imageFile.name.includes(".")
-      ? imageFile.name.split(".").pop()?.toLowerCase() ?? "png"
-      : "png";
-    const imagePath = imageFile.name.trim() || `nikke-${Date.now()}.${extension}`;
-
     try {
-      const { error: uploadError } = await supabase.storage
-        .from("nikke-images")
-        .upload(imagePath, imageFile, {
-          cacheControl: STORAGE_IMAGE_CACHE_CONTROL_SECONDS,
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
       const { error: upsertError } = await supabase.from("nikkes").upsert(
         {
           name: trimmedName,
