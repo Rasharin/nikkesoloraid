@@ -1245,13 +1245,6 @@ export default function Page() {
   async function trackSiteUser(clientId: string) {
     if (!clientId) return;
 
-    // 새 사용자인지 먼저 확인 (누적 카운터 정확도를 위해)
-    const { data: existing } = await supabase
-      .from(USER_STATS_TABLE)
-      .select("client_id")
-      .eq("client_id", clientId)
-      .maybeSingle();
-
     const { error } = await supabase.from(USER_STATS_TABLE).upsert(
       {
         client_id: clientId,
@@ -1263,26 +1256,6 @@ export default function Page() {
 
     if (error) {
       console.warn("[stats] site user tracking skipped", error.message);
-      return;
-    }
-
-    // 새 사용자라면 누적 카운터 즉시 증가 (refreshUserStats 호출 없이도 보존)
-    if (!existing) {
-      const { data: peakRow } = await supabase
-        .from(SITE_SETTINGS_TABLE)
-        .select("value")
-        .eq("key", PEAK_USER_COUNT_KEY)
-        .maybeSingle();
-      const prev = parseInt((peakRow as SiteSettingRow | null)?.value ?? "0") || 0;
-      void supabase
-        .from(SITE_SETTINGS_TABLE)
-        .upsert(
-          { key: PEAK_USER_COUNT_KEY, value: String(prev + 1), updated_at: new Date().toISOString() },
-          { onConflict: "key" }
-        )
-        .then(({ error: upsertErr }) => {
-          if (upsertErr) console.warn("[stats] cumulative count update failed", upsertErr.message);
-        });
     }
   }
 
@@ -1309,17 +1282,15 @@ export default function Page() {
   async function refreshUserStats() {
     setLoadingUserStats(true);
     try {
-      const [totalResult, activeResult, archiveResult, peakResult] = await Promise.all([
+      const [totalResult, activeResult, archiveResult] = await Promise.all([
         supabase.from(USER_STATS_TABLE).select("client_id", { count: "exact", head: true }),
         supabase.from(RAID_USER_STATS_TABLE).select("raid_key,raid_label,ended_at"),
         supabase.from(RAID_USER_ARCHIVES_TABLE).select("raid_key,raid_label,user_count,ended_at"),
-        supabase.from(SITE_SETTINGS_TABLE).select("key,value").eq("key", PEAK_USER_COUNT_KEY).limit(1).maybeSingle(),
       ]);
 
       if (totalResult.error) throw totalResult.error;
       if (activeResult.error) throw activeResult.error;
       if (archiveResult.error) throw archiveResult.error;
-      if (peakResult.error) console.warn("[stats] peak count fetch failed", peakResult.error.message);
 
       const byRaid = new Map<string, BossUserStat>();
 
@@ -1359,19 +1330,7 @@ export default function Page() {
         });
       }
 
-      const currentCount = totalResult.count ?? 0;
-      const storedPeak = parseInt((peakResult.data as SiteSettingRow | null)?.value ?? "0") || 0;
-      // site_user_stats count가 RLS 등으로 줄어들어도 저장된 peak 이하로 내려가지 않음
-      const displayCount = Math.max(currentCount, storedPeak);
-      setTotalUserCount(displayCount);
-      if (currentCount > storedPeak) {
-        void supabase.from(SITE_SETTINGS_TABLE).upsert(
-          { key: PEAK_USER_COUNT_KEY, value: String(currentCount), updated_at: new Date().toISOString() },
-          { onConflict: "key" }
-        ).then(({ error }) => {
-          if (error) console.warn("[stats] peak user count update failed", error.message);
-        });
-      }
+      setTotalUserCount(totalResult.count ?? 0);
       setBossUserStats(
         Array.from(byRaid.values()).sort((a, b) => {
           if (a.active !== b.active) return a.active ? -1 : 1;
@@ -2544,6 +2503,12 @@ export default function Page() {
     if (!clientId) return;
 
     void trackRaidUser(clientId, currentDeckRaidKey, activeRaidLabel || currentDeckRaidKey);
+
+    const intervalId = window.setInterval(() => {
+      void trackRaidUser(clientId, currentDeckRaidKey, activeRaidLabel || currentDeckRaidKey);
+    }, 1000 * 60);
+
+    return () => window.clearInterval(intervalId);
   }, [activeRaidLabel, currentDeckRaidKey, soloRaidInProgress, userId]);
 
   useEffect(() => {
