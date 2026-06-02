@@ -51,13 +51,13 @@ function compareRecommendedDecksByUsedCount(a: RecommendedDeck, b: RecommendedDe
 }
 
 function readStoredRecommendedDeckSortMode(): RecommendedDeckSortMode {
-  if (typeof window === "undefined") return "score";
+  if (typeof window === "undefined") return "usedCount";
 
   try {
     const value = localStorage.getItem(RECOMMENDED_DECK_SORT_MODE_KEY);
-    return value === "usedCount" || value === "score" ? value : "score";
+    return value === "usedCount" || value === "score" ? value : "usedCount";
   } catch {
-    return "score";
+    return "usedCount";
   }
 }
 
