@@ -246,17 +246,32 @@ function normalizeSavedDeckDrafts(value: unknown): DeckDraftState[] {
     })
     .filter((deck): deck is DeckDraftState => Boolean(deck));
 
-  if (normalized.length >= DECK_DRAFT_COUNT) return normalized;
+  const maxId = normalized.reduce((max, deck) => Math.max(max, deck.id), 0);
+  const filled: DeckDraftState[] =
+    normalized.length >= DECK_DRAFT_COUNT
+      ? normalized
+      : [
+          ...normalized,
+          ...Array.from({ length: DECK_DRAFT_COUNT - normalized.length }, (_, index) => ({
+            id: maxId + index + 1,
+            draft: createEmptyDraft(),
+            score: "",
+            editingId: null,
+          })),
+        ];
 
-  return [
-    ...normalized,
-    ...Array.from({ length: DECK_DRAFT_COUNT - normalized.length }, (_, index) => ({
-      id: normalized.length + index + 1,
-      draft: createEmptyDraft(),
-      score: "",
-      editingId: null,
-    })),
-  ];
+  // 저장된 데이터에 중복 ID가 있을 경우 재할당
+  const usedIds = new Set<number>();
+  let nextId = filled.reduce((max, deck) => Math.max(max, deck.id), 0) + 1;
+  return filled.map((deck) => {
+    if (usedIds.has(deck.id)) {
+      const newId = nextId++;
+      usedIds.add(newId);
+      return { ...deck, id: newId };
+    }
+    usedIds.add(deck.id);
+    return deck;
+  });
 }
 
 function normalizeSavedDeckBuilderPage(value: unknown, fallbackId: number): DeckBuilderPageState {
@@ -1406,6 +1421,7 @@ export default function ImaginarySoloRaidTab({
 
   return (
     <DndContext
+      id="deck-building-dnd"
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}

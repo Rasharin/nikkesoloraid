@@ -3119,7 +3119,7 @@ export default function Page() {
 	      if (existingDeck && soloRaidInProgress && userId) {
         const { data, error } = await supabase
           .from("decks")
-          .update({ score: sc })
+          .update({ score: sc, chars: [...draft] })
           .eq("id", existingDeck.id)
           .eq("user_id", userId)
           .select("id,user_id,raid_key,deck_key,chars,score,created_at")
@@ -3144,7 +3144,7 @@ export default function Page() {
         showToast("덱 저장 완료");
       } else if (existingDeck) {
         const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
-          const next = prev.map((deck) => (deck.id === existingDeck.id ? { ...deck, score: sc } : deck));
+          const next = prev.map((deck) => (deck.id === existingDeck.id ? { ...deck, chars: [...draft], score: sc } : deck));
           saveDecks(next);
           return next;
         };
@@ -3172,7 +3172,7 @@ export default function Page() {
 	          const existingIndex = prev.findIndex((deck) => deck.raidKey === targetRaidKey && deck.deckKey === nextDeckKey);
           const next =
             existingIndex >= 0
-              ? prev.map((deck, index) => (index === existingIndex ? { ...deck, score: sc } : deck))
+              ? prev.map((deck, index) => (index === existingIndex ? { ...deck, chars: [...draft], score: sc } : deck))
               : [inserted, ...prev];
 	          if (soloRaidInProgress) {
             saveLocalDecks(next);
@@ -3457,6 +3457,7 @@ export default function Page() {
     image_path: string | null;
     burst: number | null;
     aliases: string[];
+    element: NikkeElement | null;
     role: NikkeRole;
   }) {
     if (!isMasterUser) {
@@ -3471,6 +3472,7 @@ export default function Page() {
           image_path: payload.image_path,
           burst: payload.burst,
           aliases: payload.aliases,
+          element: payload.element,
           role: payload.role,
         })
         .eq("id", payload.id);

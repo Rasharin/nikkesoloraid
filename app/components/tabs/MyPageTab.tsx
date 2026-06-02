@@ -82,6 +82,7 @@ type MyPageTabProps = {
     image_path: string | null;
     burst: number | null;
     aliases: string[];
+    element: NikkeElementValue;
     role: NikkeRoleValue;
   }) => Promise<boolean>;
   nikkes: NikkeRow[];
@@ -204,6 +205,7 @@ export default function MyPageTab({
     image_path: string;
     burst: string;
     aliases: string;
+    element: string;
     role: string;
   } | null>(null);
   const [editingNikkeField, setEditingNikkeField] = useState<string | null>(null);
@@ -332,6 +334,7 @@ export default function MyPageTab({
         image_path: editingNikkeValues.image_path.trim() || null,
         burst: isNaN(burstNum) ? null : burstNum,
         aliases,
+        element: (editingNikkeValues.element || null) as NikkeElementValue,
         role: (editingNikkeValues.role || null) as NikkeRoleValue,
       });
       if (ok) {
@@ -343,6 +346,7 @@ export default function MyPageTab({
                 image_path: editingNikkeValues.image_path.trim() || null,
                 burst: isNaN(burstNum) ? null : burstNum,
                 aliases,
+                element: (editingNikkeValues.element || null) as NikkeElementValue,
                 role: (editingNikkeValues.role || null) as NikkeRoleValue,
               }
             : null
@@ -722,6 +726,7 @@ export default function MyPageTab({
                               image_path: nikke.image_path ?? "",
                               burst: nikke.burst ? String(nikke.burst) : "",
                               aliases: nikke.aliases.join(", "),
+                              element: nikke.element ?? "",
                               role: nikke.role ?? "",
                             });
                             setEditingNikkeField(null);
@@ -802,6 +807,32 @@ export default function MyPageTab({
                               title="더블클릭하여 수정"
                             >
                               {editingNikkeValues.burst === "1" ? "I" : editingNikkeValues.burst === "2" ? "II" : editingNikkeValues.burst === "3" ? "III" : <span className="text-neutral-500">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="mb-1 text-xs text-neutral-400">속성</div>
+                          {editingNikkeField === "element" ? (
+                            <select
+                              autoFocus
+                              value={editingNikkeValues.element}
+                              onChange={(e) => setEditingNikkeValues((prev) => prev ? { ...prev, element: e.target.value } : prev)}
+                              onBlur={() => setEditingNikkeField(null)}
+                              className="w-full rounded-lg border border-sky-500/50 bg-neutral-950/50 px-3 py-2 text-sm outline-none"
+                            >
+                              <option value="">-</option>
+                              {elements.map((el) => (
+                                <option key={el.v} value={el.v}>{el.label}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div
+                              onDoubleClick={() => setEditingNikkeField("element")}
+                              className="cursor-pointer rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2 text-sm text-neutral-100 hover:border-neutral-600"
+                              title="더블클릭하여 수정"
+                            >
+                              {elements.find((el) => el.v === editingNikkeValues.element)?.label ?? <span className="text-neutral-500">-</span>}
                             </div>
                           )}
                         </div>

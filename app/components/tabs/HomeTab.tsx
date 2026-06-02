@@ -1013,6 +1013,7 @@ export default function HomeTab({
       </div>
 
       <DndContext
+        id="home-dnd"
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
