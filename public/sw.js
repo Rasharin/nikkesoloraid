@@ -12,7 +12,7 @@ const NETWORK_ONLY = [
 // Cache-first: 절대 바뀌지 않는 정적 파일만
 const CACHE_FIRST = [
   /\/nikke-images\//,          // 캐릭터 이미지 (핵심)
-  /\/blablalink-icon\.png$/,   // 아이콘
+  /\/blablalink-icon\.webp$/,  // 아이콘
   /\/logo[^/]*\.png$/,         // 로고
   /\/_next\/static\//,         // JS/CSS 번들 (파일명에 해시 포함 → 불변)
 ];

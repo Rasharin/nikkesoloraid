@@ -60,6 +60,7 @@ drop policy if exists "decks_update_own" on public.decks;
 drop policy if exists "decks_delete_own" on public.decks;
 
 create policy "decks_select_own" on public.decks for select to authenticated using (auth.uid() = user_id);
+create policy "decks_select_all" on public.decks for select to authenticated using (true);
 create policy "decks_select_public" on public.decks for select to anon, authenticated using (user_id = '2d455703-52fd-4239-82f8-79c5e1856f30'::uuid);
 create policy "decks_insert_own" on public.decks for insert to authenticated with check (auth.uid() = user_id);
 create policy "decks_update_own" on public.decks for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
