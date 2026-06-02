@@ -311,7 +311,7 @@ export default function MyPageTab({
       setNikkeRole(null);
       setNikkeAliases("");
       setNikkeImageFileName("");
-      setNikkeImageInputKey((prev) => prev + 1);
+      setRaidImageInputKey((prev) => prev + 1);
     } finally {
       setSavingNikke(false);
     }
