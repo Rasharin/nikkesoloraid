@@ -2339,34 +2339,55 @@ export default function Page() {
     };
 	  }, [recommendDeckLoadRaidKey]);
   const recommendedDecks = useMemo(() => {
-    const grouped = new Map<string, { chars: string[]; totalScore: number; usedCount: number }>();
+    const grouped = new Map<string, {
+      orderCounts: Map<string, { chars: string[]; count: number }>;
+      totalScore: number;
+      usedCount: number;
+    }>();
 
     for (const deck of communityRaidDecks) {
       if (!Number.isFinite(deck.score) || deck.score <= MIN_RECOMMENDED_DECK_SCORE) continue;
 
-      const normalizedChars = [...deck.chars].map((char) => char.trim()).sort((a, b) => a.localeCompare(b));
+      const trimmedChars = deck.chars.map((char) => char.trim());
+      const normalizedChars = [...trimmedChars].sort((a, b) => a.localeCompare(b));
       const key = buildDeckKey(normalizedChars);
+      const orderKey = trimmedChars.join("|");
+
       const existing = grouped.get(key);
       if (existing) {
         existing.totalScore += deck.score;
         existing.usedCount += 1;
+        const orderEntry = existing.orderCounts.get(orderKey);
+        if (orderEntry) {
+          orderEntry.count += 1;
+        } else {
+          existing.orderCounts.set(orderKey, { chars: trimmedChars, count: 1 });
+        }
         continue;
       }
 
-      grouped.set(key, {
-        chars: normalizedChars,
-        totalScore: deck.score,
-        usedCount: 1,
-      });
+      const orderCounts = new Map<string, { chars: string[]; count: number }>();
+      orderCounts.set(orderKey, { chars: trimmedChars, count: 1 });
+      grouped.set(key, { orderCounts, totalScore: deck.score, usedCount: 1 });
     }
 
     return Array.from(grouped.entries())
-      .map(([deckKey, group]) => ({
-        deckKey,
-        chars: group.chars,
-        usedCount: group.usedCount,
-        avgScore: group.totalScore / group.usedCount,
-      }))
+      .map(([deckKey, group]) => {
+        let bestChars: string[] = [];
+        let bestCount = 0;
+        for (const { chars, count } of group.orderCounts.values()) {
+          if (count > bestCount) {
+            bestCount = count;
+            bestChars = chars;
+          }
+        }
+        return {
+          deckKey,
+          chars: bestChars,
+          usedCount: group.usedCount,
+          avgScore: group.totalScore / group.usedCount,
+        };
+      })
       .sort(compareRecommendedDecksByScore);
   }, [communityRaidDecks]);
 	  const displayedRecommendedDecks = useMemo(() => {
