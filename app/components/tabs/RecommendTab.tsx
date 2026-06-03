@@ -89,6 +89,7 @@ type RecommendTabProps = {
   nikkeMap: Map<string, NikkeRow>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   fmt: (value: number) => string;
+  myRankingData: { rank: number; total: number } | null;
 };
 
 export default function RecommendTab({
@@ -119,6 +120,7 @@ export default function RecommendTab({
   nikkeMap,
   getPublicUrl,
   fmt,
+  myRankingData,
 }: RecommendTabProps) {
   const [showWriteForm, setShowWriteForm] = useState(false);
   const [tipContent, setTipContent] = useState("");
@@ -444,6 +446,19 @@ export default function RecommendTab({
             <div className="text-sm text-neutral-400">등록된 추천 영상이 없습니다.</div>
           </section>
         )}
+
+        {myRankingData && myRankingData.total >= 2 ? (
+          <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-neutral-300">내 덱 순위</span>
+              <span className="text-lg font-bold tabular-nums text-neutral-100">
+                {myRankingData.rank <= 10
+                  ? `${myRankingData.rank}위`
+                  : `상위 ${Math.ceil((myRankingData.rank / myRankingData.total) * 100)}%`}
+              </span>
+            </div>
+          </section>
+        ) : null}
 
         <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
           <div className="flex items-center justify-between gap-3">

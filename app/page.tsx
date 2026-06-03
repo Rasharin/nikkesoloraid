@@ -41,6 +41,7 @@ type Deck = {
   chars: string[]; // length 5
   score: number;
   note: string;
+  userId?: string;
   createdAt: number;
 };
 type RecommendedDeck = {
@@ -618,6 +619,7 @@ function mapDeckRow(row: DeckRow): Deck | null {
     chars,
     score,
     note: typeof row.note === "string" ? row.note : "",
+    userId: row.user_id,
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
   };
 }
@@ -2402,6 +2404,33 @@ export default function Page() {
 	  }, [recommendedDeckSnapshots, recommendedDecks, selectedRecommendRaidKey]);
   const best = useMemo(() => pickBest5(activeRaidDecks, { minScore: 0 }), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
+
+  const myRankingData = useMemo(() => {
+    if (!soloRaidInProgress || !currentDeckRaidKey || !canRecommend) return null;
+    const myTotal = best.total;
+    if (!myTotal) return null;
+
+    const byUser = new Map<string, Deck[]>();
+    for (const deck of communityRaidDecks) {
+      if (!deck.userId || deck.raidKey !== currentDeckRaidKey) continue;
+      const list = byUser.get(deck.userId) ?? [];
+      list.push(deck);
+      byUser.set(deck.userId, list);
+    }
+
+    if (byUser.size === 0) return null;
+
+    const totals = Array.from(byUser.values())
+      .map((decks) => pickBest5(decks, { minScore: 0 }).total)
+      .filter((t) => t > 0)
+      .sort((a, b) => b - a);
+
+    if (totals.length === 0) return null;
+
+    const rank = totals.findIndex((t) => t <= myTotal) + 1;
+    const effectiveRank = rank === 0 ? totals.length + 1 : rank;
+    return { rank: effectiveRank, total: totals.length };
+  }, [best.total, canRecommend, communityRaidDecks, currentDeckRaidKey, soloRaidInProgress]);
 	  const activeRaidLabel = useMemo(
 	    () =>
 	      currentDeckRaidKey === SEASON_OFF_RAID_KEY
@@ -4532,6 +4561,7 @@ export default function Page() {
               nikkeMap={nikkeMap}
               getPublicUrl={getPublicUrl}
               fmt={fmt}
+              myRankingData={myRankingData}
             />
           </div>
         )}
