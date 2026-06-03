@@ -222,6 +222,12 @@ export default function SavedTab({
                   </div>
                 )}
 
+                {deck.note ? (
+                  <div className="mt-2 rounded-xl border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-xs text-neutral-300 whitespace-pre-wrap break-words">
+                    {deck.note}
+                  </div>
+                ) : null}
+
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={() => {
