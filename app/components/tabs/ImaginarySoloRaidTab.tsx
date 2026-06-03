@@ -1516,10 +1516,11 @@ export default function ImaginarySoloRaidTab({
           </a>
           <div className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 text-xs font-medium text-[var(--theme-text-soft)] sm:text-sm">
             <span className="whitespace-nowrap text-neutral-400">점수 표기</span>
-            <span className={`whitespace-nowrap ${scoreDisplayMode === "eok" ? "text-neutral-100" : "text-neutral-500"}`}>
+            <span suppressHydrationWarning className={`whitespace-nowrap ${scoreDisplayMode === "eok" ? "text-neutral-100" : "text-neutral-500"}`}>
               00억
             </span>
             <button
+              suppressHydrationWarning
               type="button"
               role="switch"
               aria-checked={scoreDisplayMode === "number"}
@@ -1528,12 +1529,13 @@ export default function ImaginarySoloRaidTab({
               className="relative h-6 w-11 shrink-0 rounded-full border border-[var(--border)] bg-[var(--theme-panel)] transition hover:border-[var(--theme-border-strong)] active:scale-[0.98]"
             >
               <span
+                suppressHydrationWarning
                 className={`score-mode-toggle-thumb absolute left-1 top-1 h-4 w-4 rounded-full bg-neutral-100 shadow transition-transform ${
                   scoreDisplayMode === "number" ? "translate-x-5" : "translate-x-0"
                 }`}
               />
             </button>
-            <span className={`whitespace-nowrap ${scoreDisplayMode === "number" ? "text-neutral-100" : "text-neutral-500"}`}>
+            <span suppressHydrationWarning className={`whitespace-nowrap ${scoreDisplayMode === "number" ? "text-neutral-100" : "text-neutral-500"}`}>
               숫자표기
             </span>
           </div>

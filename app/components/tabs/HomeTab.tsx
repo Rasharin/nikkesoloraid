@@ -207,6 +207,7 @@ export default function HomeTab({
   const [editingRecommendedScore, setEditingRecommendedScore] = useState("");
   const [memoText, setMemoText] = useState("");
   const [isMemoEditing, setIsMemoEditing] = useState(false);
+  const [deckNote, setDeckNote] = useState("");
   const [bossInfoOpen, setBossInfoOpen] = useState(false);
   const [draftStorageReady, setDraftStorageReady] = useState(false);
   const [isDesktopDnd, setIsDesktopDnd] = useState(false);
@@ -343,6 +344,7 @@ export default function HomeTab({
   function clearDraft() {
     setDraft(createEmptyDraft());
     setScore("");
+    setDeckNote("");
     setEditingId(null);
     requestAnimationFrame(() => scoreRef.current?.focus());
   }
@@ -367,7 +369,7 @@ export default function HomeTab({
 
   async function handleSaveDeck() {
     const completeDraft = draft.filter((value): value is string => value !== null);
-    await onSubmitDeck({ draft: completeDraft, scoreText: score, editingId });
+    await onSubmitDeck({ draft: completeDraft, scoreText: score, note: deckNote, editingId });
   }
 
   async function handleAddBulk() {
@@ -795,6 +797,8 @@ export default function HomeTab({
             onRemoveFromDraft={(slotIndex) => removeFromDraft(0, slotIndex)}
             onSaveDeck={() => void handleSaveDeck()}
             onClearDraft={clearDraft}
+            note={deckNote}
+            onNoteChange={setDeckNote}
             className="border-neutral-800 bg-neutral-950/30 p-2.5 shadow-none"
           />
         </div>
