@@ -457,6 +457,7 @@ export default function RecommendTab({
                   : `상위 ${Math.ceil((myRankingData.rank / myRankingData.total) * 100)}%`}
               </span>
             </div>
+            <div className="mt-1.5 text-xs text-neutral-500">사이트 이용자 중 내 순위 입니다. 인 게임과 무관합니다.</div>
           </section>
         ) : null}
 
