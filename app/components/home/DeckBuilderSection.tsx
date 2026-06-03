@@ -30,6 +30,8 @@ type DeckBuilderSectionProps = {
   showSaveAll?: boolean;
   selected?: boolean;
   onToggleSelected?: () => void;
+  note?: string;
+  onNoteChange?: (value: string) => void;
   className?: string;
 };
 
@@ -54,6 +56,8 @@ function DeckBuilderSectionComponent({
   showSaveAll,
   selected,
   onToggleSelected,
+  note,
+  onNoteChange,
   className,
 }: DeckBuilderSectionProps) {
   const slotIds = useMemo(() => draft.map((_, index) => getDeckSlotId(index, deckIndex)), [deckIndex, draft]);
@@ -85,7 +89,7 @@ function DeckBuilderSectionComponent({
           </div>
         </SortableContext>
 
-        <div className="mt-1.5">
+        <div className="mt-1.5 flex gap-1.5">
           <input
             ref={scoreRef}
             inputMode="text"
@@ -97,9 +101,18 @@ function DeckBuilderSectionComponent({
                 onSaveDeck();
               }
             }}
-            placeholder="점수입력 (예: 6,510,755,443 또는 23.3억)"
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--theme-input)] px-3 py-2 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--theme-border-strong)]"
+            placeholder="점수 입력"
+            className="w-1/2 min-w-0 rounded-xl border border-[var(--border)] bg-[var(--theme-input)] px-3 py-2 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--theme-border-strong)]"
           />
+          {onNoteChange !== undefined ? (
+            <input
+              type="text"
+              value={note ?? ""}
+              onChange={(event) => onNoteChange(event.target.value)}
+              placeholder="메모"
+              className="min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--theme-input)] px-3 py-2 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--theme-border-strong)]"
+            />
+          ) : null}
         </div>
 
         <div className="mt-3 flex gap-2">

@@ -11,6 +11,7 @@ type Deck = {
   deckKey: string;
   chars: string[];
   score: number;
+  note: string;
   createdAt: number;
 };
 

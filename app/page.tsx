@@ -40,6 +40,7 @@ type Deck = {
   deckKey: string;
   chars: string[]; // length 5
   score: number;
+  note: string;
   createdAt: number;
 };
 type RecommendedDeck = {
@@ -161,6 +162,7 @@ type DeckRow = {
   deck_key: string | null;
   chars: string[] | null;
   score: number | string | null;
+  note: string | null;
   created_at: string;
 };
 type AddSoloRaidPayload = {
@@ -615,6 +617,7 @@ function mapDeckRow(row: DeckRow): Deck | null {
     deckKey: row.deck_key?.trim() || buildDeckKey(chars),
     chars,
     score,
+    note: typeof row.note === "string" ? row.note : "",
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
   };
 }
@@ -628,6 +631,7 @@ function mapLocalDeck(value: unknown): Deck | null {
     deckKey?: unknown;
     chars?: unknown;
     score?: unknown;
+    note?: unknown;
     createdAt?: unknown;
   };
   const chars = Array.isArray(candidate.chars)
@@ -646,6 +650,7 @@ function mapLocalDeck(value: unknown): Deck | null {
     deckKey: typeof candidate.deckKey === "string" && candidate.deckKey.trim() ? candidate.deckKey : buildDeckKey(chars),
     chars,
     score,
+    note: typeof candidate.note === "string" ? candidate.note : "",
     createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
   };
 }
@@ -1222,7 +1227,7 @@ export default function Page() {
   async function fetchUserDecks(currentUserId: string) {
     const { data, error } = await supabase
       .from("decks")
-      .select("id,user_id,raid_key,deck_key,chars,score,created_at")
+      .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
       .eq("user_id", currentUserId)
       .order("created_at", { ascending: false });
 
@@ -1233,7 +1238,7 @@ export default function Page() {
   async function fetchCommunityRaidDecks(raidKey: string) {
     const { data, error } = await supabase
       .from("decks")
-      .select("id,user_id,raid_key,deck_key,chars,score,created_at")
+      .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
       .eq("raid_key", raidKey)
       .not("user_id", "is", null)
       .order("created_at", { ascending: false });
@@ -2870,7 +2875,7 @@ export default function Page() {
           .update({ score: sc })
           .eq("id", id)
           .eq("user_id", userId)
-          .select("id,user_id,raid_key,deck_key,chars,score,created_at")
+          .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
           .single();
 
         if (error) throw error;
@@ -2924,7 +2929,7 @@ export default function Page() {
           .update({ chars: [...nextChars], deck_key: buildDeckKey(nextChars) })
           .eq("id", id)
           .eq("user_id", userId)
-          .select("id,user_id,raid_key,deck_key,chars,score,created_at")
+          .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
           .single();
 
         if (error) throw error;
@@ -3112,11 +3117,11 @@ export default function Page() {
     }
   }
 
-	  async function submitDeckFromHome(payload: { draft: string[]; scoreText: string; editingId: string | null }) {
-	    const { draft, scoreText } = payload;
+	  async function submitDeckFromHome(payload: { draft: string[]; scoreText: string; note?: string; editingId: string | null }) {
+	    const { draft, scoreText, note } = payload;
 
     if (draft.length !== MAX_DECK_CHARS) {
-      showToast("니케 5명을 먼저 골라줘.");
+      showToast("덱 구성 니케 부족");
       return false;
     }
 	    const targetRaidKey = soloRaidInProgress ? currentDeckRaidKey : SEASON_OFF_RAID_KEY;
@@ -3140,10 +3145,10 @@ export default function Page() {
 	      if (existingDeck && soloRaidInProgress && userId) {
         const { data, error } = await supabase
           .from("decks")
-          .update({ score: sc, chars: [...draft] })
+          .update({ score: sc, chars: [...draft], ...(note !== undefined ? { note } : {}) })
           .eq("id", existingDeck.id)
           .eq("user_id", userId)
-          .select("id,user_id,raid_key,deck_key,chars,score,created_at")
+          .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
           .single();
         if (error) throw error;
         const updated = mapDeckRow(data as DeckRow);
@@ -3154,8 +3159,8 @@ export default function Page() {
 	      } else if (!existingDeck && soloRaidInProgress && userId) {
         const { data, error } = await supabase
           .from("decks")
-	          .insert({ user_id: userId, raid_key: targetRaidKey, deck_key: nextDeckKey, chars: [...draft], score: sc })
-          .select("id,user_id,raid_key,deck_key,chars,score,created_at")
+	          .insert({ user_id: userId, raid_key: targetRaidKey, deck_key: nextDeckKey, chars: [...draft], score: sc, ...(note !== undefined ? { note } : {}) })
+          .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
           .single();
         if (error) throw error;
         const inserted = mapDeckRow(data as DeckRow);
@@ -3187,6 +3192,7 @@ export default function Page() {
 	          deckKey: nextDeckKey,
           chars: [...draft],
           score: sc,
+          note: note ?? "",
           createdAt: Date.now(),
         };
         const updateLocalDecks = (prev: Deck[]) => {
@@ -3270,7 +3276,7 @@ export default function Page() {
         const { data, error } = await supabase
           .from("decks")
           .insert(insertRows)
-          .select("id,user_id,raid_key,deck_key,chars,score,created_at");
+          .select("id,user_id,raid_key,deck_key,chars,score,note,created_at");
         if (error) throw error;
         added = ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
       } else {
@@ -3281,6 +3287,7 @@ export default function Page() {
           deckKey: buildDeckKey(candidate.chars),
           chars: [...candidate.chars],
           score: candidate.score,
+          note: "",
           createdAt: now + index,
         }));
       }

@@ -14,6 +14,7 @@ create table if not exists public.decks (
 alter table public.decks add column if not exists raid_key text;
 alter table public.decks add column if not exists deck_key text;
 alter table public.decks add column if not exists created_at timestamptz not null default now();
+alter table public.decks add column if not exists note text;
 
 do $$
 begin

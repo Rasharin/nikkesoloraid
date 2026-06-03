@@ -39,6 +39,7 @@ type DeckDraftState = {
   id: number;
   draft: DraftSlot[];
   score: string;
+  note: string;
   editingId: string | null;
 };
 
@@ -74,7 +75,7 @@ type DeckBuildingTabProps = {
   onRemoveSelectedNikke: (name: string) => void;
   onGoToSettings: () => void;
   onShowToast: (message: string) => void;
-  onSubmitDeck: (payload: { draft: string[]; scoreText: string; editingId: string | null }) => Promise<boolean>;
+  onSubmitDeck: (payload: { draft: string[]; scoreText: string; note?: string; editingId: string | null }) => Promise<boolean>;
   onUpdateDeckScore: (id: string, scoreText: string) => Promise<boolean>;
 };
 
@@ -147,6 +148,7 @@ const BURSTS = [
 const DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
 const LAYOUT_STORAGE_KEY = "soloraid_deck_building_wide_layout_v1";
 const RECOMMENDED_OPEN_STORAGE_KEY = "soloraid_deck_building_recommended_open_v1";
+const DECK_BUILDING_MEMO_STORAGE_KEY = "soloraid_deck_building_memo_v1";
 const SELECTED_TRASH_DROP_ID = "deck-building-selected-trash";
 const DECK_DRAFT_COUNT = 5;
 const SPARE_SLOT_COUNT = 10;
@@ -195,6 +197,7 @@ function createEmptyDeckDrafts(): DeckDraftState[] {
     id: index + 1,
     draft: createEmptyDraft(),
     score: "",
+    note: "",
     editingId: null,
   }));
 }
@@ -232,6 +235,7 @@ function normalizeSavedDeckDrafts(value: unknown): DeckDraftState[] {
           id: index + 1,
           draft: createEmptyDraft(),
           score: "",
+          note: "",
           editingId: null,
         } satisfies DeckDraftState;
       }
@@ -241,6 +245,7 @@ function normalizeSavedDeckDrafts(value: unknown): DeckDraftState[] {
         id: typeof saved.id === "number" && Number.isFinite(saved.id) ? saved.id : index + 1,
         draft: normalizeDraftSlots(saved.draft, MAX_DECK_CHARS),
         score: typeof saved.score === "string" ? formatPlainScoreText(saved.score) : "",
+        note: typeof saved.note === "string" ? saved.note : "",
         editingId: typeof saved.editingId === "string" ? saved.editingId : null,
       } satisfies DeckDraftState;
     })
@@ -256,6 +261,7 @@ function normalizeSavedDeckDrafts(value: unknown): DeckDraftState[] {
             id: maxId + index + 1,
             draft: createEmptyDraft(),
             score: "",
+            note: "",
             editingId: null,
           })),
         ];
@@ -493,7 +499,7 @@ export default function ImaginarySoloRaidTab({
 }: DeckBuildingTabProps) {
   const [deckOpen, setDeckOpen] = useState(true);
   const [nikkeOpen, setNikkeOpen] = useState(true);
-  const [recommendedOpen, setRecommendedOpen] = useState(false);
+  const [recommendedOpen, setRecommendedOpen] = useState(canRecommend);
   const [wideDeckLayout, setWideDeckLayout] = useState(true);
   const [deckSectionHeight, setDeckSectionHeight] = useState<number | null>(null);
   const [expandedDeckSectionHeight, setExpandedDeckSectionHeight] = useState<number | null>(null);
@@ -509,6 +515,8 @@ export default function ImaginarySoloRaidTab({
   const [overlayWidth, setOverlayWidth] = useState<number | null>(null);
   const [editingRecommendedDeckId, setEditingRecommendedDeckId] = useState<string | null>(null);
   const [editingRecommendedScore, setEditingRecommendedScore] = useState("");
+  const [memoText, setMemoText] = useState("");
+  const [isMemoEditing, setIsMemoEditing] = useState(false);
   const [nikkeSearch, setNikkeSearch] = useState("");
   const [selectedElementFilter, setSelectedElementFilter] = useState<Set<string>>(new Set());
   const [selectedBurstFilter, setSelectedBurstFilter] = useState<Set<number>>(new Set());
@@ -517,6 +525,7 @@ export default function ImaginarySoloRaidTab({
   const deckSectionRef = useRef<HTMLElement | null>(null);
   const nikkeSectionRef = useRef<HTMLElement | null>(null);
   const selectedTrashRef = useRef<HTMLDivElement | null>(null);
+  const memoTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const previousScoreDisplayModeRef = useRef<ScoreDisplayMode>(scoreDisplayMode);
   const { setNodeRef: setSelectedTrashNodeRef, isOver: selectedTrashOver } = useDroppable({
     id: SELECTED_TRASH_DROP_ID,
@@ -597,6 +606,28 @@ export default function ImaginarySoloRaidTab({
 
     setRecommendedOpenStorageReady(true);
   }, []);
+
+  useEffect(() => {
+    try {
+      const rawMemo = localStorage.getItem(DECK_BUILDING_MEMO_STORAGE_KEY);
+      if (typeof rawMemo === "string") {
+        setMemoText(rawMemo);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const textarea = memoTextareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "0px";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [memoText, isMemoEditing]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DECK_BUILDING_MEMO_STORAGE_KEY, memoText);
+    } catch {}
+  }, [memoText]);
 
   useEffect(() => {
     if (!layoutStorageReady) return;
@@ -832,6 +863,10 @@ export default function ImaginarySoloRaidTab({
     setActiveDeckDrafts((prev) => prev.map((deck, index) => (index === deckIndex ? { ...deck, score: scoreText } : deck)));
   }
 
+  function updateDeckNote(deckIndex: number, noteText: string) {
+    setActiveDeckDrafts((prev) => prev.map((deck, index) => (index === deckIndex ? { ...deck, note: noteText } : deck)));
+  }
+
   function clearDraft(deckIndex: number) {
     setActiveDeckDrafts((prev) =>
       prev.map((deck, index) => (index === deckIndex ? { ...deck, draft: createEmptyDraft(), score: "", editingId: null } : deck))
@@ -858,6 +893,7 @@ export default function ImaginarySoloRaidTab({
           id: nextId,
           draft: createEmptyDraft(),
           score: "",
+          note: "",
           editingId: null,
         },
       ];
@@ -990,6 +1026,17 @@ export default function ImaginarySoloRaidTab({
     setEditingRecommendedScore("");
   }
 
+  function clearDeckMemo() {
+    setMemoText("");
+    try {
+      localStorage.removeItem(DECK_BUILDING_MEMO_STORAGE_KEY);
+      onShowToast("메모 비우기 완료");
+    } catch {
+      onShowToast("메모 비우기 실패");
+    }
+    setIsMemoEditing(true);
+  }
+
   function copyRecommendedDecksToBuilder() {
     const recommendedDecks = best.picked.slice(0, DECK_DRAFT_COUNT);
     if (recommendedDecks.length === 0) {
@@ -1014,6 +1061,7 @@ export default function ImaginarySoloRaidTab({
           id: maxId + index + 1,
           draft: normalizeDraftSlots(deck.chars, MAX_DECK_CHARS),
           score: displayScore(deck.score),
+          note: "",
           editingId: null,
       }));
 
@@ -1141,9 +1189,11 @@ export default function ImaginarySoloRaidTab({
             <h2 className="text-lg font-semibold">내 추천 조합</h2>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
-              {decksCount}개 덱
-            </div>
+            {canRecommend ? (
+              <div className="tabular-nums text-sm font-bold text-neutral-200">
+                {displayScore(best.total)}
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={() => setRecommendedOpen((prev) => !prev)}
@@ -1161,15 +1211,8 @@ export default function ImaginarySoloRaidTab({
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--theme-panel)] px-3 py-2">
                 <div className="text-sm font-semibold text-neutral-300">총합</div>
-                <div className="text-2xl font-bold tabular-nums">{displayScore(best.total)}</div>
-              </div>
-
-              <div className="grid gap-2 lg:grid-cols-3">
-                {topDecks.map((deck) => renderRecommendedDeckCard(deck))}
-              </div>
-              <div className="grid gap-2 lg:grid-cols-3">
-                {bottomDecks.map((deck) => renderRecommendedDeckCard(deck))}
-                <div className="flex items-end justify-end">
+                <div className="flex items-center gap-3">
+                  <div className="text-2xl font-bold tabular-nums">{displayScore(best.total)}</div>
                   <button
                     type="button"
                     onClick={copyRecommendedDecksToBuilder}
@@ -1177,6 +1220,34 @@ export default function ImaginarySoloRaidTab({
                   >
                     덱 복사
                   </button>
+                </div>
+              </div>
+
+              <div className="grid gap-2 lg:grid-cols-3">
+                {topDecks.map((deck) => renderRecommendedDeckCard(deck))}
+              </div>
+              <div className="grid gap-2 lg:grid-cols-3">
+                {bottomDecks.map((deck) => renderRecommendedDeckCard(deck))}
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold">메모장</h3>
+                    <button
+                      onClick={clearDeckMemo}
+                      className="rounded-xl border border-neutral-700 px-2 py-1 text-xs transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
+                    >
+                      비우기
+                    </button>
+                  </div>
+                  <textarea
+                    ref={memoTextareaRef}
+                    value={memoText}
+                    readOnly={!isMemoEditing}
+                    onDoubleClick={() => setIsMemoEditing(true)}
+                    onChange={(event) => setMemoText(event.target.value)}
+                    placeholder="메모장은 기기에 저장됩니다."
+                    className={`mt-2 w-full overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950/50 p-2 text-xs outline-none ${isMemoEditing ? "" : "cursor-default text-neutral-300"}`}
+                    rows={3}
+                  />
                 </div>
               </div>
             </div>
@@ -1193,7 +1264,7 @@ export default function ImaginarySoloRaidTab({
     const target = deckDrafts[deckIndex];
     if (!target) return;
     const completeDraft = target.draft.filter((value): value is string => value !== null);
-    await onSubmitDeck({ draft: completeDraft, scoreText: target.score, editingId: null });
+    await onSubmitDeck({ draft: completeDraft, scoreText: target.score, note: target.note, editingId: null });
   }
 
   async function handleSaveAllDecks() {
@@ -1204,7 +1275,7 @@ export default function ImaginarySoloRaidTab({
       const completeDraft = deck.draft.filter((value): value is string => value !== null);
       const hasAnyValue = completeDraft.length > 0 || deck.score.trim().length > 0;
       if (!hasAnyValue) continue;
-      await onSubmitDeck({ draft: completeDraft, scoreText: deck.score, editingId: null });
+      await onSubmitDeck({ draft: completeDraft, scoreText: deck.score, note: deck.note, editingId: null });
     }
   }
 
@@ -1603,6 +1674,8 @@ export default function ImaginarySoloRaidTab({
                       onDeleteDeck={() => removeDeckDraft(deckIndex)}
                       selected={selectedDeckDraftIds.has(deck.id)}
                       onToggleSelected={() => toggleDeckDraftSelected(deck.id)}
+                      note={deck.note}
+                      onNoteChange={(value) => updateDeckNote(deckIndex, value)}
                       className="border-[var(--border)] bg-[var(--card)] p-1.5 shadow-none"
                     />
                   </SortableDeckDraft>

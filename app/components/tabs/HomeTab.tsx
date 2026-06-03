@@ -81,7 +81,7 @@ type HomeTabProps = {
   onRemoveSelectedNikke: (name: string) => void;
   onGoToSettings: () => void;
   onShowToast: (message: string) => void;
-  onSubmitDeck: (payload: { draft: string[]; scoreText: string; editingId: string | null }) => Promise<boolean>;
+  onSubmitDeck: (payload: { draft: string[]; scoreText: string; note?: string; editingId: string | null }) => Promise<boolean>;
   onSubmitBulk: (text: string) => Promise<boolean>;
   onUpdateDeckScore: (id: string, scoreText: string) => Promise<boolean>;
 };
