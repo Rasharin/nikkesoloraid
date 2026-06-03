@@ -18,7 +18,8 @@ import {
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { toPng } from "html-to-image";
 import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
 import { formatPlainScoreText } from "../../../lib/score-format";
 import DeckBuilderSection, {
@@ -214,6 +215,8 @@ export default function HomeTab({
   const scoreRef = useRef<HTMLInputElement | null>(null);
   const deckSectionRef = useRef<HTMLElement | null>(null);
   const memoTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const captureRefMobile = useRef<HTMLDivElement | null>(null);
+  const captureRefDesktop = useRef<HTMLDivElement | null>(null);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -583,6 +586,19 @@ export default function HomeTab({
     setIsMemoEditing(true);
   }
 
+  const handleCapture = useCallback(async (ref: React.RefObject<HTMLDivElement | null>) => {
+    if (!ref.current) return;
+    try {
+      const dataUrl = await toPng(ref.current, { cacheBust: true, pixelRatio: 2 });
+      const link = document.createElement("a");
+      link.download = `추천조합_${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch {
+      onShowToast("캡처에 실패했어");
+    }
+  }, [onShowToast]);
+
   function renderRecommendedDeckCard(deck: Deck, compact = false) {
     const scoreText = fmt(deck.score);
     const scoreTextClass = getRecommendedScoreTextClass(scoreText, compact);
@@ -896,22 +912,37 @@ export default function HomeTab({
         <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold">내 추천 조합</h2>
-            <div className="text-xs text-neutral-400">{decksCount}개 덱</div>
+            {canRecommend ? (
+              <button
+                type="button"
+                onClick={() => void handleCapture(captureRefMobile)}
+                className="flex items-center gap-1.5 rounded-xl border border-neutral-700 px-3 py-1.5 text-xs transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
+                title="캡처"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                캡처
+              </button>
+            ) : null}
           </div>
           <div className="mt-3 rounded-2xl bg-neutral-950/40 p-3">
             {canRecommend ? (
               <>
-                <div className="mb-3">
-                  <div className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/70 px-3 py-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm font-semibold text-neutral-300">총합</div>
-                      <div className="text-2xl font-bold tabular-nums">{fmt(best.total)}</div>
+                <div ref={captureRefMobile} className="rounded-xl bg-neutral-950/60 p-2">
+                  <div className="mb-3">
+                    <div className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/70 px-3 py-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-neutral-300">총합</div>
+                        <div className="text-2xl font-bold tabular-nums">{fmt(best.total)}</div>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  {best.picked.map((deck) => renderRecommendedDeckCard(deck, true))}
+                  <div className="space-y-2">
+                    {best.picked.map((deck) => renderRecommendedDeckCard(deck, true))}
+                  </div>
                 </div>
               </>
             ) : (
@@ -1032,24 +1063,37 @@ export default function HomeTab({
               <section className="flex self-start flex-col rounded-3xl border border-neutral-800 bg-neutral-900/50 p-5 shadow-[0_16px_40px_rgba(0,0,0,0.24)]">
                 <div className="flex items-center justify-between gap-4">
                   <h2 className="text-lg font-semibold">내 추천 조합</h2>
-                  <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
-                    {decksCount}개 덱
-                  </div>
+                  {canRecommend ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleCapture(captureRefDesktop)}
+                      className="flex items-center gap-1.5 rounded-xl border border-neutral-700 px-3 py-1.5 text-xs transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
+                      title="캡처"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                        <circle cx="12" cy="13" r="4"/>
+                      </svg>
+                      캡처
+                    </button>
+                  ) : null}
                 </div>
                 <div className="mt-4 rounded-2xl bg-neutral-950/50 p-3">
                   {canRecommend ? (
                     <>
-                      <div className="mb-4">
-                        <div className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/70 px-4 py-3">
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="text-base font-semibold text-neutral-300">총합</div>
-                            <div className="text-3xl font-bold tabular-nums">{fmt(best.total)}</div>
+                      <div ref={captureRefDesktop} className="rounded-xl bg-neutral-950/60 p-2">
+                        <div className="mb-4">
+                          <div className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/70 px-4 py-3">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="text-base font-semibold text-neutral-300">총합</div>
+                              <div className="text-3xl font-bold tabular-nums">{fmt(best.total)}</div>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="space-y-2">
-                        {best.picked.map((deck) => renderRecommendedDeckCard(deck))}
+                        <div className="space-y-2">
+                          {best.picked.map((deck) => renderRecommendedDeckCard(deck))}
+                        </div>
                       </div>
                     </>
                   ) : (

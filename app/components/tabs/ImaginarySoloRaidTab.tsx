@@ -1273,8 +1273,8 @@ export default function ImaginarySoloRaidTab({
 
     for (const deck of targetDecks) {
       const completeDraft = deck.draft.filter((value): value is string => value !== null);
-      const hasAnyValue = completeDraft.length > 0 || deck.score.trim().length > 0;
-      if (!hasAnyValue) continue;
+      if (completeDraft.length !== MAX_DECK_CHARS) continue;
+      if (!deck.score.trim()) continue;
       await onSubmitDeck({ draft: completeDraft, scoreText: deck.score, note: deck.note, editingId: null });
     }
   }

@@ -10,7 +10,9 @@
       "Bash(npx tsc *)",
       "Bash(Select-Object Name)",
       "Bash(grep -c \"\\\\.png$\")",
-      "Bash(grep -c \"\\\\.webp$\")"
+      "Bash(grep -c \"\\\\.webp$\")",
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('html-to-image'\\)\")"
     ]
   }
 }
