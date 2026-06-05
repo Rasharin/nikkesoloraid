@@ -16,6 +16,8 @@ type RecommendationRecord = {
   total: number;
   decks: RecommendationDeck[];
   updatedAt: number;
+  savedRank?: number;
+  savedRankTotal?: number;
 };
 type BossUserStat = {
   raidKey: string;
@@ -111,7 +113,6 @@ type MyPageTabProps = {
   onThemeModeChange: (mode: ThemeMode) => void;
   persistSession: boolean;
   onPersistSessionChange: (persist: boolean) => void;
-  rankingByRaidKey: Record<string, { rank: number; total: number }>;
 };
 
 function formatRankLabel(rank: number, total: number): string {
@@ -169,7 +170,6 @@ export default function MyPageTab({
   onThemeModeChange,
   persistSession,
   onPersistSessionChange,
-  rankingByRaidKey,
 }: MyPageTabProps) {
   const [openRaidKey, setOpenRaidKey] = useState<string>("");
   const [adminSection, setAdminSection] = useState<AdminSectionKey>("nikkes");
@@ -1269,18 +1269,14 @@ export default function MyPageTab({
                           ))}
                         </div>
 
-                        {(() => {
-                          const ranking = rankingByRaidKey[tab.key];
-                          if (!ranking) return null;
-                          return (
-                            <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-800 px-3 py-2">
-                              <div className="text-xs text-neutral-400">웹 이용자 대비 내 등수</div>
-                              <div className="text-sm font-semibold tabular-nums text-neutral-100">
-                                {formatRankLabel(ranking.rank, ranking.total)}
-                              </div>
+                        {tabRecommendation.savedRank != null && tabRecommendation.savedRankTotal != null ? (
+                          <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-800 px-3 py-2">
+                            <div className="text-xs text-neutral-400">웹 이용자 대비 내 등수</div>
+                            <div className="text-sm font-semibold tabular-nums text-neutral-100">
+                              {formatRankLabel(tabRecommendation.savedRank, tabRecommendation.savedRankTotal)}
                             </div>
-                          );
-                        })()}
+                          </div>
+                        ) : null}
                       </div>
                     ) : (
                       <div className="text-sm text-neutral-400">해당 레이드에 저장된 추천 기록이 없습니다.</div>

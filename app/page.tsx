@@ -72,6 +72,8 @@ type RecommendationRecord = {
   total: number;
   decks: RecommendationDeck[];
   updatedAt: number;
+  savedRank?: number;
+  savedRankTotal?: number;
 };
 type ThemeMode = "dark" | "light";
 
@@ -82,6 +84,8 @@ type RecommendationRow = {
   total: number | string | null;
   decks: unknown;
   updated_at: string | null;
+  saved_rank: number | null;
+  saved_rank_total: number | null;
 };
 type FavoriteRow = {
   user_id: string;
@@ -1010,12 +1014,17 @@ function mapRecommendationRow(row: RecommendationRow): RecommendationRecord | nu
 
   const updatedAt = row.updated_at ? Date.parse(row.updated_at) : NaN;
 
+  const savedRank = row.saved_rank != null ? Number(row.saved_rank) : undefined;
+  const savedRankTotal = row.saved_rank_total != null ? Number(row.saved_rank_total) : undefined;
+
   return {
     raidKey: row.raid_key,
     raidLabel: row.raid_label,
     total,
     decks,
     updatedAt: Number.isFinite(updatedAt) ? updatedAt : Date.now(),
+    savedRank: Number.isFinite(savedRank) ? savedRank : undefined,
+    savedRankTotal: Number.isFinite(savedRankTotal) ? savedRankTotal : undefined,
   };
 }
 
@@ -1186,7 +1195,6 @@ export default function Page() {
   const [onlineUserCount, setOnlineUserCount] = useState(1);
   const [totalUserCount, setTotalUserCount] = useState(0);
   const [bossUserStats, setBossUserStats] = useState<BossUserStat[]>([]);
-  const [rankingByRaidKey, setRankingByRaidKey] = useState<Record<string, { rank: number; total: number }>>({});
   const [loadingUserStats, setLoadingUserStats] = useState(false);
   const [termsText, setTermsText] = useState("");
   const [privacyText, setPrivacyText] = useState("");
@@ -1984,7 +1992,7 @@ export default function Page() {
       try {
         const { data, error } = await supabase
           .from(RECOMMENDATION_TABLE)
-          .select("user_id,raid_key,raid_label,total,decks,updated_at")
+          .select("user_id,raid_key,raid_label,total,decks,updated_at,saved_rank,saved_rank_total")
           .eq("user_id", userId);
 
         if (error) throw error;
@@ -2016,47 +2024,6 @@ export default function Page() {
       cancelled = true;
     };
   }, [userId]);
-
-  useEffect(() => {
-    const raidKeys = Object.keys(recommendationHistory);
-    if (!userId || raidKeys.length === 0) {
-      setRankingByRaidKey({});
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadRankings() {
-      const { data, error } = await supabase
-        .from(RECOMMENDATION_TABLE)
-        .select("user_id,raid_key,total")
-        .in("raid_key", raidKeys);
-
-      if (error || cancelled) return;
-
-      const totalsByRaid = new Map<string, number[]>();
-      for (const row of (data ?? []) as Array<{ user_id: string; raid_key: string; total: number | string | null }>) {
-        const val = Number(row.total);
-        if (!row.raid_key || !Number.isFinite(val) || val <= 0) continue;
-        const list = totalsByRaid.get(row.raid_key) ?? [];
-        list.push(val);
-        totalsByRaid.set(row.raid_key, list);
-      }
-
-      const next: Record<string, { rank: number; total: number }> = {};
-      for (const raidKey of raidKeys) {
-        const myTotal = recommendationHistory[raidKey]?.total ?? 0;
-        if (!myTotal) continue;
-        const sorted = (totalsByRaid.get(raidKey) ?? []).sort((a, b) => b - a);
-        const rank = sorted.findIndex((t) => t <= myTotal) + 1;
-        next[raidKey] = { rank: rank === 0 ? sorted.length + 1 : rank, total: sorted.length };
-      }
-      if (!cancelled) setRankingByRaidKey(next);
-    }
-
-    void loadRankings();
-    return () => { cancelled = true; };
-  }, [recommendationHistory, userId]);
 
   // 로그인 상태 변화 시 덱 로드
   useEffect(() => {
@@ -2622,6 +2589,24 @@ export default function Page() {
 	    setOffSeasonRaidKey(fallbackRaidKey);
 	  }, [deckTabs, decks, offSeasonDecks, offSeasonRaidKey, soloRaidInProgress]);
 
+  async function fetchRankForRaid(raidKey: string, myTotal: number): Promise<{ rank: number; total: number } | null> {
+    const { data, error } = await supabase
+      .from(RECOMMENDATION_TABLE)
+      .select("user_id,total")
+      .eq("raid_key", raidKey);
+
+    if (error || !data) return null;
+
+    const totals = (data as Array<{ user_id: string; total: number | string | null }>)
+      .map((r) => Number(r.total))
+      .filter((v) => Number.isFinite(v) && v > 0)
+      .sort((a, b) => b - a);
+
+    if (totals.length === 0) return null;
+    const rank = totals.findIndex((t) => t <= myTotal) + 1;
+    return { rank: rank === 0 ? totals.length + 1 : rank, total: totals.length };
+  }
+
   async function persistRecommendationRecord(currentUserId: string, record: RecommendationRecord) {
     const { error } = await supabase
       .from(RECOMMENDATION_TABLE)
@@ -2633,6 +2618,8 @@ export default function Page() {
           total: record.total,
           decks: record.decks,
           updated_at: new Date(record.updatedAt).toISOString(),
+          saved_rank: record.savedRank ?? null,
+          saved_rank_total: record.savedRankTotal ?? null,
         },
         { onConflict: "user_id,raid_key" }
       );
@@ -2709,14 +2696,20 @@ export default function Page() {
 
     async function saveRecommendation() {
       try {
-        await persistRecommendationRecord(currentUserId, nextRecord);
+        const rankData = await fetchRankForRaid(currentRaidKey, nextRecord.total);
+        const recordWithRank: RecommendationRecord = {
+          ...nextRecord,
+          savedRank: rankData?.rank,
+          savedRankTotal: rankData?.total,
+        };
+        await persistRecommendationRecord(currentUserId, recordWithRank);
         if (cancelled) return;
 
         setRecommendationHistory((prev) => {
-          if (sameRecommendationRecord(prev[currentRaidKey], nextRecord)) return prev;
+          if (sameRecommendationRecord(prev[currentRaidKey], recordWithRank)) return prev;
           return {
             ...prev,
-            [currentRaidKey]: nextRecord,
+            [currentRaidKey]: recordWithRank,
           };
         });
       } catch (error) {
@@ -4699,7 +4692,6 @@ export default function Page() {
             onThemeModeChange={updateThemeMode}
             persistSession={persistSessionState}
             onPersistSessionChange={updatePersistSession}
-            rankingByRaidKey={rankingByRaidKey}
           />
         )}
           </>
