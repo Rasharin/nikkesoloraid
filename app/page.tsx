@@ -1186,6 +1186,7 @@ export default function Page() {
   const [onlineUserCount, setOnlineUserCount] = useState(1);
   const [totalUserCount, setTotalUserCount] = useState(0);
   const [bossUserStats, setBossUserStats] = useState<BossUserStat[]>([]);
+  const [rankingByRaidKey, setRankingByRaidKey] = useState<Record<string, { rank: number; total: number }>>({});
   const [loadingUserStats, setLoadingUserStats] = useState(false);
   const [termsText, setTermsText] = useState("");
   const [privacyText, setPrivacyText] = useState("");
@@ -2015,6 +2016,47 @@ export default function Page() {
       cancelled = true;
     };
   }, [userId]);
+
+  useEffect(() => {
+    const raidKeys = Object.keys(recommendationHistory);
+    if (!userId || raidKeys.length === 0) {
+      setRankingByRaidKey({});
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadRankings() {
+      const { data, error } = await supabase
+        .from(RECOMMENDATION_TABLE)
+        .select("user_id,raid_key,total")
+        .in("raid_key", raidKeys);
+
+      if (error || cancelled) return;
+
+      const totalsByRaid = new Map<string, number[]>();
+      for (const row of (data ?? []) as Array<{ user_id: string; raid_key: string; total: number | string | null }>) {
+        const val = Number(row.total);
+        if (!row.raid_key || !Number.isFinite(val) || val <= 0) continue;
+        const list = totalsByRaid.get(row.raid_key) ?? [];
+        list.push(val);
+        totalsByRaid.set(row.raid_key, list);
+      }
+
+      const next: Record<string, { rank: number; total: number }> = {};
+      for (const raidKey of raidKeys) {
+        const myTotal = recommendationHistory[raidKey]?.total ?? 0;
+        if (!myTotal) continue;
+        const sorted = (totalsByRaid.get(raidKey) ?? []).sort((a, b) => b - a);
+        const rank = sorted.findIndex((t) => t <= myTotal) + 1;
+        next[raidKey] = { rank: rank === 0 ? sorted.length + 1 : rank, total: sorted.length };
+      }
+      if (!cancelled) setRankingByRaidKey(next);
+    }
+
+    void loadRankings();
+    return () => { cancelled = true; };
+  }, [recommendationHistory, userId]);
 
   // 로그인 상태 변화 시 덱 로드
   useEffect(() => {
@@ -4657,6 +4699,7 @@ export default function Page() {
             onThemeModeChange={updateThemeMode}
             persistSession={persistSessionState}
             onPersistSessionChange={updatePersistSession}
+            rankingByRaidKey={rankingByRaidKey}
           />
         )}
           </>

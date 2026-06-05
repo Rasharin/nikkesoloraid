@@ -111,7 +111,15 @@ type MyPageTabProps = {
   onThemeModeChange: (mode: ThemeMode) => void;
   persistSession: boolean;
   onPersistSessionChange: (persist: boolean) => void;
+  rankingByRaidKey: Record<string, { rank: number; total: number }>;
 };
+
+function formatRankLabel(rank: number, total: number): string {
+  if (total === 0) return "-";
+  if (rank <= 10) return `${rank}등`;
+  const pct = Math.ceil((rank / total) * 100);
+  return `상위 ${Math.min(pct, 99)}%`;
+}
 
 function adminTabClass(active: boolean) {
   return active
@@ -161,6 +169,7 @@ export default function MyPageTab({
   onThemeModeChange,
   persistSession,
   onPersistSessionChange,
+  rankingByRaidKey,
 }: MyPageTabProps) {
   const [openRaidKey, setOpenRaidKey] = useState<string>("");
   const [adminSection, setAdminSection] = useState<AdminSectionKey>("nikkes");
