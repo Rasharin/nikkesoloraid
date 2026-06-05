@@ -16,8 +16,6 @@ type RecommendationRecord = {
   total: number;
   decks: RecommendationDeck[];
   updatedAt: number;
-  savedRank?: number;
-  savedRankTotal?: number;
 };
 type BossUserStat = {
   raidKey: string;
@@ -113,6 +111,8 @@ type MyPageTabProps = {
   onThemeModeChange: (mode: ThemeMode) => void;
   persistSession: boolean;
   onPersistSessionChange: (persist: boolean) => void;
+  activeRaidKey: string | null;
+  rankingByRaidKey: Record<string, { rank: number; total: number }>;
 };
 
 function formatRankLabel(rank: number, total: number): string {
@@ -170,6 +170,8 @@ export default function MyPageTab({
   onThemeModeChange,
   persistSession,
   onPersistSessionChange,
+  activeRaidKey,
+  rankingByRaidKey,
 }: MyPageTabProps) {
   const [openRaidKey, setOpenRaidKey] = useState<string>("");
   const [adminSection, setAdminSection] = useState<AdminSectionKey>("nikkes");
@@ -1269,11 +1271,11 @@ export default function MyPageTab({
                           ))}
                         </div>
 
-                        {tabRecommendation.savedRank != null && tabRecommendation.savedRankTotal != null ? (
+                        {rankingByRaidKey[tab.key] ? (
                           <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-800 px-3 py-2">
                             <div className="text-xs text-neutral-400">웹 이용자 대비 내 등수</div>
                             <div className="text-sm font-semibold tabular-nums text-neutral-100">
-                              {formatRankLabel(tabRecommendation.savedRank, tabRecommendation.savedRankTotal)}
+                              {formatRankLabel(rankingByRaidKey[tab.key].rank, rankingByRaidKey[tab.key].total)}
                             </div>
                           </div>
                         ) : null}
