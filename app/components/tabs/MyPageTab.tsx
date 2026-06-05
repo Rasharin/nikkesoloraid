@@ -1268,6 +1268,19 @@ export default function MyPageTab({
                             </div>
                           ))}
                         </div>
+
+                        {(() => {
+                          const ranking = rankingByRaidKey[tab.key];
+                          if (!ranking) return null;
+                          return (
+                            <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-800 px-3 py-2">
+                              <div className="text-xs text-neutral-400">웹 이용자 대비 내 등수</div>
+                              <div className="text-sm font-semibold tabular-nums text-neutral-100">
+                                {formatRankLabel(ranking.rank, ranking.total)}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div className="text-sm text-neutral-400">해당 레이드에 저장된 추천 기록이 없습니다.</div>
