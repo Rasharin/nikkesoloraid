@@ -259,15 +259,15 @@ export default function MyPageTab({
           raidKey: tab.key,
           raidLabel: tab.label,
           userCount: 0,
-          active: soloRaidActive,
+          active: soloRaidActive && activeRaidKey === tab.key,
           endedAt: null,
         }
       );
     });
 
     const tabKeys = new Set(deckTabs.map((tab) => tab.key));
-    return [...fromTabs, ...bossUserStats.filter((stat) => !tabKeys.has(stat.raidKey))];
-  }, [bossUserStats, bossUserStatsByKey, deckTabs, soloRaidActive]);
+    return [...fromTabs, ...bossUserStats.filter((stat) => !tabKeys.has(stat.raidKey) && stat.endedAt)];
+  }, [activeRaidKey, bossUserStats, bossUserStatsByKey, deckTabs, soloRaidActive]);
 
   useEffect(() => {
     if (!deckTabs.some((tab) => tab.key === openRaidKey)) {
