@@ -1,7 +1,23 @@
 -- 80_user_stats_lockdown.sql
--- Lock visitor statistics tables so browser clients cannot forge counts.
--- Writes now go through Next.js server routes using SUPABASE_SERVICE_ROLE_KEY.
+-- Lock high-risk RLS policies.
+-- - Visitor statistics writes/reads now go through Next.js server routes using SUPABASE_SERVICE_ROLE_KEY.
+-- - Saved deck notes must not be exposed through broad authenticated SELECT policies.
 
+-- =============================================
+-- 1. Prevent authenticated users from reading every saved deck, including note.
+-- =============================================
+alter table public.decks enable row level security;
+
+drop policy if exists "decks_select_all" on public.decks;
+
+-- Keep these expected policies from 30_decks_and_recommendations.sql:
+-- - decks_select_own: authenticated users can read their own decks.
+-- - decks_select_public: anon/authenticated users can read the configured public/submaster decks.
+-- Do not recreate decks_select_all here.
+
+-- =============================================
+-- 2. Prevent browser clients from forging visitor statistics.
+-- =============================================
 alter table public.site_user_stats enable row level security;
 alter table public.raid_user_stats enable row level security;
 alter table public.raid_user_archives enable row level security;
