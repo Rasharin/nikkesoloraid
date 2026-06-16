@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/core";
 import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { buildDeckKey } from "../../../lib/recommend";
 import { formatPlainScoreText, formatScore, parseScoreInput, type ScoreDisplayMode } from "../../../lib/score-format";
@@ -68,12 +68,15 @@ type DeckBuildingTabProps = {
   onScoreDisplayModeChange: (mode: ScoreDisplayMode) => void;
   selectedNames: string[];
   selectedNikkes: NikkeRow[];
+  nikkes: NikkeRow[];
+  favoriteNames: Set<string>;
+  recommendedNames: string[];
   maxSelected: number;
   nikkeMap: Map<string, NikkeRow>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   onResetSelected: () => void;
   onRemoveSelectedNikke: (name: string) => void;
-  onGoToSettings: () => void;
+  onAddSelectedNikkes: (names: string[]) => void;
   onShowToast: (message: string) => void;
   onSubmitDeck: (payload: { draft: string[]; scoreText: string; note?: string; editingId: string | null }) => Promise<boolean>;
   onUpdateDeckScore: (id: string, scoreText: string) => Promise<boolean>;
@@ -144,6 +147,23 @@ const BURSTS = [
   { n: 2, label: "II" },
   { n: 3, label: "III" },
 ] as const;
+
+function normalizeNameKey(name: string) {
+  return name.replace(/\s+/g, "").trim().toLowerCase();
+}
+
+function buildNameMatchSet(names: Iterable<string>) {
+  const next = new Set<string>();
+  for (const name of names) {
+    next.add(normalizeNameKey(name));
+    next.add(normalizeNameKey(formatNikkeDisplayName(name)));
+  }
+  return next;
+}
+
+function nameMatchesSet(name: string, names: Set<string>) {
+  return names.has(normalizeNameKey(name)) || names.has(normalizeNameKey(formatNikkeDisplayName(name)));
+}
 
 const DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
 const LAYOUT_STORAGE_KEY = "soloraid_deck_building_wide_layout_v1";
@@ -487,12 +507,15 @@ export default function ImaginarySoloRaidTab({
   onScoreDisplayModeChange,
   selectedNames,
   selectedNikkes,
+  nikkes,
+  favoriteNames,
+  recommendedNames,
   maxSelected,
   nikkeMap,
   getPublicUrl,
   onResetSelected,
   onRemoveSelectedNikke,
-  onGoToSettings,
+  onAddSelectedNikkes,
   onShowToast,
   onSubmitDeck,
   onUpdateDeckScore,
@@ -506,6 +529,12 @@ export default function ImaginarySoloRaidTab({
   const [layoutStorageReady, setLayoutStorageReady] = useState(false);
   const [recommendedOpenStorageReady, setRecommendedOpenStorageReady] = useState(false);
   const [draftStorageReady, setDraftStorageReady] = useState(false);
+  const [showNikkePickerOverlay, setShowNikkePickerOverlay] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
+  const [pendingNikkeNames, setPendingNikkeNames] = useState<Set<string>>(new Set());
+  const [pickerElementFilter, setPickerElementFilter] = useState<Set<string>>(new Set());
+  const [pickerBurstFilter, setPickerBurstFilter] = useState<Set<number>>(new Set());
+  const [pickerListFilter, setPickerListFilter] = useState<Set<"favorite" | "recommended">>(new Set());
   const [deckPages, setDeckPages] = useState<DeckBuilderPageState[]>(() => [createEmptyDeckBuilderPage(1)]);
   const [activeDeckPageId, setActiveDeckPageId] = useState(1);
   const [activeDrag, setActiveDrag] = useState<DragItemData | null>(null);
@@ -739,6 +768,28 @@ export default function ImaginarySoloRaidTab({
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [nikkeSearch]);
 
+  const closeNikkePickerOverlay = useCallback(() => {
+    setShowNikkePickerOverlay(false);
+    setPickerSearch("");
+    setPendingNikkeNames(new Set());
+    setPickerElementFilter(new Set());
+    setPickerBurstFilter(new Set());
+    setPickerListFilter(new Set());
+  }, []);
+
+  useEffect(() => {
+    if (!showNikkePickerOverlay) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeNikkePickerOverlay();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closeNikkePickerOverlay, showNikkePickerOverlay]);
+
   const effectiveNikkeMap = useMemo(() => {
     const next = new Map(nikkeMap);
     selectedNames.forEach((name) => {
@@ -807,6 +858,48 @@ export default function ImaginarySoloRaidTab({
 
     return groups;
   }, [filteredSelectedNikkes]);
+
+  const selectedNameSet = useMemo(() => new Set(selectedNames), [selectedNames]);
+  const favoriteNameSet = useMemo(() => buildNameMatchSet(favoriteNames), [favoriteNames]);
+  const recommendedNameSet = useMemo(() => buildNameMatchSet(recommendedNames), [recommendedNames]);
+  const filteredPickerNikkes = useMemo(() => {
+    const query = pickerSearch.trim().toLowerCase();
+    return nikkes
+      .filter((nikke) => {
+        if (query) {
+          const matchesName = nikke.name.toLowerCase().includes(query);
+          const matchesAlias = nikke.aliases?.some((alias) => alias.toLowerCase().includes(query)) ?? false;
+          if (!matchesName && !matchesAlias) return false;
+        }
+        if (pickerElementFilter.size > 0 && (!nikke.element || !pickerElementFilter.has(nikke.element))) return false;
+        if (pickerBurstFilter.size > 0) {
+          const burst = nikke.burst ?? -1;
+          if (!pickerBurstFilter.has(burst)) return false;
+        }
+        if (pickerListFilter.size > 0) {
+          const matchesFavorite = pickerListFilter.has("favorite") && nameMatchesSet(nikke.name, favoriteNameSet);
+          const matchesRecommended = pickerListFilter.has("recommended") && nameMatchesSet(nikke.name, recommendedNameSet);
+          if (!matchesFavorite && !matchesRecommended) return false;
+        }
+        return true;
+      })
+      .slice()
+      .sort((a, b) => {
+        const burstA = a.burst ?? 99;
+        const burstB = b.burst ?? 99;
+        if (burstA !== burstB) return burstA - burstB;
+        return a.name.localeCompare(b.name);
+      });
+  }, [favoriteNameSet, nikkes, pickerBurstFilter, pickerElementFilter, pickerListFilter, pickerSearch, recommendedNameSet]);
+
+  const pickerAvailableNikkes = useMemo(
+    () => filteredPickerNikkes.filter((nikke) => !selectedNameSet.has(nikke.name)),
+    [filteredPickerNikkes, selectedNameSet]
+  );
+  const pickerAddedNikkes = useMemo(
+    () => filteredPickerNikkes.filter((nikke) => selectedNameSet.has(nikke.name)),
+    [filteredPickerNikkes, selectedNameSet]
+  );
 
   const overlayNikke = activeDrag?.nikkeName ? effectiveNikkeMap.get(activeDrag.nikkeName) : undefined;
   const overlayUrl = overlayNikke?.image_path ? getPublicUrl("nikke-images", overlayNikke.image_path) : "";
@@ -941,6 +1034,84 @@ export default function ImaginarySoloRaidTab({
         return { ...deck, draft: nextDraft };
       });
     });
+  }
+
+  function openNikkePickerOverlay() {
+    if (showNikkePickerOverlay) {
+      closeNikkePickerOverlay();
+      return;
+    }
+    setDeckOpen(true);
+    setShowNikkePickerOverlay(true);
+  }
+
+  function togglePendingNikke(name: string) {
+    if (selectedNameSet.has(name)) return;
+    setPendingNikkeNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  }
+
+  function completeNikkePickerSelection() {
+    const names = Array.from(pendingNikkeNames);
+    if (names.length === 0) {
+      return;
+    }
+
+    onAddSelectedNikkes(names);
+    closeNikkePickerOverlay();
+  }
+
+  function renderPickerNikkeGrid(list: NikkeRow[]) {
+    return (
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-2 sm:grid-cols-[repeat(auto-fill,minmax(88px,1fr))]">
+        {list.map((nikke) => {
+          const alreadySelected = selectedNameSet.has(nikke.name);
+          const pending = pendingNikkeNames.has(nikke.name);
+          const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+
+          return (
+            <button
+              key={nikke.id}
+              type="button"
+              onClick={() => togglePendingNikke(nikke.name)}
+              disabled={alreadySelected}
+              className={`group relative min-w-0 rounded-2xl border p-1.5 text-left transition active:scale-[0.99] ${
+                alreadySelected
+                  ? "border-[var(--border)] bg-[var(--card)] opacity-55"
+                  : pending
+                    ? "border-cyan-300 bg-cyan-500/20 shadow-[0_0_0_1px_rgba(103,232,249,0.35)]"
+                    : "border-[var(--border)] bg-[var(--card)] hover:border-[var(--theme-border-strong)] hover:bg-[var(--theme-input)]"
+              }`}
+            >
+              <div className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--theme-input)]">
+                {imageUrl ? (
+                  <Image fill src={imageUrl} alt={nikke.name} className="object-cover" draggable={false} sizes="(max-width: 640px) 22vw, 88px" />
+                ) : (
+                  <div className="grid h-full w-full place-items-center text-xs text-[var(--muted)]">?</div>
+                )}
+              </div>
+              <div className="mt-1 truncate text-center text-xs font-semibold text-[var(--text)]">{nikke.name}</div>
+              {alreadySelected || pending ? (
+                <div
+                  className={`absolute right-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                    alreadySelected ? "bg-[var(--theme-border-strong)] text-[var(--text)]" : "bg-cyan-300 text-neutral-950"
+                  }`}
+                >
+                  {alreadySelected ? "추가됨" : "선택"}
+                </div>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    );
   }
 
   function removeFromDraft(deckIndex: number, slotIndex: number) {
@@ -1548,7 +1719,7 @@ export default function ImaginarySoloRaidTab({
           </button>
         </div>
 
-        <section ref={deckSectionRef} className={`${wideDeckLayout ? `order-3 self-start lg:order-3 ${deckOpen ? "p-4" : "p-2"}` : "order-3 p-4"} rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}>
+        <section ref={deckSectionRef} className={`${wideDeckLayout ? `order-3 self-start lg:order-3 ${deckOpen ? "p-4" : "p-2"}` : "order-3 p-4"} relative rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}>
           {wideDeckLayout && !deckOpen ? (
             <button
               type="button"
@@ -1650,9 +1821,174 @@ export default function ImaginarySoloRaidTab({
                 </div>
               ) : null}
             </div>
-          </div>
+	          </div>
 
-          {deckOpen ? (
+              {showNikkePickerOverlay ? (
+                <div className="absolute inset-2 z-30 flex flex-col rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-3 shadow-[0_24px_80px_rgba(0,0,0,0.55)] backdrop-blur sm:inset-4 sm:p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+		                <div className="min-w-0 flex-1 sm:max-w-[180px]">
+		                  <h3 className="text-base font-semibold text-[var(--text)]">니케 목록</h3>
+		                </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="nikke-search-shell flex min-w-0 items-center rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4">
+		                    <input
+		                      value={pickerSearch}
+		                      onChange={(event) => setPickerSearch(event.target.value)}
+		                      placeholder="니케 이름 검색"
+		                      className="nikke-search-input min-w-0 flex-1 bg-transparent py-2.5 pl-1 text-sm text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
+		                    />
+		                    {pickerSearch ? (
+		                      <button
+		                        type="button"
+		                        onClick={() => setPickerSearch("")}
+		                        aria-label="검색어 지우기"
+		                        className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--muted)] transition hover:bg-[var(--theme-input)] hover:text-[var(--text)]"
+		                      >
+		                        ×
+		                      </button>
+		                    ) : null}
+                      </div>
+	                    </div>
+			                <div className="flex shrink-0 items-center gap-2">
+		                  <button
+		                    type="button"
+		                    onClick={completeNikkePickerSelection}
+		                    className="rounded-xl border border-cyan-400/50 bg-cyan-500/15 px-3 py-2 text-sm font-semibold text-[var(--text)] transition hover:border-cyan-300 hover:bg-cyan-500/25 active:scale-[0.99]"
+	                  >
+		                    추가하기 {pendingNikkeNames.size > 0 ? `(${pendingNikkeNames.size})` : ""}
+	                  </button>
+		                  <button
+		                    type="button"
+		                    onClick={closeNikkePickerOverlay}
+		                    className="rounded-xl border border-[var(--border)] px-3 py-2 text-sm text-[var(--theme-text-soft)] transition hover:border-[var(--theme-border-strong)] hover:bg-[var(--card)] active:scale-[0.99]"
+		                  >
+		                    닫기
+		                  </button>
+			                </div>
+			              </div>
+
+                    <div className="mt-2 overflow-x-auto pb-0.5">
+                      <div className="flex min-w-full flex-nowrap items-center justify-end gap-1">
+                        {ELEMENTS.map((el) => (
+                        <button
+                          key={el.v}
+                          type="button"
+                          onClick={() =>
+                            setPickerElementFilter((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(el.v)) {
+                                next.delete(el.v);
+                              } else {
+                                next.add(el.v);
+                              }
+                              return next;
+                            })
+                          }
+                          className={`shrink-0 whitespace-nowrap rounded-lg border px-2.5 py-0.5 text-sm transition ${
+                            pickerElementFilter.has(el.v)
+                              ? "settings-filter-btn-active border-white bg-white text-black"
+                              : "border-[var(--border)] bg-transparent text-[var(--theme-text-soft)] hover:border-[var(--theme-border-strong)]"
+                          }`}
+                        >
+                          {el.label}
+                        </button>
+                        ))}
+                        <div className="mx-0.5 h-4 w-px shrink-0 bg-[var(--border)]" />
+                        {BURSTS.map((burst) => (
+                        <button
+                          key={burst.n}
+                          type="button"
+                          onClick={() =>
+                            setPickerBurstFilter((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(burst.n)) {
+                                next.delete(burst.n);
+                              } else {
+                                next.add(burst.n);
+                              }
+                              return next;
+                            })
+                          }
+                          className={`shrink-0 whitespace-nowrap rounded-lg border px-2.5 py-0.5 text-sm transition ${
+                            pickerBurstFilter.has(burst.n)
+                              ? "settings-filter-btn-active border-white bg-white text-black"
+                              : "border-[var(--border)] bg-transparent text-[var(--theme-text-soft)] hover:border-[var(--theme-border-strong)]"
+                          }`}
+                        >
+                          {burst.label}
+                        </button>
+                        ))}
+                        <div className="mx-0.5 h-4 w-px shrink-0 bg-[var(--border)]" />
+                        <button
+                        type="button"
+                        onClick={() =>
+                          setPickerListFilter((prev) => {
+                            const next = new Set(prev);
+                            if (next.has("favorite")) {
+                              next.delete("favorite");
+                            } else {
+                              next.add("favorite");
+                            }
+                            return next;
+                          })
+                        }
+                        className={`shrink-0 whitespace-nowrap rounded-lg border px-2.5 py-0.5 text-sm transition ${
+                          pickerListFilter.has("favorite")
+                            ? "settings-filter-btn-active border-white bg-white text-black"
+                            : "border-[var(--border)] bg-transparent text-[var(--theme-text-soft)] hover:border-[var(--theme-border-strong)]"
+                        }`}
+                      >
+                        즐겨찾기
+                        </button>
+                        <button
+                        type="button"
+                        onClick={() =>
+                          setPickerListFilter((prev) => {
+                            const next = new Set(prev);
+                            if (next.has("recommended")) {
+                              next.delete("recommended");
+                            } else {
+                              next.add("recommended");
+                            }
+                            return next;
+                          })
+                        }
+                        className={`shrink-0 whitespace-nowrap rounded-lg border px-2.5 py-0.5 text-sm transition ${
+                          pickerListFilter.has("recommended")
+                            ? "settings-filter-btn-active border-white bg-white text-black"
+                            : "border-[var(--border)] bg-transparent text-[var(--theme-text-soft)] hover:border-[var(--theme-border-strong)]"
+                        }`}
+                      >
+                        추천 니케
+                        </button>
+                      </div>
+                    </div>
+
+			              <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+			                {filteredPickerNikkes.length === 0 ? (
+			                  <div className="grid h-full min-h-[220px] place-items-center rounded-2xl border border-[var(--border)] bg-[var(--card)] text-sm text-[var(--muted)]">
+			                    조건에 맞는 니케가 없습니다.
+			                  </div>
+			                ) : (
+		                  <div className="space-y-4">
+                        {pickerAvailableNikkes.length > 0 ? renderPickerNikkeGrid(pickerAvailableNikkes) : null}
+                        {pickerAddedNikkes.length > 0 ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--muted)]">
+                              <span className="h-px flex-1 bg-[var(--border)]" />
+                              <span>추가됨</span>
+                              <span className="h-px flex-[6] bg-[var(--border)]" />
+                            </div>
+                            {renderPickerNikkeGrid(pickerAddedNikkes)}
+                          </div>
+                        ) : null}
+                      </div>
+	                )}
+	              </div>
+	            </div>
+	          ) : null}
+
+	          {deckOpen ? (
             <div className="mt-4 grid gap-3 lg:grid-cols-2">
               <SortableContext items={deckDraftSortableIds} strategy={rectSortingStrategy}>
                 {deckDrafts.map((deck, deckIndex) => (
@@ -1781,13 +2117,13 @@ export default function ImaginarySoloRaidTab({
                 리스트 초기화
               </button>
 
-              <button
-                type="button"
-                onClick={onGoToSettings}
-                className="rounded-xl border border-neutral-700 px-3 py-2 text-sm transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
-              >
-                니케 추가
-              </button>
+	              <button
+	                type="button"
+	                onClick={openNikkePickerOverlay}
+	                className="rounded-xl border border-neutral-700 px-3 py-2 text-sm transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
+	              >
+	                니케 목록 열기
+	              </button>
               <div
                 ref={setSelectedTrashRefs}
                 className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition ${

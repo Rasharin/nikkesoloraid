@@ -3409,6 +3409,39 @@ export default function Page() {
     setSelectedNames((prev) => prev.filter((currentName) => currentName !== name));
   }
 
+  function addSelectedNikkes(names: string[]) {
+    const availableNames = new Set(nikkes.map((nikke) => nikke.name));
+    const uniqueNames = Array.from(new Set(names.map((name) => name.trim()).filter((name) => availableNames.has(name))));
+
+    if (uniqueNames.length === 0) {
+      showToast("추가할 니케가 없어");
+      return;
+    }
+
+    const nextNames = [...selectedNames];
+    const nextNameSet = new Set(nextNames);
+    let limited = false;
+
+    for (const name of uniqueNames) {
+      if (nextNameSet.has(name)) continue;
+      if (nextNames.length >= MAX_SELECTED) {
+        limited = true;
+        break;
+      }
+      nextNames.push(name);
+      nextNameSet.add(name);
+    }
+
+    const addedCount = nextNames.length - selectedNames.length;
+    if (addedCount === 0) {
+      showToast(limited ? `최대 ${MAX_SELECTED}개까지 선택 가능` : "이미 추가된 니케야");
+      return;
+    }
+
+    setSelectedNames(nextNames);
+    showToast(limited ? `${addedCount}명 추가, 최대 ${MAX_SELECTED}개까지 선택 가능` : `${addedCount}명 추가 완료`);
+  }
+
   async function toggleFavorite(name: string) {
     const wasFavorite = favoriteNames.has(name);
     const nextFavorites = new Set(favoriteNames);
@@ -4907,16 +4940,19 @@ export default function Page() {
 	              showMyRecommendation={soloRaidInProgress}
 	              best={best}
               scoreDisplayMode={scoreDisplayMode}
-              onScoreDisplayModeChange={updateScoreDisplayMode}
-              selectedNames={selectedNames}
-              selectedNikkes={selectednikkes}
-              maxSelected={MAX_SELECTED}
-              nikkeMap={nikkeMap}
-              getPublicUrl={getPublicUrl}
-              onResetSelected={resetSelected}
-              onRemoveSelectedNikke={removeSelectedNikke}
-              onGoToSettings={() => navigateToTab("settings")}
-              onShowToast={showToast}
+	              onScoreDisplayModeChange={updateScoreDisplayMode}
+	              selectedNames={selectedNames}
+		              selectedNikkes={selectednikkes}
+		              nikkes={nikkes}
+		              favoriteNames={favoriteNames}
+		              recommendedNames={recommendedNikkeNames}
+		              maxSelected={MAX_SELECTED}
+	              nikkeMap={nikkeMap}
+	              getPublicUrl={getPublicUrl}
+	              onResetSelected={resetSelected}
+	              onRemoveSelectedNikke={removeSelectedNikke}
+	              onAddSelectedNikkes={addSelectedNikkes}
+	              onShowToast={showToast}
               onSubmitDeck={submitDeckFromHome}
               onUpdateDeckScore={updateDeckScore}
             />
