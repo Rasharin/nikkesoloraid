@@ -74,7 +74,6 @@ type HomeTabProps = {
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   selectedNames: string[];
   selectedNikkes: NikkeRow[];
-  maxSelected: number;
   nikkeMap: Map<string, NikkeRow>;
   editRequest: Deck | null;
   onEditRequestConsumed: () => void;
@@ -184,7 +183,6 @@ export default function HomeTab({
   getPublicUrl,
   selectedNames,
   selectedNikkes,
-  maxSelected,
   nikkeMap,
   editRequest,
   onEditRequestConsumed,
@@ -1131,13 +1129,13 @@ export default function HomeTab({
 
                 {effectiveSelectedNikkes.length === 0 ? (
                   <div className="mt-4 text-sm text-neutral-300">
-                    <span className="text-neutral-200">니케 관리 탭</span>에서 최대 {maxSelected}개 선택 가능.
+                    <span className="text-neutral-200">니케 관리 탭</span>에서 니케를 선택해줘.
                   </div>
                 ) : (
                   <>
                     <div className="mt-4 flex items-center justify-between gap-3 text-sm text-neutral-400">
                       <div>
-                        선택됨: <span className="text-neutral-200">{effectiveSelectedNikkes.length}</span> / {maxSelected}
+                        선택됨: <span className="text-neutral-200">{effectiveSelectedNikkes.length}</span>
                       </div>
                       <div>니케를 드래그 하거나 클릭하여 덱에 추가 가능</div>
                     </div>
@@ -1181,16 +1179,16 @@ export default function HomeTab({
                 </div>
               </div>
 
-              {effectiveSelectedNikkes.length === 0 ? (
-                <div className="mt-3 text-sm text-neutral-300">
-                  <span className="text-neutral-200">니케 관리 탭</span>에서 최대 {maxSelected}개 선택 가능.
-                </div>
-              ) : (
-                <>
-                  <div className="mt-2 flex items-center justify-between gap-3 text-xs text-neutral-400">
-                    <div>
-                      선택됨: <span className="text-neutral-200">{effectiveSelectedNikkes.length}</span> / {maxSelected}
-                    </div>
+	              {effectiveSelectedNikkes.length === 0 ? (
+	                <div className="mt-3 text-sm text-neutral-300">
+	                  <span className="text-neutral-200">니케 관리 탭</span>에서 니케를 선택해줘.
+	                </div>
+	              ) : (
+	                <>
+	                  <div className="mt-2 flex items-center justify-between gap-3 text-xs text-neutral-400">
+	                    <div>
+	                      선택됨: <span className="text-neutral-200">{effectiveSelectedNikkes.length}</span>
+	                    </div>
                     <div>니케를 드래그 하거나 클릭하여 덱에 추가 가능</div>
                   </div>
 

@@ -71,7 +71,6 @@ type DeckBuildingTabProps = {
   nikkes: NikkeRow[];
   favoriteNames: Set<string>;
   recommendedNames: string[];
-  maxSelected: number;
   nikkeMap: Map<string, NikkeRow>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   onResetSelected: () => void;
@@ -510,7 +509,6 @@ export default function ImaginarySoloRaidTab({
   nikkes,
   favoriteNames,
   recommendedNames,
-  maxSelected,
   nikkeMap,
   getPublicUrl,
   onResetSelected,
@@ -2197,10 +2195,10 @@ export default function ImaginarySoloRaidTab({
             </div>
           )}
 
-          {nikkeOpen ? effectiveSelectedNikkes.length === 0 ? (
-            <div className="mt-4 text-sm text-neutral-300">
-              <span className="text-neutral-200">니케 관리</span>에서 최대 {maxSelected}개 선택 가능.
-            </div>
+	          {nikkeOpen ? effectiveSelectedNikkes.length === 0 ? (
+	            <div className="mt-4 text-sm text-neutral-300">
+	              <span className="text-neutral-200">니케 관리</span>에서 니케를 선택해줘.
+	            </div>
           ) : filteredSelectedNikkes.length === 0 ? (
             <div className="mt-4 text-sm text-neutral-300">조건에 맞는 니케가 없습니다.</div>
           ) : (

@@ -40,7 +40,6 @@ type SettingsTabProps = {
   elements: readonly FilterOption[];
   roles: readonly FilterOption[];
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
-  maxSelected: number;
   onResetFilters: () => void;
 };
 
@@ -196,7 +195,6 @@ export default function SettingsTab({
   elements,
   roles,
   getPublicUrl,
-  maxSelected,
   onResetFilters,
 }: SettingsTabProps) {
   const [q, setQ] = useState("");
@@ -267,9 +265,7 @@ export default function SettingsTab({
     <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">사용할 니케 선택</h2>
-        <div className="text-xs text-neutral-400">
-          {selectedNames.length} / {maxSelected}
-        </div>
+        <div className="text-xs text-neutral-400">{selectedNames.length}개 선택됨</div>
       </div>
 
       <div className="mt-3 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1.35fr)_300px] lg:items-start lg:gap-3">

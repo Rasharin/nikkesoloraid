@@ -365,7 +365,6 @@ const DECK_BUILDING_DRAFT_STORAGE_KEY = "soloraid_deck_building_draft_v1";
 const DECK_BUILDING_DRAFT_COUNT = 5;
 const DECK_BUILDING_SPARE_SLOT_COUNT = 10;
 
-const MAX_SELECTED = 100;
 const MAX_DECK_CHARS = 5;
 
 // -------------------- Utils --------------------
@@ -2190,7 +2189,7 @@ export default function Page() {
       const rawSel = localStorage.getItem(SELECTED_KEY);
       if (rawSel) {
         const parsed = JSON.parse(rawSel) as string[];
-        if (Array.isArray(parsed)) setSelectedNames(parsed.slice(0, MAX_SELECTED));
+        if (Array.isArray(parsed)) setSelectedNames(parsed);
       }
     } catch { }
     setSelectedNamesReady(true);
@@ -3397,10 +3396,6 @@ export default function Page() {
   function toggleSelect(name: string) {
     setSelectedNames((prev) => {
       if (prev.includes(name)) return prev.filter((x) => x !== name);
-      if (prev.length >= MAX_SELECTED) {
-        showToast("최대 100개 선택가능.");
-        return prev;
-      }
       return [...prev, name];
     });
   }
@@ -3420,26 +3415,21 @@ export default function Page() {
 
     const nextNames = [...selectedNames];
     const nextNameSet = new Set(nextNames);
-    let limited = false;
 
     for (const name of uniqueNames) {
       if (nextNameSet.has(name)) continue;
-      if (nextNames.length >= MAX_SELECTED) {
-        limited = true;
-        break;
-      }
       nextNames.push(name);
       nextNameSet.add(name);
     }
 
     const addedCount = nextNames.length - selectedNames.length;
     if (addedCount === 0) {
-      showToast(limited ? `최대 ${MAX_SELECTED}개까지 선택 가능` : "이미 추가된 니케야");
+      showToast("이미 추가된 니케야");
       return;
     }
 
     setSelectedNames(nextNames);
-    showToast(limited ? `${addedCount}명 추가, 최대 ${MAX_SELECTED}개까지 선택 가능` : `${addedCount}명 추가 완료`);
+    showToast("추가 완료");
   }
 
   async function toggleFavorite(name: string) {
@@ -4828,7 +4818,6 @@ export default function Page() {
                 getPublicUrl={getPublicUrl}
                 selectedNames={selectedNames}
                 selectedNikkes={selectednikkes}
-                maxSelected={MAX_SELECTED}
                 nikkeMap={nikkeMap}
                 editRequest={homeEditRequest}
                 onEditRequestConsumed={() => setHomeEditRequest(null)}
@@ -4891,7 +4880,6 @@ export default function Page() {
               elements={elements}
               roles={roles}
               getPublicUrl={getPublicUrl}
-              maxSelected={MAX_SELECTED}
               onResetFilters={resetFilters}
             />
           </div>
@@ -4946,8 +4934,7 @@ export default function Page() {
 		              nikkes={nikkes}
 		              favoriteNames={favoriteNames}
 		              recommendedNames={recommendedNikkeNames}
-		              maxSelected={MAX_SELECTED}
-	              nikkeMap={nikkeMap}
+		              nikkeMap={nikkeMap}
 	              getPublicUrl={getPublicUrl}
 	              onResetSelected={resetSelected}
 	              onRemoveSelectedNikke={removeSelectedNikke}
