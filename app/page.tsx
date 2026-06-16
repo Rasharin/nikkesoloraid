@@ -161,6 +161,9 @@ type NoticePostsCache = {
   rows: NoticePostRow[];
   cachedAt: number;
 };
+type CommunityRaidDecksCache = {
+  decksByRaidKey: Record<string, { decks: Deck[]; cachedAt: number }>;
+};
 type BossUserStat = {
   raidKey: string;
   raidLabel: string;
@@ -318,6 +321,8 @@ const APP_CONFIG_CACHE_TTL = 1000 * 60;
 const USAGE_POSTS_CACHE_KEY = "soloraid_usage_posts_cache_v1";
 const BOARD_POSTS_CACHE_TTL = 1000 * 60 * 10;
 const NOTICE_POSTS_CACHE_KEY = "soloraid_notice_posts_cache_v1";
+const COMMUNITY_RAID_DECKS_CACHE_KEY = "soloraid_community_raid_decks_cache_v1";
+const COMMUNITY_RAID_DECKS_CACHE_TTL = 1000 * 60 * 5;
 const USER_DECKS_CACHE_KEY = "soloraid_user_decks_cache_v1";
 const USER_DECKS_CACHE_TTL = 1000 * 60 * 5;
 const STORAGE_IMAGE_CACHE_CONTROL_SECONDS = "31536000";
@@ -683,6 +688,68 @@ function removeCachedNoticePosts() {
 
   try {
     localStorage.removeItem(NOTICE_POSTS_CACHE_KEY);
+  } catch {}
+}
+
+function readRawCommunityRaidDecksCache(): CommunityRaidDecksCache {
+  if (typeof window === "undefined") return { decksByRaidKey: {} };
+
+  try {
+    const raw = localStorage.getItem(COMMUNITY_RAID_DECKS_CACHE_KEY);
+    if (!raw) return { decksByRaidKey: {} };
+    const parsed = JSON.parse(raw) as Partial<CommunityRaidDecksCache>;
+    return parsed.decksByRaidKey && typeof parsed.decksByRaidKey === "object"
+      ? { decksByRaidKey: parsed.decksByRaidKey }
+      : { decksByRaidKey: {} };
+  } catch {
+    return { decksByRaidKey: {} };
+  }
+}
+
+function readCachedCommunityRaidDecks(raidKey: string): Deck[] | null {
+  if (typeof window === "undefined") return null;
+
+  const normalizedRaidKey = raidKey.trim();
+  if (!normalizedRaidKey) return null;
+  const entry = readRawCommunityRaidDecksCache().decksByRaidKey[normalizedRaidKey];
+  if (!entry || !entry.cachedAt || Date.now() - entry.cachedAt > COMMUNITY_RAID_DECKS_CACHE_TTL) return null;
+  if (!Array.isArray(entry.decks)) return null;
+
+  return entry.decks
+    .map(mapLocalDeck)
+    .filter((deck): deck is Deck => deck !== null && deck.raidKey === normalizedRaidKey);
+}
+
+function writeCachedCommunityRaidDecks(raidKey: string, decks: readonly Deck[]) {
+  if (typeof window === "undefined") return;
+
+  const normalizedRaidKey = raidKey.trim();
+  if (!normalizedRaidKey) return;
+
+  try {
+    const cache = readRawCommunityRaidDecksCache();
+    cache.decksByRaidKey[normalizedRaidKey] = {
+      decks: decks.filter((deck) => deck.raidKey === normalizedRaidKey),
+      cachedAt: Date.now(),
+    };
+    localStorage.setItem(COMMUNITY_RAID_DECKS_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
+function removeCachedCommunityRaidDecks(raidKeys: readonly (string | null | undefined)[]) {
+  if (typeof window === "undefined") return;
+
+  const normalizedRaidKeys = Array.from(
+    new Set(raidKeys.map((raidKey) => raidKey?.trim()).filter((raidKey): raidKey is string => Boolean(raidKey)))
+  );
+  if (normalizedRaidKeys.length === 0) return;
+
+  try {
+    const cache = readRawCommunityRaidDecksCache();
+    for (const raidKey of normalizedRaidKeys) {
+      delete cache.decksByRaidKey[raidKey];
+    }
+    localStorage.setItem(COMMUNITY_RAID_DECKS_CACHE_KEY, JSON.stringify(cache));
   } catch {}
 }
 
@@ -1428,6 +1495,9 @@ export default function Page() {
   }
 
   async function fetchCommunityRaidDecks(raidKey: string) {
+    const cachedDecks = readCachedCommunityRaidDecks(raidKey);
+    if (cachedDecks) return cachedDecks;
+
     const { data, error } = await supabase
       .from("decks")
       .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
@@ -1436,7 +1506,9 @@ export default function Page() {
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
+    const decks = ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
+    writeCachedCommunityRaidDecks(raidKey, decks);
+    return decks;
   }
 
   async function trackSiteUser() {
@@ -3154,7 +3226,7 @@ export default function Page() {
         const updated = mapDeckRow(data as DeckRow);
         if (!updated) throw new Error("Invalid deck row");
         setDecks((prev) => prev.map((deck) => (deck.id === id ? updated : deck)));
-        setCommunityRaidDecks((prev) => prev.map((d) => (d.id === id ? updated : d)));
+        removeCachedCommunityRaidDecks([updated.raidKey]);
       } else {
         const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
           const next = prev.map((deck) => (deck.id === id ? { ...deck, score: sc } : deck));
@@ -3164,12 +3236,13 @@ export default function Page() {
 
         const targetInPrimaryLocalDecks = decks.some((deck) => deck.id === id);
 
-	        if (soloRaidInProgress || (!userId && targetInPrimaryLocalDecks)) {
+        if (soloRaidInProgress || (!userId && targetInPrimaryLocalDecks)) {
           setDecks(updateLocalDecks(saveLocalDecks));
         } else {
           setOffSeasonDecks(updateLocalDecks(saveLocalOffSeasonDecks));
         }
       }
+      removeCachedCommunityRaidDecks([targetDeck.raidKey]);
 
       showToast("점수 수정 완료");
       return true;
@@ -3208,6 +3281,8 @@ export default function Page() {
         const updated = mapDeckRow(data as DeckRow);
         if (!updated) throw new Error("Invalid deck row");
         setDecks((prev) => prev.map((deck) => (deck.id === id ? updated : deck)));
+        setCommunityRaidDecks((prev) => prev.map((d) => (d.id === id ? updated : d)));
+        removeCachedCommunityRaidDecks([updated.raidKey]);
       } else {
         const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
           const next = prev.map((deck) =>
@@ -3219,12 +3294,13 @@ export default function Page() {
 
         const targetInPrimaryLocalDecks = decks.some((deck) => deck.id === id);
 
-	        if (soloRaidInProgress || (!userId && targetInPrimaryLocalDecks)) {
+        if (soloRaidInProgress || (!userId && targetInPrimaryLocalDecks)) {
           setDecks(updateLocalDecks(saveLocalDecks));
         } else {
           setOffSeasonDecks(updateLocalDecks(saveLocalOffSeasonDecks));
         }
       }
+      removeCachedCommunityRaidDecks([targetDeck.raidKey]);
 
       showToast("덱 니케 변경 완료");
       return true;
@@ -3237,6 +3313,7 @@ export default function Page() {
 
 	  async function deleteDeck(id: string) {
 	    const targetIsRemoteDeck = Boolean(userId && decks.some((deck) => deck.id === id));
+	    const targetDeck = (soloRaidInProgress ? editableDecks : savedDeckSource).find((deck) => deck.id === id) ?? null;
 	    if (!targetIsRemoteDeck || !userId) {
 	      const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
         const next = prev.filter((d) => d.id !== id);
@@ -3249,11 +3326,12 @@ export default function Page() {
 	      if (soloRaidInProgress || (!userId && targetInPrimaryLocalDecks)) {
         setDecks(updateLocalDecks(saveLocalDecks));
       } else {
-        setOffSeasonDecks(updateLocalDecks(saveLocalOffSeasonDecks));
-      }
-      showToast("삭제 완료");
-      return;
-    }
+	        setOffSeasonDecks(updateLocalDecks(saveLocalOffSeasonDecks));
+	      }
+	      removeCachedCommunityRaidDecks([targetDeck?.raidKey]);
+	      showToast("삭제 완료");
+	      return;
+	    }
 
     try {
       const { error } = await supabase
@@ -3261,19 +3339,21 @@ export default function Page() {
         .delete()
         .eq("id", id)
         .eq("user_id", userId);
-      if (error) throw error;
-      setDecks((prev) => prev.filter((d) => d.id !== id));
-      showToast("삭제 완료");
+	      if (error) throw error;
+	      setDecks((prev) => prev.filter((d) => d.id !== id));
+	      removeCachedCommunityRaidDecks([targetDeck?.raidKey]);
+	      showToast("삭제 완료");
     } catch (e) {
       console.error(e);
       showToast("덱 삭제 실패");
     }
   }
 
-  async function deleteAllVisibleSavedDecks() {
-	    if (visibleSavedDecks.length === 0) return;
-	    const targetIds = new Set(visibleSavedDecks.map((deck) => deck.id));
-	    const remoteTargetIds = userId ? visibleSavedDecks.filter((deck) => decks.some((remoteDeck) => remoteDeck.id === deck.id)).map((deck) => deck.id) : [];
+	  async function deleteAllVisibleSavedDecks() {
+		    if (visibleSavedDecks.length === 0) return;
+		    const targetIds = new Set(visibleSavedDecks.map((deck) => deck.id));
+		    const targetRaidKeys = Array.from(new Set(visibleSavedDecks.map((deck) => deck.raidKey)));
+		    const remoteTargetIds = userId ? visibleSavedDecks.filter((deck) => decks.some((remoteDeck) => remoteDeck.id === deck.id)).map((deck) => deck.id) : [];
 	
 	    if (remoteTargetIds.length > 0 && userId) {
 	      try {
@@ -3304,14 +3384,15 @@ export default function Page() {
       return next;
     };
 
-	    if (soloRaidInProgress) {
-	      setDecks(updatePrimaryDecks);
-	    } else {
-	      setDecks(updatePrimaryDecks);
-	      setOffSeasonDecks(updateOffSeasonDecks);
-	    }
+		    if (soloRaidInProgress) {
+		      setDecks(updatePrimaryDecks);
+		    } else {
+		      setDecks(updatePrimaryDecks);
+		      setOffSeasonDecks(updateOffSeasonDecks);
+		    }
+	    removeCachedCommunityRaidDecks(targetRaidKeys);
     showToast("전체 삭제 완료");
-  }
+	  }
 
   function toggleSelect(name: string) {
     setSelectedNames((prev) => {
@@ -3425,10 +3506,11 @@ export default function Page() {
         if (error) throw error;
         const updated = mapDeckRow(data as DeckRow);
         if (!updated) throw new Error("Invalid deck row");
-        setDecks((prev) => prev.map((deck) => (deck.id === existingDeck.id ? updated : deck)));
-        showToast("덱 저장 완료");
-        setCommunityRaidDecks((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
-	      } else if (!existingDeck && soloRaidInProgress && userId) {
+	        setDecks((prev) => prev.map((deck) => (deck.id === existingDeck.id ? updated : deck)));
+	        showToast("덱 저장 완료");
+	        setCommunityRaidDecks((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+	        removeCachedCommunityRaidDecks([updated.raidKey]);
+		      } else if (!existingDeck && soloRaidInProgress && userId) {
         const { data, error } = await supabase
           .from("decks")
 	          .insert({ user_id: userId, raid_key: targetRaidKey, deck_key: nextDeckKey, chars: [...draft], score: sc, ...(note !== undefined ? { note } : {}) })
@@ -3437,9 +3519,10 @@ export default function Page() {
         if (error) throw error;
         const inserted = mapDeckRow(data as DeckRow);
         if (!inserted) throw new Error("Invalid deck row");
-        setDecks((prev) => [inserted, ...prev]);
-        setCommunityRaidDecks((prev) => [inserted, ...prev]);
-        showToast("덱 저장 완료");
+	        setDecks((prev) => [inserted, ...prev]);
+	        setCommunityRaidDecks((prev) => [inserted, ...prev]);
+	        removeCachedCommunityRaidDecks([inserted.raidKey]);
+	        showToast("덱 저장 완료");
       } else if (existingDeck) {
         const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
           const next = prev.map((deck) => (deck.id === existingDeck.id ? { ...deck, chars: [...draft], score: sc } : deck));
@@ -3486,9 +3569,10 @@ export default function Page() {
         } else {
           setOffSeasonDecks(updateLocalDecks);
         }
-        showToast("덱 저장 완료");
-      }
-    } catch (e) {
+	        showToast("덱 저장 완료");
+	      }
+	      removeCachedCommunityRaidDecks([targetRaidKey]);
+	    } catch (e) {
       console.error(e);
       showToast("덱 저장 실패");
       return false;
@@ -3575,13 +3659,14 @@ export default function Page() {
       };
 
 	      if (soloRaidInProgress && userId) {
-        setDecks((prev) => [...added, ...prev]);
-	      } else if (soloRaidInProgress) {
-        setDecks(updateLocalDecks);
-      } else {
-        setOffSeasonDecks(updateLocalDecks);
-      }
-      showToast(`텍스트로 ${added.length}개 추가`);
+	        setDecks((prev) => [...added, ...prev]);
+		      } else if (soloRaidInProgress) {
+	        setDecks(updateLocalDecks);
+	      } else {
+	        setOffSeasonDecks(updateLocalDecks);
+	      }
+	      removeCachedCommunityRaidDecks([targetRaidKey]);
+	      showToast(`텍스트로 ${added.length}개 추가`);
     } catch (e) {
       console.error(e);
       showToast("텍스트 덱 저장 실패");
@@ -3680,10 +3765,11 @@ export default function Page() {
         .select("master_user_id")
         .maybeSingle();
 
-      if (error) throw error;
+	      if (error) throw error;
 
-      await refreshAppConfig({ force: true });
-      await refreshSupabase(true);
+	      removeCachedCommunityRaidDecks([nextKey]);
+	      await refreshAppConfig({ force: true });
+	      await refreshSupabase(true);
       showToast("새 솔로레이드 추가 완료");
       return true;
     } catch (error) {
@@ -3858,11 +3944,12 @@ export default function Page() {
       if (error) throw error;
       if (!data) throw new Error("app_config 업데이트 대상이 없어");
 
-	      setOffSeasonDecks(archivedOffSeasonDecks);
-	      saveLocalOffSeasonDecks(archivedOffSeasonDecks);
-	      setOffSeasonRaidKey(SEASON_OFF_RAID_KEY);
-      await refreshAppConfig({ force: true });
-      await refreshSupabase(false);
+		      setOffSeasonDecks(archivedOffSeasonDecks);
+		      saveLocalOffSeasonDecks(archivedOffSeasonDecks);
+		      setOffSeasonRaidKey(SEASON_OFF_RAID_KEY);
+	      removeCachedCommunityRaidDecks([finalRaidKey, SEASON_OFF_RAID_KEY]);
+	      await refreshAppConfig({ force: true });
+	      await refreshSupabase(false);
       showToast("솔로레이드 종료 완료");
       return true;
     } catch (error) {
@@ -3904,11 +3991,12 @@ export default function Page() {
         .select("master_user_id")
         .maybeSingle();
 
-      if (error) throw error;
-      if (!data) throw new Error("app_config 업데이트 대상이 없어");
+	      if (error) throw error;
+	      if (!data) throw new Error("app_config 업데이트 대상이 없어");
 
-      await refreshAppConfig({ force: true });
-      await refreshSupabase(true);
+	      removeCachedCommunityRaidDecks([restartRaidKey]);
+	      await refreshAppConfig({ force: true });
+	      await refreshSupabase(true);
       showToast("솔로레이드 재시작 완료");
       return true;
     } catch (error) {
