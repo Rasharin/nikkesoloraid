@@ -145,6 +145,22 @@ type AppConfigRow = {
   solo_raid_active: boolean | null;
   solo_raid_tabs: unknown;
 };
+type CachedSiteSettingRow = SiteSettingRow & {
+  cachedAt: number;
+};
+type SiteSettingsCache = {
+  settings: Record<string, CachedSiteSettingRow>;
+};
+type AppConfigCache = AppConfigRow & {
+  cachedAt: number;
+};
+type UsagePostsCache = {
+  postsByCategory: Record<string, { rows: UsagePostRow[]; cachedAt: number }>;
+};
+type NoticePostsCache = {
+  rows: NoticePostRow[];
+  cachedAt: number;
+};
 type BossUserStat = {
   raidKey: string;
   raidLabel: string;
@@ -295,6 +311,13 @@ const NOTICE_POSTS_TABLE = "notice_posts";
 const USER_STATS_CLIENT_ID_KEY = "soloraid_stats_client_id_v1";
 const SUPABASE_DATA_CACHE_KEY = "soloraid_supabase_data_cache_v1";
 const SUPABASE_DATA_CACHE_TTL = 1000 * 60 * 10;
+const SITE_SETTINGS_CACHE_KEY = "soloraid_site_settings_cache_v1";
+const SITE_SETTINGS_CACHE_TTL = 1000 * 60 * 60;
+const APP_CONFIG_CACHE_KEY = "soloraid_app_config_cache_v1";
+const APP_CONFIG_CACHE_TTL = 1000 * 60;
+const USAGE_POSTS_CACHE_KEY = "soloraid_usage_posts_cache_v1";
+const BOARD_POSTS_CACHE_TTL = 1000 * 60 * 10;
+const NOTICE_POSTS_CACHE_KEY = "soloraid_notice_posts_cache_v1";
 const USER_DECKS_CACHE_KEY = "soloraid_user_decks_cache_v1";
 const USER_DECKS_CACHE_TTL = 1000 * 60 * 5;
 const STORAGE_IMAGE_CACHE_CONTROL_SECONDS = "31536000";
@@ -491,6 +514,175 @@ function writeCachedSupabaseData(cache: SupabaseDataCache) {
     const serializedCache = JSON.stringify(cache);
     localStorage.setItem(SUPABASE_DATA_CACHE_KEY, serializedCache);
     sessionStorage.setItem(SUPABASE_DATA_CACHE_KEY, serializedCache);
+  } catch {}
+}
+
+function readRawSiteSettingsCache(): SiteSettingsCache {
+  if (typeof window === "undefined") return { settings: {} };
+
+  try {
+    const raw = localStorage.getItem(SITE_SETTINGS_CACHE_KEY);
+    if (!raw) return { settings: {} };
+    const parsed = JSON.parse(raw) as Partial<SiteSettingsCache>;
+    return parsed.settings && typeof parsed.settings === "object" ? { settings: parsed.settings } : { settings: {} };
+  } catch {
+    return { settings: {} };
+  }
+}
+
+function readCachedSiteSettings(keys: readonly string[]): SiteSettingRow[] | null {
+  if (typeof window === "undefined") return null;
+
+  const cache = readRawSiteSettingsCache();
+  const rows: SiteSettingRow[] = [];
+  for (const key of keys) {
+    const row = cache.settings[key];
+    if (!row || !row.cachedAt || Date.now() - row.cachedAt > SITE_SETTINGS_CACHE_TTL) return null;
+    rows.push({
+      key: row.key,
+      value: row.value ?? null,
+      updated_at: row.updated_at ?? null,
+      updated_by: row.updated_by ?? null,
+    });
+  }
+  return rows;
+}
+
+function writeCachedSiteSettings(rows: readonly SiteSettingRow[]) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const cache = readRawSiteSettingsCache();
+    const cachedAt = Date.now();
+    for (const row of rows) {
+      if (!row.key) continue;
+      cache.settings[row.key] = {
+        key: row.key,
+        value: row.value ?? null,
+        updated_at: row.updated_at ?? null,
+        updated_by: row.updated_by ?? null,
+        cachedAt,
+      };
+    }
+    localStorage.setItem(SITE_SETTINGS_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
+function readCachedAppConfig(): AppConfigRow | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = localStorage.getItem(APP_CONFIG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AppConfigCache>;
+    if (!parsed.cachedAt || Date.now() - parsed.cachedAt > APP_CONFIG_CACHE_TTL) return null;
+
+    return {
+      master_user_id: typeof parsed.master_user_id === "string" ? parsed.master_user_id : null,
+      active_raid_key: typeof parsed.active_raid_key === "string" ? parsed.active_raid_key : null,
+      solo_raid_active: typeof parsed.solo_raid_active === "boolean" ? parsed.solo_raid_active : null,
+      solo_raid_tabs: parsed.solo_raid_tabs,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedAppConfig(config: AppConfigRow | null) {
+  if (typeof window === "undefined" || !config) return;
+
+  try {
+    localStorage.setItem(
+      APP_CONFIG_CACHE_KEY,
+      JSON.stringify({
+        ...config,
+        cachedAt: Date.now(),
+      })
+    );
+  } catch {}
+}
+
+function readRawUsagePostsCache(): UsagePostsCache {
+  if (typeof window === "undefined") return { postsByCategory: {} };
+
+  try {
+    const raw = localStorage.getItem(USAGE_POSTS_CACHE_KEY);
+    if (!raw) return { postsByCategory: {} };
+    const parsed = JSON.parse(raw) as Partial<UsagePostsCache>;
+    return parsed.postsByCategory && typeof parsed.postsByCategory === "object"
+      ? { postsByCategory: parsed.postsByCategory }
+      : { postsByCategory: {} };
+  } catch {
+    return { postsByCategory: {} };
+  }
+}
+
+function readCachedUsagePosts(categoryKey: UsageBoardCategoryKey): UsagePost[] | null {
+  if (typeof window === "undefined") return null;
+
+  const entry = readRawUsagePostsCache().postsByCategory[categoryKey];
+  if (!entry || !entry.cachedAt || Date.now() - entry.cachedAt > BOARD_POSTS_CACHE_TTL) return null;
+  if (!Array.isArray(entry.rows)) return null;
+  return entry.rows.map(mapUsagePostRow).filter((post): post is UsagePost => post !== null);
+}
+
+function writeCachedUsagePosts(categoryKey: UsageBoardCategoryKey, rows: readonly UsagePostRow[]) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const cache = readRawUsagePostsCache();
+    cache.postsByCategory[categoryKey] = {
+      rows: [...rows],
+      cachedAt: Date.now(),
+    };
+    localStorage.setItem(USAGE_POSTS_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
+function removeCachedUsagePosts(categoryKey: string) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const cache = readRawUsagePostsCache();
+    delete cache.postsByCategory[categoryKey];
+    localStorage.setItem(USAGE_POSTS_CACHE_KEY, JSON.stringify(cache));
+  } catch {}
+}
+
+function readCachedNoticePosts(): NoticePost[] | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = localStorage.getItem(NOTICE_POSTS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<NoticePostsCache>;
+    if (!parsed.cachedAt || Date.now() - parsed.cachedAt > BOARD_POSTS_CACHE_TTL) return null;
+    if (!Array.isArray(parsed.rows)) return null;
+    return parsed.rows.map(mapNoticePostRow).filter((post): post is NoticePost => post !== null);
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedNoticePosts(rows: readonly NoticePostRow[]) {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.setItem(
+      NOTICE_POSTS_CACHE_KEY,
+      JSON.stringify({
+        rows: [...rows],
+        cachedAt: Date.now(),
+      })
+    );
+  } catch {}
+}
+
+function removeCachedNoticePosts() {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.removeItem(NOTICE_POSTS_CACHE_KEY);
   } catch {}
 }
 
@@ -1313,6 +1505,9 @@ export default function Page() {
   }
 
   async function fetchRecommendedVideoUrl() {
+    const cachedRows = readCachedSiteSettings([RECOMMENDED_VIDEO_KEY]);
+    if (cachedRows) return (cachedRows[0]?.value ?? "").trim();
+
     const { data, error } = await supabase
       .from(SITE_SETTINGS_TABLE)
       .select("key,value,updated_at,updated_by")
@@ -1321,10 +1516,23 @@ export default function Page() {
       .maybeSingle();
 
     if (error) throw error;
-    return ((data as SiteSettingRow | null)?.value ?? "").trim();
+    const row = (data as SiteSettingRow | null) ?? { key: RECOMMENDED_VIDEO_KEY, value: null, updated_at: null, updated_by: null };
+    writeCachedSiteSettings([row]);
+    return (row.value ?? "").trim();
   }
 
   async function fetchRecommendedNikkeNames() {
+    const cachedRows = readCachedSiteSettings([RECOMMENDED_NIKKES_KEY]);
+    if (cachedRows) {
+      const cachedValue = cachedRows[0]?.value;
+      if (!cachedValue) return [];
+      try {
+        return normalizeRecommendedNikkeNames(JSON.parse(cachedValue));
+      } catch {
+        return [];
+      }
+    }
+
     const { data, error } = await supabase
       .from(SITE_SETTINGS_TABLE)
       .select("key,value,updated_at,updated_by")
@@ -1334,7 +1542,9 @@ export default function Page() {
 
     if (error) throw error;
 
-    const rawValue = (data as SiteSettingRow | null)?.value;
+    const row = (data as SiteSettingRow | null) ?? { key: RECOMMENDED_NIKKES_KEY, value: null, updated_at: null, updated_by: null };
+    writeCachedSiteSettings([row]);
+    const rawValue = row.value;
     if (!rawValue) return [];
 
     try {
@@ -1345,14 +1555,27 @@ export default function Page() {
   }
 
   async function fetchLegalTexts() {
+    const legalKeys = [TERMS_TEXT_KEY, PRIVACY_TEXT_KEY];
+    const cachedRows = readCachedSiteSettings(legalKeys);
+    if (cachedRows) {
+      return {
+        terms: cachedRows.find((row) => row.key === TERMS_TEXT_KEY)?.value ?? "",
+        privacy: cachedRows.find((row) => row.key === PRIVACY_TEXT_KEY)?.value ?? "",
+      };
+    }
+
     const { data, error } = await supabase
       .from(SITE_SETTINGS_TABLE)
       .select("key,value,updated_at,updated_by")
-      .in("key", [TERMS_TEXT_KEY, PRIVACY_TEXT_KEY]);
+      .in("key", legalKeys);
 
     if (error) throw error;
 
     const rows = (data ?? []) as SiteSettingRow[];
+    const rowsByKey = new Map(rows.map((row) => [row.key, row]));
+    writeCachedSiteSettings(
+      legalKeys.map((key) => rowsByKey.get(key) ?? { key, value: null, updated_at: null, updated_by: null })
+    );
     return {
       terms: rows.find((row) => row.key === TERMS_TEXT_KEY)?.value ?? "",
       privacy: rows.find((row) => row.key === PRIVACY_TEXT_KEY)?.value ?? "",
@@ -1363,16 +1586,33 @@ export default function Page() {
     const normalizedKeys = Array.from(new Set(raidKeys.map((raidKey) => raidKey.trim()).filter((raidKey) => raidKey.length > 0)));
 
     if (normalizedKeys.length === 0) return {};
+    const settingKeys = normalizedKeys.map(getRecommendedDeckSnapshotKey);
+    const cachedRows = readCachedSiteSettings(settingKeys);
+    if (cachedRows) {
+      const snapshots: Record<string, RecommendedDeckSnapshot> = {};
+      for (const row of cachedRows) {
+        const mapped = mapRecommendedDeckSnapshot(row);
+        if (!mapped) continue;
+        snapshots[mapped.raidKey] = mapped;
+      }
+      return snapshots;
+    }
 
     const { data, error } = await supabase
       .from(SITE_SETTINGS_TABLE)
       .select("key,value,updated_at,updated_by")
-      .in("key", normalizedKeys.map(getRecommendedDeckSnapshotKey));
+      .in("key", settingKeys);
 
     if (error) throw error;
 
+    const rows = (data ?? []) as SiteSettingRow[];
+    const rowsByKey = new Map(rows.map((row) => [row.key, row]));
+    writeCachedSiteSettings(
+      settingKeys.map((key) => rowsByKey.get(key) ?? { key, value: null, updated_at: null, updated_by: null })
+    );
+
     const snapshots: Record<string, RecommendedDeckSnapshot> = {};
-    for (const row of (data ?? []) as SiteSettingRow[]) {
+    for (const row of rows) {
       const mapped = mapRecommendedDeckSnapshot(row);
       if (!mapped) continue;
       snapshots[mapped.raidKey] = mapped;
@@ -1405,6 +1645,9 @@ export default function Page() {
   }
 
   async function fetchUsagePosts(categoryKey: UsageBoardCategoryKey) {
+    const cachedPosts = readCachedUsagePosts(categoryKey);
+    if (cachedPosts) return cachedPosts;
+
     const { data, error } = await supabase
       .from(USAGE_POSTS_TABLE)
       .select("id,category_key,title,blocks,user_id,created_at,updated_at")
@@ -1413,17 +1656,24 @@ export default function Page() {
       .limit(1);
 
     if (error) throw error;
-    return ((data ?? []) as UsagePostRow[]).map(mapUsagePostRow).filter((post): post is UsagePost => post !== null);
+    const rows = (data ?? []) as UsagePostRow[];
+    writeCachedUsagePosts(categoryKey, rows);
+    return rows.map(mapUsagePostRow).filter((post): post is UsagePost => post !== null);
   }
 
   async function fetchNoticePosts() {
+    const cachedPosts = readCachedNoticePosts();
+    if (cachedPosts) return cachedPosts;
+
     const { data, error } = await supabase
       .from(NOTICE_POSTS_TABLE)
       .select("id,title,content,user_id,created_at,updated_at")
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    return ((data ?? []) as NoticePostRow[]).map(mapNoticePostRow).filter((post): post is NoticePost => post !== null);
+    const rows = (data ?? []) as NoticePostRow[];
+    writeCachedNoticePosts(rows);
+    return rows.map(mapNoticePostRow).filter((post): post is NoticePost => post !== null);
   }
 
   function shouldIgnoreNoticeLoadError(error: unknown) {
@@ -1554,16 +1804,7 @@ export default function Page() {
     };
   }, []);
 
-  async function refreshAppConfig() {
-    const { data, error } = await supabase
-      .from("app_config")
-      .select("master_user_id,active_raid_key,solo_raid_active,solo_raid_tabs")
-      .limit(1)
-      .maybeSingle();
-
-    if (error) throw error;
-
-    const config = data as AppConfigRow | null;
+  function applyAppConfig(config: AppConfigRow | null) {
     const nextTabs = mapDeckTabs(config?.solo_raid_tabs);
     const resolvedTabs = nextTabs.length > 0 ? nextTabs : DEFAULT_DECK_TABS;
     const validRaidKeys = new Set(resolvedTabs.map((tab) => tab.key));
@@ -1577,6 +1818,28 @@ export default function Page() {
     setConfiguredActiveRaidKey(nextActiveKey);
     setActiveRaidKey(nextActiveKey);
     setSoloRaidActive(config?.solo_raid_active ?? true);
+  }
+
+  async function refreshAppConfig(options: { force?: boolean } = {}) {
+    if (!options.force) {
+      const cachedConfig = readCachedAppConfig();
+      if (cachedConfig) {
+        applyAppConfig(cachedConfig);
+        return;
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("app_config")
+      .select("master_user_id,active_raid_key,solo_raid_active,solo_raid_tabs")
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    const config = data as AppConfigRow | null;
+    writeCachedAppConfig(config);
+    applyAppConfig(config);
   }
 
   useEffect(() => {
@@ -2586,29 +2849,33 @@ export default function Page() {
       })),
       updatedAt: Date.now(),
     };
+    const settingKey = getRecommendedDeckSnapshotKey(raidKey);
+    const settingValue = JSON.stringify({
+      raidKey: snapshot.raidKey,
+      raidLabel: snapshot.raidLabel,
+      decks: snapshot.decks.map((deck) => ({
+        chars: deck.chars,
+        usedCount: deck.usedCount,
+        avgScore: deck.avgScore,
+      })),
+      updatedAt: snapshot.updatedAt,
+    });
+    const updatedAt = new Date(snapshot.updatedAt).toISOString();
 
     const { error } = await supabase
       .from(SITE_SETTINGS_TABLE)
       .upsert(
         {
-          key: getRecommendedDeckSnapshotKey(raidKey),
-          value: JSON.stringify({
-            raidKey: snapshot.raidKey,
-            raidLabel: snapshot.raidLabel,
-            decks: snapshot.decks.map((deck) => ({
-              chars: deck.chars,
-              usedCount: deck.usedCount,
-              avgScore: deck.avgScore,
-            })),
-            updatedAt: snapshot.updatedAt,
-          }),
+          key: settingKey,
+          value: settingValue,
           updated_by: currentUserId,
-          updated_at: new Date(snapshot.updatedAt).toISOString(),
+          updated_at: updatedAt,
         },
         { onConflict: "key" }
       );
 
     if (error) throw error;
+    writeCachedSiteSettings([{ key: settingKey, value: settingValue, updated_at: updatedAt, updated_by: currentUserId }]);
 
     setRecommendedDeckSnapshots((prev) => ({
       ...prev,
@@ -3415,7 +3682,7 @@ export default function Page() {
 
       if (error) throw error;
 
-      await refreshAppConfig();
+      await refreshAppConfig({ force: true });
       await refreshSupabase(true);
       showToast("새 솔로레이드 추가 완료");
       return true;
@@ -3594,7 +3861,7 @@ export default function Page() {
 	      setOffSeasonDecks(archivedOffSeasonDecks);
 	      saveLocalOffSeasonDecks(archivedOffSeasonDecks);
 	      setOffSeasonRaidKey(SEASON_OFF_RAID_KEY);
-      await refreshAppConfig();
+      await refreshAppConfig({ force: true });
       await refreshSupabase(false);
       showToast("솔로레이드 종료 완료");
       return true;
@@ -3640,7 +3907,7 @@ export default function Page() {
       if (error) throw error;
       if (!data) throw new Error("app_config 업데이트 대상이 없어");
 
-      await refreshAppConfig();
+      await refreshAppConfig({ force: true });
       await refreshSupabase(true);
       showToast("솔로레이드 재시작 완료");
       return true;
@@ -3676,6 +3943,7 @@ export default function Page() {
     }
 
     try {
+      const updatedAt = new Date().toISOString();
       const { error } = await supabase
         .from(SITE_SETTINGS_TABLE)
         .upsert(
@@ -3683,12 +3951,13 @@ export default function Page() {
             key: RECOMMENDED_VIDEO_KEY,
             value: trimmed,
             updated_by: currentUserId,
-            updated_at: new Date().toISOString(),
+            updated_at: updatedAt,
           },
           { onConflict: "key" }
         );
 
       if (error) throw error;
+      writeCachedSiteSettings([{ key: RECOMMENDED_VIDEO_KEY, value: trimmed, updated_at: updatedAt, updated_by: currentUserId }]);
       setRecommendedVideoUrl(trimmed);
       showToast("추천 영상 저장 완료");
       return true;
@@ -3715,19 +3984,22 @@ export default function Page() {
     const normalizedNames = normalizeRecommendedNikkeNames(nextNames).filter((name) => availableNames.has(name));
 
     try {
+      const updatedAt = new Date().toISOString();
+      const settingValue = JSON.stringify(normalizedNames);
       const { error } = await supabase
         .from(SITE_SETTINGS_TABLE)
         .upsert(
           {
             key: RECOMMENDED_NIKKES_KEY,
-            value: JSON.stringify(normalizedNames),
+            value: settingValue,
             updated_by: currentUserId,
-            updated_at: new Date().toISOString(),
+            updated_at: updatedAt,
           },
           { onConflict: "key" }
         );
 
       if (error) throw error;
+      writeCachedSiteSettings([{ key: RECOMMENDED_NIKKES_KEY, value: settingValue, updated_at: updatedAt, updated_by: currentUserId }]);
       setRecommendedNikkeNames(normalizedNames);
       showToast("추천 니케 저장 완료");
       return true;
@@ -3758,6 +4030,7 @@ export default function Page() {
 
     setSavingLegalTextKey(key);
     try {
+      const updatedAt = new Date().toISOString();
       const { error } = await supabase
         .from(SITE_SETTINGS_TABLE)
         .upsert(
@@ -3765,12 +4038,13 @@ export default function Page() {
             key,
             value: trimmed,
             updated_by: currentUserId,
-            updated_at: new Date().toISOString(),
+            updated_at: updatedAt,
           },
           { onConflict: "key" }
         );
 
       if (error) throw error;
+      writeCachedSiteSettings([{ key, value: trimmed, updated_at: updatedAt, updated_by: currentUserId }]);
       if (key === TERMS_TEXT_KEY) {
         setTermsText(trimmed);
       } else {
@@ -4069,6 +4343,7 @@ export default function Page() {
       showToast("게시판 탭 정보가 올바르지 않아");
       return false;
     }
+    const categoryKey = payload.categoryKey as UsageBoardCategoryKey;
 
     if (payload.blocks.length === 0) {
       showToast("본문 블록을 하나 이상 추가해줘");
@@ -4179,6 +4454,7 @@ export default function Page() {
       if (inserted.categoryKey === usageBoardTab) {
         setUsagePosts([inserted]);
       }
+      removeCachedUsagePosts(categoryKey);
 
       showToast(existingPost ? "사용법 게시글 수정 완료" : "사용법 게시글 등록 완료");
       return true;
@@ -4223,6 +4499,11 @@ export default function Page() {
       }
 
       setUsagePosts((prev) => prev.filter((post) => post.id !== id));
+      if (target) {
+        removeCachedUsagePosts(target.categoryKey);
+      } else {
+        removeCachedUsagePosts(usageBoardTab);
+      }
       showToast("사용법 게시글 삭제 완료");
       return true;
     } catch (error) {
@@ -4294,6 +4575,7 @@ export default function Page() {
         const withoutSaved = prev.filter((post) => post.id !== saved.id);
         return [saved, ...withoutSaved].sort((a, b) => b.createdAt - a.createdAt);
       });
+      removeCachedNoticePosts();
       showToast(payload.id ? "공지 수정 완료" : "공지 등록 완료");
       return true;
     } catch (error) {
@@ -4329,6 +4611,7 @@ export default function Page() {
       if (error) throw error;
 
       setNoticePosts((prev) => prev.filter((post) => post.id !== id));
+      removeCachedNoticePosts();
       showToast("공지 삭제 완료");
       return true;
     } catch (error) {
