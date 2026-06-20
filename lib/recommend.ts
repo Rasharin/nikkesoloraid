@@ -13,6 +13,17 @@ export type RecommendationSourceDeck = {
   createdAt: number;
 };
 
+export type AggregatedRecommendedDeck = {
+  deckKey: string;
+  chars: string[];
+  usedCount: number;
+  avgScore: number;
+};
+
+export type RecommendedDeckSnapshotLike = {
+  decks: readonly AggregatedRecommendedDeck[];
+} | null | undefined;
+
 type DeckRow = {
   id: string;
   user_id: string;
@@ -29,6 +40,86 @@ function normToken(s: string) {
 
 export function buildDeckKey(chars: readonly string[]) {
   return [...chars].map((char) => char.trim()).sort((a, b) => a.localeCompare(b)).join("|");
+}
+
+export function compareAggregatedRecommendedDecksByScore(a: AggregatedRecommendedDeck, b: AggregatedRecommendedDeck) {
+  if (a.avgScore !== b.avgScore) return b.avgScore - a.avgScore;
+  return b.usedCount - a.usedCount;
+}
+
+export function aggregateRecommendedDecks<T extends { chars: string[]; score: number }>(
+  decks: readonly T[],
+  options: { minScore?: number } = {}
+): AggregatedRecommendedDeck[] {
+  const minScore = options.minScore ?? MIN_RECOMMENDED_DECK_SCORE;
+  const grouped = new Map<string, {
+    orderCounts: Map<string, { chars: string[]; count: number }>;
+    totalScore: number;
+    usedCount: number;
+  }>();
+
+  for (const deck of decks) {
+    if (!Number.isFinite(deck.score) || deck.score <= minScore) continue;
+    if (!Array.isArray(deck.chars) || deck.chars.length !== MAX_DECK_CHARS) continue;
+
+    const trimmedChars = deck.chars.map((char) => char.trim());
+    if (trimmedChars.some((char) => char.length === 0)) continue;
+
+    const normalizedChars = [...trimmedChars].sort((a, b) => a.localeCompare(b));
+    const key = buildDeckKey(normalizedChars);
+    const orderKey = trimmedChars.join("|");
+
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.totalScore += deck.score;
+      existing.usedCount += 1;
+      const orderEntry = existing.orderCounts.get(orderKey);
+      if (orderEntry) {
+        orderEntry.count += 1;
+      } else {
+        existing.orderCounts.set(orderKey, { chars: trimmedChars, count: 1 });
+      }
+      continue;
+    }
+
+    const orderCounts = new Map<string, { chars: string[]; count: number }>();
+    orderCounts.set(orderKey, { chars: trimmedChars, count: 1 });
+    grouped.set(key, { orderCounts, totalScore: deck.score, usedCount: 1 });
+  }
+
+  return Array.from(grouped.entries())
+    .map(([deckKey, group]) => {
+      let bestChars: string[] = [];
+      let bestCount = 0;
+      for (const { chars, count } of group.orderCounts.values()) {
+        if (count > bestCount) {
+          bestCount = count;
+          bestChars = chars;
+        }
+      }
+      return {
+        deckKey,
+        chars: bestChars,
+        usedCount: group.usedCount,
+        avgScore: group.totalScore / group.usedCount,
+      };
+    })
+    .sort(compareAggregatedRecommendedDecksByScore);
+}
+
+export function chooseDisplayedRecommendedDecks({
+  liveDecks,
+  snapshot,
+  isAuthenticated,
+}: {
+  liveDecks: readonly AggregatedRecommendedDeck[];
+  snapshot?: RecommendedDeckSnapshotLike;
+  isAuthenticated: boolean;
+}): AggregatedRecommendedDeck[] {
+  if (isAuthenticated && liveDecks.length > 0) return [...liveDecks].sort(compareAggregatedRecommendedDecksByScore);
+  const snapshotDecks = snapshot?.decks ?? [];
+  if (snapshotDecks.length > 0) return [...snapshotDecks].sort(compareAggregatedRecommendedDecksByScore);
+  return [...liveDecks].sort(compareAggregatedRecommendedDecksByScore);
 }
 
 function deckCharSet(chars: readonly string[]): Set<string> {

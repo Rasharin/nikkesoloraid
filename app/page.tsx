@@ -18,7 +18,13 @@ import PrivacyContent from "./components/PrivacyContent";
 import TermsContent from "./components/TermsContent";
 import type { ImageBlock, TextBlock, UsageBlock, UsageEditorBlock, UsagePost } from "./components/tabs/usage/types";
 import { supabase, migrateAuthCookies } from "../lib/supabase";
-import { MIN_RECOMMENDED_DECK_SCORE, pickBest5 } from "../lib/recommend";
+import {
+  aggregateRecommendedDecks,
+  chooseDisplayedRecommendedDecks,
+  MIN_RECOMMENDED_DECK_SCORE,
+  pickBest5,
+  type AggregatedRecommendedDeck,
+} from "../lib/recommend";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
@@ -44,23 +50,13 @@ type Deck = {
   userId?: string;
   createdAt: number;
 };
-type RecommendedDeck = {
-  deckKey: string;
-  chars: string[];
-  usedCount: number;
-  avgScore: number;
-};
+type RecommendedDeck = AggregatedRecommendedDeck;
 type RecommendedDeckSnapshot = {
   raidKey: string;
   raidLabel: string;
   decks: RecommendedDeck[];
   updatedAt: number;
 };
-
-function compareRecommendedDecksByScore(a: RecommendedDeck, b: RecommendedDeck) {
-  if (a.avgScore !== b.avgScore) return b.avgScore - a.avgScore;
-  return b.usedCount - a.usedCount;
-}
 
 type RecommendationDeck = {
   chars: string[];
@@ -1493,8 +1489,8 @@ export default function Page() {
     return ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
   }
 
-  async function fetchCommunityRaidDecks(raidKey: string) {
-    const cachedDecks = readCachedCommunityRaidDecks(raidKey);
+  async function fetchCommunityRaidDecks(raidKey: string, options: { forceRefresh?: boolean } = {}) {
+    const cachedDecks = options.forceRefresh ? null : readCachedCommunityRaidDecks(raidKey);
     if (cachedDecks) return cachedDecks;
 
     const { data, error } = await supabase
@@ -2669,63 +2665,17 @@ export default function Page() {
       cancelled = true;
     };
 	  }, [recommendDeckLoadRaidKey]);
-  const recommendedDecks = useMemo(() => {
-    const grouped = new Map<string, {
-      orderCounts: Map<string, { chars: string[]; count: number }>;
-      totalScore: number;
-      usedCount: number;
-    }>();
-
-    for (const deck of communityRaidDecks) {
-      if (!Number.isFinite(deck.score) || deck.score <= MIN_RECOMMENDED_DECK_SCORE) continue;
-
-      const trimmedChars = deck.chars.map((char) => char.trim());
-      const normalizedChars = [...trimmedChars].sort((a, b) => a.localeCompare(b));
-      const key = buildDeckKey(normalizedChars);
-      const orderKey = trimmedChars.join("|");
-
-      const existing = grouped.get(key);
-      if (existing) {
-        existing.totalScore += deck.score;
-        existing.usedCount += 1;
-        const orderEntry = existing.orderCounts.get(orderKey);
-        if (orderEntry) {
-          orderEntry.count += 1;
-        } else {
-          existing.orderCounts.set(orderKey, { chars: trimmedChars, count: 1 });
-        }
-        continue;
-      }
-
-      const orderCounts = new Map<string, { chars: string[]; count: number }>();
-      orderCounts.set(orderKey, { chars: trimmedChars, count: 1 });
-      grouped.set(key, { orderCounts, totalScore: deck.score, usedCount: 1 });
-    }
-
-    return Array.from(grouped.entries())
-      .map(([deckKey, group]) => {
-        let bestChars: string[] = [];
-        let bestCount = 0;
-        for (const { chars, count } of group.orderCounts.values()) {
-          if (count > bestCount) {
-            bestCount = count;
-            bestChars = chars;
-          }
-        }
-        return {
-          deckKey,
-          chars: bestChars,
-          usedCount: group.usedCount,
-          avgScore: group.totalScore / group.usedCount,
-        };
-      })
-      .sort(compareRecommendedDecksByScore);
-  }, [communityRaidDecks]);
+	  const recommendedDecks = useMemo(() => {
+	    return aggregateRecommendedDecks(communityRaidDecks);
+	  }, [communityRaidDecks]);
 	  const displayedRecommendedDecks = useMemo(() => {
 	    if (!selectedRecommendRaidKey || selectedRecommendRaidKey === SEASON_OFF_RAID_KEY) return [];
-	    if (recommendedDecks.length > 0) return recommendedDecks;
-	    return [...(recommendedDeckSnapshots[selectedRecommendRaidKey]?.decks ?? [])].sort(compareRecommendedDecksByScore);
-	  }, [recommendedDeckSnapshots, recommendedDecks, selectedRecommendRaidKey]);
+	    return chooseDisplayedRecommendedDecks({
+	      liveDecks: recommendedDecks,
+	      snapshot: recommendedDeckSnapshots[selectedRecommendRaidKey],
+	      isAuthenticated: Boolean(userId),
+	    });
+	  }, [recommendedDeckSnapshots, recommendedDecks, selectedRecommendRaidKey, userId]);
   const best = useMemo(() => pickBest5(activeRaidDecks, { minScore: 0 }), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
 
@@ -3921,8 +3871,10 @@ export default function Page() {
         : offSeasonDecks;
 
 	      if (currentUserId && finalRaidKey) {
-	        await persistRecommendedDeckSnapshot(currentUserId, finalRaidKey, activeRaidLabel, recommendedDecks);
-	        if (canRecommend) {
+		        const finalCommunityDecks = await fetchCommunityRaidDecks(finalRaidKey, { forceRefresh: true });
+		        const finalRecommendedDecks = aggregateRecommendedDecks(finalCommunityDecks);
+		        await persistRecommendedDeckSnapshot(currentUserId, finalRaidKey, activeRaidLabel, finalRecommendedDecks);
+		        if (canRecommend) {
           const finalRecord: RecommendationRecord = {
             raidKey: finalRaidKey,
             raidLabel: activeRaidLabel,
