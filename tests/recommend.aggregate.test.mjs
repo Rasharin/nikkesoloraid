@@ -8,7 +8,9 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
 const jiti = createJiti(import.meta.url);
 const {
   aggregateRecommendedDecks,
+  calculateRecommendationRank,
   chooseDisplayedRecommendedDecks,
+  formatRecommendationRankLabel,
   getCommunityRaidDecksCacheKey,
   MIN_RECOMMENDED_DECK_SCORE,
 } = jiti("../lib/recommend.ts");
@@ -115,4 +117,25 @@ test("getCommunityRaidDecksCacheKey separates authenticated and anonymous raid c
   assert.equal(getCommunityRaidDecksCacheKey(" raid-1 ", true), "auth:raid-1");
   assert.equal(getCommunityRaidDecksCacheKey(" raid-1 ", false), "anon:raid-1");
   assert.notEqual(getCommunityRaidDecksCacheKey("raid-1", true), getCommunityRaidDecksCacheKey("raid-1", false));
+});
+
+test("calculateRecommendationRank ranks current score against saved recommendation totals", () => {
+  assert.deepEqual(
+    calculateRecommendationRank({
+      currentUserId: "me",
+      currentTotal: 250,
+      rows: [
+        { userId: "u1", total: 300 },
+        { userId: "me", total: 100 },
+        { userId: "u2", total: 200 },
+      ],
+    }),
+    { rank: 2, total: 3 }
+  );
+});
+
+test("formatRecommendationRankLabel shows top 10 as rank and others as percentile", () => {
+  assert.equal(formatRecommendationRankLabel({ rank: 1, total: 30 }), "1위");
+  assert.equal(formatRecommendationRankLabel({ rank: 10, total: 30 }), "10위");
+  assert.equal(formatRecommendationRankLabel({ rank: 11, total: 30 }), "상위 37%");
 });

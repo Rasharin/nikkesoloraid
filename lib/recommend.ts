@@ -24,6 +24,16 @@ export type RecommendedDeckSnapshotLike = {
   decks: readonly AggregatedRecommendedDeck[];
 } | null | undefined;
 
+export type RecommendationRankData = {
+  rank: number;
+  total: number;
+};
+
+export type RecommendationRankRow = {
+  userId: string;
+  total: number;
+};
+
 type DeckRow = {
   id: string;
   user_id: string;
@@ -126,6 +136,41 @@ export function chooseDisplayedRecommendedDecks({
   const snapshotDecks = snapshot?.decks ?? [];
   if (snapshotDecks.length > 0) return [...snapshotDecks].sort(compareAggregatedRecommendedDecksByScore);
   return [...liveDecks].sort(compareAggregatedRecommendedDecksByScore);
+}
+
+export function calculateRecommendationRank({
+  currentUserId,
+  currentTotal,
+  rows,
+}: {
+  currentUserId: string;
+  currentTotal: number;
+  rows: readonly RecommendationRankRow[];
+}): RecommendationRankData | null {
+  if (!currentUserId.trim() || !Number.isFinite(currentTotal) || currentTotal <= 0) return null;
+
+  const totalsByUser = new Map<string, number>();
+  for (const row of rows) {
+    const userId = row.userId.trim();
+    if (!userId || !Number.isFinite(row.total) || row.total <= 0) continue;
+    totalsByUser.set(userId, row.total);
+  }
+  totalsByUser.set(currentUserId.trim(), currentTotal);
+
+  const totals = Array.from(totalsByUser.values()).sort((a, b) => b - a);
+  if (totals.length === 0) return null;
+
+  const rank = totals.findIndex((total) => total <= currentTotal) + 1;
+  return {
+    rank: rank === 0 ? totals.length + 1 : rank,
+    total: totals.length,
+  };
+}
+
+export function formatRecommendationRankLabel(rankData: RecommendationRankData): string {
+  if (rankData.total <= 0) return "-";
+  if (rankData.rank <= 10) return `${rankData.rank}위`;
+  return `상위 ${Math.ceil((rankData.rank / rankData.total) * 100)}%`;
 }
 
 function deckCharSet(chars: readonly string[]): Set<string> {

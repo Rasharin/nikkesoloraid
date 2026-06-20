@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
+import { formatRecommendationRankLabel } from "../../../lib/recommend";
 import GiseonDeckSection from "../recommend/GiseonDeckSection";
 
 type NikkeRow = {
@@ -450,14 +451,12 @@ export default function RecommendTab({
         {myRankingData && myRankingData.total >= 2 ? (
           <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 px-4 py-3">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-semibold text-neutral-300">내 덱 순위</span>
+              <span className="text-sm font-semibold text-neutral-300">내 덱 딜량 순위</span>
               <span className="text-lg font-bold tabular-nums text-neutral-100">
-                {myRankingData.rank <= 10
-                  ? `${myRankingData.rank}위`
-                  : `상위 ${Math.ceil((myRankingData.rank / myRankingData.total) * 100)}%`}
+                {formatRecommendationRankLabel(myRankingData)}
               </span>
             </div>
-            <div className="mt-1.5 text-xs text-neutral-500">사이트 이용자 중 내 순위 입니다. 인 게임과 무관합니다.</div>
+            <div className="mt-1.5 text-xs text-neutral-500">본 순위는 사이트 내 딜량 순위로 인게임과 무관합니다</div>
           </section>
         ) : null}
 

@@ -25,6 +25,7 @@ import {
   MIN_RECOMMENDED_DECK_SCORE,
   pickBest5,
   type AggregatedRecommendedDeck,
+  type RecommendationRankData,
 } from "../lib/recommend";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
 const btnClass = (selected: boolean) =>
@@ -1444,6 +1445,7 @@ export default function Page() {
   const [totalUserCount, setTotalUserCount] = useState(0);
   const [bossUserStats, setBossUserStats] = useState<BossUserStat[]>([]);
   const [rankingByRaidKey, setRankingByRaidKey] = useState<Record<string, { rank: number; total: number }>>({});
+  const [myRankingData, setMyRankingData] = useState<RecommendationRankData | null>(null);
   const [loadingUserStats, setLoadingUserStats] = useState(false);
   const [termsText, setTermsText] = useState("");
   const [privacyText, setPrivacyText] = useState("");
@@ -2703,32 +2705,44 @@ export default function Page() {
   const best = useMemo(() => pickBest5(activeRaidDecks, { minScore: 0 }), [activeRaidDecks]);
   const canRecommend = best.picked.length === 5;
 
-  const myRankingData = useMemo(() => {
-    if (!soloRaidInProgress || !currentDeckRaidKey || !canRecommend) return null;
-    const myTotal = best.total;
-    if (!myTotal) return null;
-
-    const byUser = new Map<string, Deck[]>();
-    for (const deck of communityRaidDecks) {
-      if (!deck.userId || deck.raidKey !== currentDeckRaidKey) continue;
-      const list = byUser.get(deck.userId) ?? [];
-      list.push(deck);
-      byUser.set(deck.userId, list);
+  useEffect(() => {
+    if (!soloRaidInProgress || !currentDeckRaidKey || !userId || !canRecommend || best.total <= 0) {
+      setMyRankingData(null);
+      return;
     }
 
-    if (byUser.size === 0) return null;
+    const rankingRaidKey = currentDeckRaidKey;
+    let cancelled = false;
 
-    const totals = Array.from(byUser.values())
-      .map((decks) => pickBest5(decks, { minScore: 0 }).total)
-      .filter((t) => t > 0)
-      .sort((a, b) => b - a);
+    async function loadMyRankingData() {
+      try {
+        const params = new URLSearchParams({
+          raidKey: rankingRaidKey,
+          currentTotal: String(best.total),
+        });
+        const response = await fetch(`/api/recommendations/rank?${params.toString()}`, {
+          credentials: "same-origin",
+        });
+        if (!response.ok) throw new Error(`recommendation rank failed: ${response.status}`);
+        const payload = (await response.json()) as Partial<RecommendationRankData>;
+        const rank = Number(payload.rank);
+        const total = Number(payload.total);
+        if (!Number.isFinite(rank) || !Number.isFinite(total) || rank <= 0 || total <= 0) {
+          throw new Error("Invalid recommendation rank payload");
+        }
+        if (!cancelled) setMyRankingData({ rank, total });
+      } catch (error) {
+        console.warn("[recommendations/rank] loading skipped", error);
+        if (!cancelled) setMyRankingData(null);
+      }
+    }
 
-    if (totals.length === 0) return null;
+    void loadMyRankingData();
 
-    const rank = totals.findIndex((t) => t <= myTotal) + 1;
-    const effectiveRank = rank === 0 ? totals.length + 1 : rank;
-    return { rank: effectiveRank, total: totals.length };
-  }, [best.total, canRecommend, communityRaidDecks, currentDeckRaidKey, soloRaidInProgress]);
+    return () => {
+      cancelled = true;
+    };
+  }, [best.total, canRecommend, currentDeckRaidKey, soloRaidInProgress, userId]);
 	  const activeRaidLabel = useMemo(
 	    () =>
 	      currentDeckRaidKey === SEASON_OFF_RAID_KEY
