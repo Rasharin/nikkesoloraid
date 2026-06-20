@@ -1500,15 +1500,27 @@ export default function Page() {
     const cachedDecks = options.forceRefresh ? null : readCachedCommunityRaidDecks(raidKey, isAuthenticated);
     if (cachedDecks) return cachedDecks;
 
-    const { data, error } = await supabase
-      .from("decks")
-      .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
-      .eq("raid_key", raidKey)
-      .not("user_id", "is", null)
-      .order("created_at", { ascending: false });
+    let rows: DeckRow[] = [];
+    if (isAuthenticated) {
+      const response = await fetch(`/api/recommendations/decks?raidKey=${encodeURIComponent(raidKey)}`, {
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error(`recommendation decks failed: ${response.status}`);
+      const payload = (await response.json()) as { decks?: unknown };
+      rows = Array.isArray(payload.decks) ? (payload.decks as DeckRow[]) : [];
+    } else {
+      const { data, error } = await supabase
+        .from("decks")
+        .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
+        .eq("raid_key", raidKey)
+        .not("user_id", "is", null)
+        .order("created_at", { ascending: false });
 
-    if (error) throw error;
-    const decks = ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
+      if (error) throw error;
+      rows = (data ?? []) as DeckRow[];
+    }
+
+    const decks = rows.map(mapDeckRow).filter((d): d is Deck => d !== null);
     writeCachedCommunityRaidDecks(raidKey, decks, isAuthenticated);
     return decks;
   }
