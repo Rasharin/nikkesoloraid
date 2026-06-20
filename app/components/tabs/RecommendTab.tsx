@@ -456,6 +456,7 @@ export default function RecommendTab({
                 {formatRecommendationRankLabel(myRankingData)}
               </span>
             </div>
+            <div className="mt-1 text-[11px] tabular-nums text-neutral-500">총 참여 인원 {myRankingData.total}명</div>
             <div className="mt-1.5 text-xs text-neutral-500">본 순위는 사이트 내 딜량 순위로 인게임과 무관합니다</div>
           </section>
         ) : null}
