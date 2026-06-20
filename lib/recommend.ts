@@ -169,7 +169,7 @@ export function calculateRecommendationRank({
 
 export function formatRecommendationRankLabel(rankData: RecommendationRankData): string {
   if (rankData.total <= 0) return "-";
-  if (rankData.rank <= 10) return `${rankData.rank}위`;
+  if (rankData.rank <= 100) return `${rankData.rank}위`;
   return `상위 ${Math.ceil((rankData.rank / rankData.total) * 100)}%`;
 }
 

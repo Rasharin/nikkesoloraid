@@ -134,8 +134,8 @@ test("calculateRecommendationRank ranks current score against saved recommendati
   );
 });
 
-test("formatRecommendationRankLabel shows top 10 as rank and others as percentile", () => {
+test("formatRecommendationRankLabel shows top 100 as rank and others as percentile", () => {
   assert.equal(formatRecommendationRankLabel({ rank: 1, total: 30 }), "1위");
-  assert.equal(formatRecommendationRankLabel({ rank: 10, total: 30 }), "10위");
-  assert.equal(formatRecommendationRankLabel({ rank: 11, total: 30 }), "상위 37%");
+  assert.equal(formatRecommendationRankLabel({ rank: 100, total: 200 }), "100위");
+  assert.equal(formatRecommendationRankLabel({ rank: 101, total: 200 }), "상위 51%");
 });
