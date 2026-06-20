@@ -3536,7 +3536,11 @@ export default function Page() {
 	        showToast("덱 저장 완료");
       } else if (existingDeck) {
         const updateLocalDecks = (saveDecks: (nextDecks: Deck[]) => void) => (prev: Deck[]) => {
-          const next = prev.map((deck) => (deck.id === existingDeck.id ? { ...deck, chars: [...draft], score: sc } : deck));
+          const next = prev.map((deck) =>
+            deck.id === existingDeck.id
+              ? { ...deck, chars: [...draft], score: sc, ...(note !== undefined ? { note } : {}) }
+              : deck
+          );
           saveDecks(next);
           return next;
         };
@@ -3565,7 +3569,11 @@ export default function Page() {
 	          const existingIndex = prev.findIndex((deck) => deck.raidKey === targetRaidKey && deck.deckKey === nextDeckKey);
           const next =
             existingIndex >= 0
-              ? prev.map((deck, index) => (index === existingIndex ? { ...deck, chars: [...draft], score: sc } : deck))
+              ? prev.map((deck, index) =>
+                  index === existingIndex
+                    ? { ...deck, chars: [...draft], score: sc, ...(note !== undefined ? { note } : {}) }
+                    : deck
+                )
               : [inserted, ...prev];
 	          if (soloRaidInProgress) {
             saveLocalDecks(next);

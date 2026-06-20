@@ -53,6 +53,7 @@ type Deck = {
   id: string;
   chars: string[];
   score: number;
+  note?: string;
   createdAt: number;
 };
 
@@ -542,6 +543,8 @@ export default function ImaginarySoloRaidTab({
   const [overlayWidth, setOverlayWidth] = useState<number | null>(null);
   const [editingRecommendedDeckId, setEditingRecommendedDeckId] = useState<string | null>(null);
   const [editingRecommendedScore, setEditingRecommendedScore] = useState("");
+  const [editingRecommendedNoteDeckId, setEditingRecommendedNoteDeckId] = useState<string | null>(null);
+  const [editingRecommendedNote, setEditingRecommendedNote] = useState("");
   const [memoText, setMemoText] = useState("");
   const [isMemoEditing, setIsMemoEditing] = useState(false);
   const [nikkeSearch, setNikkeSearch] = useState("");
@@ -1195,6 +1198,25 @@ export default function ImaginarySoloRaidTab({
     setEditingRecommendedScore("");
   }
 
+  async function saveRecommendedDeckNote(deck: Deck, noteText: string) {
+    const nextNote = noteText.trim();
+    if ((deck.note ?? "") === nextNote) {
+      setEditingRecommendedNoteDeckId(null);
+      setEditingRecommendedNote("");
+      return;
+    }
+
+    const saved = await onSubmitDeck({
+      draft: deck.chars,
+      scoreText: displayScore(deck.score),
+      note: nextNote,
+      editingId: null,
+    });
+    if (!saved) return;
+    setEditingRecommendedNoteDeckId(null);
+    setEditingRecommendedNote("");
+  }
+
   function clearDeckMemo() {
     setMemoText("");
     try {
@@ -1230,7 +1252,7 @@ export default function ImaginarySoloRaidTab({
           id: maxId + index + 1,
           draft: normalizeDraftSlots(deck.chars, MAX_DECK_CHARS),
           score: displayScore(deck.score),
-          note: "",
+          note: deck.note ?? "",
           editingId: null,
       }));
 
@@ -1241,6 +1263,8 @@ export default function ImaginarySoloRaidTab({
   }
 
   function renderRecommendedDeckCard(deck: Deck) {
+    const noteText = editingRecommendedNoteDeckId === deck.id ? editingRecommendedNote : deck.note ?? "";
+
     return (
       <div key={deck.id} className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-2">
         <div className="grid min-w-0 grid-cols-5 gap-1.5">
@@ -1265,7 +1289,32 @@ export default function ImaginarySoloRaidTab({
           })}
         </div>
 
-        <div className="mt-2 flex justify-end">
+        <div className="mt-2 flex items-end gap-2">
+          <textarea
+            value={noteText}
+            onFocus={() => {
+              setEditingRecommendedNoteDeckId(deck.id);
+              setEditingRecommendedNote(deck.note ?? "");
+            }}
+            onChange={(event) => {
+              if (editingRecommendedNoteDeckId !== deck.id) {
+                setEditingRecommendedNoteDeckId(deck.id);
+              }
+              setEditingRecommendedNote(event.target.value);
+            }}
+            onBlur={(event) => void saveRecommendedDeckNote(deck, event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setEditingRecommendedNoteDeckId(null);
+                setEditingRecommendedNote("");
+              }
+            }}
+            placeholder="메모"
+            rows={1}
+            className="min-h-8 min-w-0 flex-1 resize-none overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950/40 px-2 py-1.5 text-xs text-neutral-200 outline-none transition placeholder:text-neutral-600 focus:border-neutral-600 focus:bg-neutral-950/70"
+            title={noteText || "메모 수정"}
+          />
           {editingRecommendedDeckId === deck.id ? (
             <input
               autoFocus
