@@ -6,7 +6,12 @@ process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
 
 const jiti = createJiti(import.meta.url);
-const { aggregateRecommendedDecks, chooseDisplayedRecommendedDecks, MIN_RECOMMENDED_DECK_SCORE } = jiti("../lib/recommend.ts");
+const {
+  aggregateRecommendedDecks,
+  chooseDisplayedRecommendedDecks,
+  getCommunityRaidDecksCacheKey,
+  MIN_RECOMMENDED_DECK_SCORE,
+} = jiti("../lib/recommend.ts");
 
 test("aggregateRecommendedDecks groups all users by deck and reports count with average score", () => {
   const decks = [
@@ -104,4 +109,10 @@ test("chooseDisplayedRecommendedDecks falls back to live decks when current raid
     }),
     liveDecks
   );
+});
+
+test("getCommunityRaidDecksCacheKey separates authenticated and anonymous raid caches", () => {
+  assert.equal(getCommunityRaidDecksCacheKey(" raid-1 ", true), "auth:raid-1");
+  assert.equal(getCommunityRaidDecksCacheKey(" raid-1 ", false), "anon:raid-1");
+  assert.notEqual(getCommunityRaidDecksCacheKey("raid-1", true), getCommunityRaidDecksCacheKey("raid-1", false));
 });

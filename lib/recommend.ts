@@ -42,6 +42,12 @@ export function buildDeckKey(chars: readonly string[]) {
   return [...chars].map((char) => char.trim()).sort((a, b) => a.localeCompare(b)).join("|");
 }
 
+export function getCommunityRaidDecksCacheKey(raidKey: string, isAuthenticated: boolean) {
+  const normalizedRaidKey = raidKey.trim();
+  if (!normalizedRaidKey) return "";
+  return `${isAuthenticated ? "auth" : "anon"}:${normalizedRaidKey}`;
+}
+
 export function compareAggregatedRecommendedDecksByScore(a: AggregatedRecommendedDeck, b: AggregatedRecommendedDeck) {
   if (a.avgScore !== b.avgScore) return b.avgScore - a.avgScore;
   return b.usedCount - a.usedCount;

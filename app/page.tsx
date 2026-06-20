@@ -21,6 +21,7 @@ import { supabase, migrateAuthCookies } from "../lib/supabase";
 import {
   aggregateRecommendedDecks,
   chooseDisplayedRecommendedDecks,
+  getCommunityRaidDecksCacheKey,
   MIN_RECOMMENDED_DECK_SCORE,
   pickBest5,
   type AggregatedRecommendedDeck,
@@ -701,12 +702,13 @@ function readRawCommunityRaidDecksCache(): CommunityRaidDecksCache {
   }
 }
 
-function readCachedCommunityRaidDecks(raidKey: string): Deck[] | null {
+function readCachedCommunityRaidDecks(raidKey: string, isAuthenticated: boolean): Deck[] | null {
   if (typeof window === "undefined") return null;
 
   const normalizedRaidKey = raidKey.trim();
   if (!normalizedRaidKey) return null;
-  const entry = readRawCommunityRaidDecksCache().decksByRaidKey[normalizedRaidKey];
+  const cacheKey = getCommunityRaidDecksCacheKey(normalizedRaidKey, isAuthenticated);
+  const entry = readRawCommunityRaidDecksCache().decksByRaidKey[cacheKey];
   if (!entry || !entry.cachedAt || Date.now() - entry.cachedAt > COMMUNITY_RAID_DECKS_CACHE_TTL) return null;
   if (!Array.isArray(entry.decks)) return null;
 
@@ -715,15 +717,17 @@ function readCachedCommunityRaidDecks(raidKey: string): Deck[] | null {
     .filter((deck): deck is Deck => deck !== null && deck.raidKey === normalizedRaidKey);
 }
 
-function writeCachedCommunityRaidDecks(raidKey: string, decks: readonly Deck[]) {
+function writeCachedCommunityRaidDecks(raidKey: string, decks: readonly Deck[], isAuthenticated: boolean) {
   if (typeof window === "undefined") return;
 
   const normalizedRaidKey = raidKey.trim();
   if (!normalizedRaidKey) return;
+  const cacheKey = getCommunityRaidDecksCacheKey(normalizedRaidKey, isAuthenticated);
+  if (!cacheKey) return;
 
   try {
     const cache = readRawCommunityRaidDecksCache();
-    cache.decksByRaidKey[normalizedRaidKey] = {
+    cache.decksByRaidKey[cacheKey] = {
       decks: decks.filter((deck) => deck.raidKey === normalizedRaidKey),
       cachedAt: Date.now(),
     };
@@ -743,6 +747,8 @@ function removeCachedCommunityRaidDecks(raidKeys: readonly (string | null | unde
     const cache = readRawCommunityRaidDecksCache();
     for (const raidKey of normalizedRaidKeys) {
       delete cache.decksByRaidKey[raidKey];
+      delete cache.decksByRaidKey[getCommunityRaidDecksCacheKey(raidKey, true)];
+      delete cache.decksByRaidKey[getCommunityRaidDecksCacheKey(raidKey, false)];
     }
     localStorage.setItem(COMMUNITY_RAID_DECKS_CACHE_KEY, JSON.stringify(cache));
   } catch {}
@@ -1490,7 +1496,8 @@ export default function Page() {
   }
 
   async function fetchCommunityRaidDecks(raidKey: string, options: { forceRefresh?: boolean } = {}) {
-    const cachedDecks = options.forceRefresh ? null : readCachedCommunityRaidDecks(raidKey);
+    const isAuthenticated = Boolean(userId);
+    const cachedDecks = options.forceRefresh ? null : readCachedCommunityRaidDecks(raidKey, isAuthenticated);
     if (cachedDecks) return cachedDecks;
 
     const { data, error } = await supabase
@@ -1502,7 +1509,7 @@ export default function Page() {
 
     if (error) throw error;
     const decks = ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
-    writeCachedCommunityRaidDecks(raidKey, decks);
+    writeCachedCommunityRaidDecks(raidKey, decks, isAuthenticated);
     return decks;
   }
 
@@ -2630,13 +2637,18 @@ export default function Page() {
 	    () => (soloRaidInProgress && currentDeckRaidKey ? decks.filter((deck) => deck.raidKey === currentDeckRaidKey) : []),
 	    [currentDeckRaidKey, decks, soloRaidInProgress]
 	  );
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadCommunityRaidDecks() {
-      if (!recommendDeckLoadRaidKey || recommendDeckLoadRaidKey === SEASON_OFF_RAID_KEY) {
-		        setCommunityRaidDecks([]);
-		        setLoadingCommunityRaidDecks(false);
+	  useEffect(() => {
+	    let cancelled = false;
+	
+	    async function loadCommunityRaidDecks() {
+	      if (!authResolved) {
+	        setCommunityRaidDecks([]);
+	        setLoadingCommunityRaidDecks(false);
+	        return;
+	      }
+	      if (!recommendDeckLoadRaidKey || recommendDeckLoadRaidKey === SEASON_OFF_RAID_KEY) {
+			        setCommunityRaidDecks([]);
+			        setLoadingCommunityRaidDecks(false);
 		        return;
 		      }
 
@@ -2661,10 +2673,10 @@ export default function Page() {
 
     void loadCommunityRaidDecks();
 
-    return () => {
-      cancelled = true;
-    };
-	  }, [recommendDeckLoadRaidKey]);
+	    return () => {
+	      cancelled = true;
+	    };
+		  }, [authResolved, recommendDeckLoadRaidKey, userId]);
 	  const recommendedDecks = useMemo(() => {
 	    return aggregateRecommendedDecks(communityRaidDecks);
 	  }, [communityRaidDecks]);
