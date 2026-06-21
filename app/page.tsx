@@ -304,6 +304,7 @@ const APP_CONFIG_CACHE_KEY = "soloraid_app_config_cache_v1";
 const APP_CONFIG_CACHE_TTL = 1000 * 60;
 const USAGE_POSTS_CACHE_KEY = "soloraid_usage_posts_cache_v1";
 const BOARD_POSTS_CACHE_TTL = 1000 * 60 * 10;
+const CONTACT_POSTS_CACHE_TTL = 1000 * 30;
 const NOTICE_POSTS_CACHE_KEY = "soloraid_notice_posts_cache_v1";
 const COMMUNITY_RAID_DECKS_CACHE_KEY = "soloraid_community_raid_decks_cache_v1";
 const COMMUNITY_RAID_DECKS_CACHE_TTL = 1000 * 60 * 5;
@@ -1367,6 +1368,8 @@ export default function Page() {
   const [loadingSoloRaidTips, setLoadingSoloRaidTips] = useState(false);
   const [contactPosts, setContactPosts] = useState<ContactPostSummary[]>([]);
   const [loadingContactPosts, setLoadingContactPosts] = useState(false);
+  const [contactPostsLoadedAt, setContactPostsLoadedAt] = useState(0);
+  const [contactPostsLoadedFor, setContactPostsLoadedFor] = useState("");
   const [contactBoardSetupRequired, setContactBoardSetupRequired] = useState(false);
   const [usagePosts, setUsagePosts] = useState<UsagePost[]>([]);
   const [loadingUsagePosts, setLoadingUsagePosts] = useState(false);
@@ -1388,6 +1391,7 @@ export default function Page() {
   const [scoreDisplayMode, setScoreDisplayModeState] = useState<ScoreDisplayMode>(() => readStoredScoreDisplayMode());
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredThemeMode());
   const [persistSessionState, setPersistSessionState] = useState<boolean>(() => readStoredPersistSession());
+  const contactPostsCacheKey = `${userId ?? "anonymous"}:${isMasterUser ? "master" : "user"}`;
   const isLicensePage = pathname === "/license";
   const isNoticePage = pathname === "/notice";
   const isPrivacyPage = pathname === "/privacy";
@@ -2040,17 +2044,28 @@ export default function Page() {
 
     async function loadContactPosts() {
       if (tab !== "contact") return;
+      const hasFreshPosts =
+        contactPostsLoadedFor === contactPostsCacheKey &&
+        contactPostsLoadedAt > 0 &&
+        Date.now() - contactPostsLoadedAt < CONTACT_POSTS_CACHE_TTL;
+      if (hasFreshPosts) return;
 
-      setLoadingContactPosts(true);
+      if (contactPosts.length === 0) {
+        setLoadingContactPosts(true);
+      }
       try {
         const posts = await fetchContactPosts();
         if (!cancelled) {
           setContactPosts(posts);
+          setContactPostsLoadedAt(Date.now());
+          setContactPostsLoadedFor(contactPostsCacheKey);
         }
       } catch (error) {
         console.warn(error);
         if (!cancelled) {
-          setContactPosts([]);
+          if (contactPosts.length === 0) {
+            setContactPosts([]);
+          }
           setContactBoardSetupRequired(true);
         }
       } finally {
@@ -2065,7 +2080,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [tab, userId, isMasterUser]);
+  }, [tab, userId, isMasterUser, contactPosts.length, contactPostsLoadedAt, contactPostsLoadedFor, contactPostsCacheKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -4292,6 +4307,8 @@ export default function Page() {
       }
 
       setContactPosts((prev) => [data.post!, ...prev]);
+      setContactPostsLoadedAt(Date.now());
+      setContactPostsLoadedFor(contactPostsCacheKey);
       showToast("문의 등록 완료");
       return true;
     } catch (error) {
@@ -4346,6 +4363,8 @@ export default function Page() {
       }
 
       setContactPosts((prev) => prev.map((post) => (post.id === id ? data.post! : post)));
+      setContactPostsLoadedAt(Date.now());
+      setContactPostsLoadedFor(contactPostsCacheKey);
       showToast("문의 글 수정 완료");
       return data.post;
     } catch (error) {
@@ -4367,6 +4386,8 @@ export default function Page() {
       }
 
       setContactPosts((prev) => prev.filter((post) => post.id !== id));
+      setContactPostsLoadedAt(Date.now());
+      setContactPostsLoadedFor(contactPostsCacheKey);
       showToast("문의 글 삭제 완료");
       return true;
     } catch (error) {

@@ -501,7 +501,11 @@ function SpareSlot({ index, name, nikke, imageUrl, activeDrag, hovered, canDrop,
             {...attributes}
             {...listeners}
           >
-            <Image fill src={imageUrl} alt={displayName} draggable={false} className="pointer-events-none object-cover" sizes="(max-width: 640px) 20vw, 100px" />
+            {imageUrl ? (
+              <Image fill src={imageUrl} alt={displayName} draggable={false} className="pointer-events-none object-cover" sizes="(max-width: 640px) 20vw, 100px" />
+            ) : (
+              <div className="grid h-full w-full place-items-center text-xs text-neutral-600">no image</div>
+            )}
           </button>
         ) : (
           <div className="grid h-full w-full place-items-center text-lg text-neutral-600">+</div>

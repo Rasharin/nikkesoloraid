@@ -14,6 +14,7 @@ export const runtime = "nodejs";
 
 const CONTACT_POST_COLUMNS =
   "id,title,content,visibility,status,password_hash,user_id,reply_content,replied_by,replied_at,created_at,updated_at";
+const CONTACT_POST_SUMMARY_COLUMNS = "id,title,visibility,status,user_id,reply_content,created_at,updated_at";
 
 function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -47,8 +48,9 @@ export async function GET() {
     const master = await isMasterUser(admin, userId);
     const { data, error } = await admin
       .from("contact_posts")
-      .select(CONTACT_POST_COLUMNS)
-      .order("created_at", { ascending: false });
+      .select(CONTACT_POST_SUMMARY_COLUMNS)
+      .order("created_at", { ascending: false })
+      .limit(50);
 
     if (error) throw error;
 

@@ -6,14 +6,14 @@ import type { ContactPostDetail, ContactPostSummary, ContactPostStatus, ContactP
 export type ContactPostRow = {
   id: string;
   title: string | null;
-  content: string | null;
+  content?: string | null;
   visibility: ContactPostVisibility | string | null;
   status: ContactPostStatus | string | null;
-  password_hash: string | null;
+  password_hash?: string | null;
   user_id: string | null;
   reply_content: string | null;
-  replied_by: string | null;
-  replied_at: string | null;
+  replied_by?: string | null;
+  replied_at?: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
