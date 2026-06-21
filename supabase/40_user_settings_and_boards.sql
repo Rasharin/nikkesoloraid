@@ -58,6 +58,105 @@ create policy "contact_inquiries_insert_all" on public.contact_inquiries for ins
 create policy "contact_inquiries_select_master_only" on public.contact_inquiries for select to authenticated using (exists (select 1 from public.app_config where public.app_config.master_user_id = auth.uid()));
 create policy "contact_inquiries_delete_master_only" on public.contact_inquiries for delete to authenticated using (exists (select 1 from public.app_config where public.app_config.master_user_id = auth.uid()));
 
+create table if not exists public.contact_posts (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  content text not null,
+  visibility text not null default 'private',
+  status text not null default 'received',
+  password_hash text,
+  user_id uuid references auth.users(id) on delete set null,
+  reply_content text,
+  replied_by uuid references auth.users(id) on delete set null,
+  replied_at timestamptz,
+  migrated_from_contact_inquiry_id uuid unique,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint contact_posts_visibility_check check (visibility in ('public', 'private')),
+  constraint contact_posts_status_check check (status in ('received', 'resolved'))
+);
+
+alter table public.contact_posts add column if not exists title text;
+alter table public.contact_posts add column if not exists content text;
+alter table public.contact_posts add column if not exists visibility text not null default 'private';
+alter table public.contact_posts add column if not exists status text not null default 'received';
+alter table public.contact_posts add column if not exists password_hash text;
+alter table public.contact_posts add column if not exists user_id uuid references auth.users(id) on delete set null;
+alter table public.contact_posts add column if not exists reply_content text;
+alter table public.contact_posts add column if not exists replied_by uuid references auth.users(id) on delete set null;
+alter table public.contact_posts add column if not exists replied_at timestamptz;
+alter table public.contact_posts add column if not exists migrated_from_contact_inquiry_id uuid unique;
+alter table public.contact_posts add column if not exists created_at timestamptz not null default now();
+alter table public.contact_posts add column if not exists updated_at timestamptz not null default now();
+
+create index if not exists contact_posts_created_at_idx on public.contact_posts (created_at desc);
+create index if not exists contact_posts_user_id_created_at_idx on public.contact_posts (user_id, created_at desc);
+create index if not exists contact_posts_visibility_created_at_idx on public.contact_posts (visibility, created_at desc);
+create index if not exists contact_posts_status_created_at_idx on public.contact_posts (status, created_at desc);
+alter table public.contact_posts enable row level security;
+
+insert into public.contact_posts (
+  title,
+  content,
+  visibility,
+  status,
+  user_id,
+  migrated_from_contact_inquiry_id,
+  created_at,
+  updated_at
+)
+select
+  '이전 문의 ' || to_char(created_at at time zone 'Asia/Seoul', 'YYYY-MM-DD HH24:MI'),
+  content,
+  'private',
+  'received',
+  user_id,
+  id,
+  created_at,
+  created_at
+from public.contact_inquiries
+where not exists (
+  select 1
+  from public.contact_posts
+  where public.contact_posts.migrated_from_contact_inquiry_id = public.contact_inquiries.id
+);
+
+drop policy if exists "contact_posts_select_own_or_master" on public.contact_posts;
+drop policy if exists "contact_posts_insert_own" on public.contact_posts;
+drop policy if exists "contact_posts_update_master_only" on public.contact_posts;
+drop policy if exists "contact_posts_delete_master_only" on public.contact_posts;
+
+create policy "contact_posts_select_own_or_master"
+on public.contact_posts
+for select
+to authenticated
+using (
+  auth.uid() is not null
+  and (
+    auth.uid() = user_id
+    or exists (select 1 from public.app_config where public.app_config.master_user_id = auth.uid())
+  )
+);
+
+create policy "contact_posts_insert_own"
+on public.contact_posts
+for insert
+to authenticated
+with check (auth.uid() is not null and auth.uid() = user_id);
+
+create policy "contact_posts_update_master_only"
+on public.contact_posts
+for update
+to authenticated
+using (exists (select 1 from public.app_config where public.app_config.master_user_id = auth.uid()))
+with check (exists (select 1 from public.app_config where public.app_config.master_user_id = auth.uid()));
+
+create policy "contact_posts_delete_master_only"
+on public.contact_posts
+for delete
+to authenticated
+using (exists (select 1 from public.app_config where public.app_config.master_user_id = auth.uid()));
+
 create table if not exists public.usage_posts (
   id uuid primary key default gen_random_uuid(),
   category_key text not null,

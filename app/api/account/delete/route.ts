@@ -80,6 +80,12 @@ export async function POST() {
     return NextResponse.json({ error: "문의 데이터 정리 중 오류가 발생했습니다." }, { status: 500 });
   }
 
+  const { error: contactPostsError } = await admin.from("contact_posts").update({ user_id: null }).eq("user_id", userId);
+  if (contactPostsError && !isMissingRelationError(contactPostsError)) {
+    console.error("[account/delete] contact_posts cleanup failed", contactPostsError);
+    return NextResponse.json({ error: "문의 게시판 데이터 정리 중 오류가 발생했습니다." }, { status: 500 });
+  }
+
   const { error: settingsError } = await admin.from("site_settings").update({ updated_by: null }).eq("updated_by", userId);
   if (settingsError && !isMissingRelationError(settingsError)) {
     console.error("[account/delete] site_settings cleanup failed", settingsError);

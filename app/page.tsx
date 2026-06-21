@@ -28,6 +28,7 @@ import {
   type RecommendationRankData,
 } from "../lib/recommend";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
+import type { ContactPostDetail, ContactPostStatus, ContactPostSummary, ContactPostVisibility } from "../lib/contact-board";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
    ${selected
@@ -102,19 +103,6 @@ type SoloRaidTipRow = {
 type SoloRaidTip = {
   id: string;
   raidKey: string;
-  content: string;
-  userId: string | null;
-  createdAt: number;
-  source: "remote" | "local";
-};
-type ContactInquiryRow = {
-  id: string;
-  content: string;
-  user_id: string | null;
-  created_at: string;
-};
-type ContactInquiry = {
-  id: string;
   content: string;
   userId: string | null;
   createdAt: number;
@@ -303,8 +291,6 @@ const RECOMMENDED_DECK_SNAPSHOT_KEY_PREFIX = "recommended_deck_snapshot_";
 const SOLO_RAID_TIPS_TABLE = "solo_raid_tips";
 const LOCAL_TIPS_KEY = "soloraid_local_tips_v1";
 const DEV_LOCAL_TIP_USER_ID = "__dev_local_tip_user__";
-const CONTACT_INQUIRIES_TABLE = "contact_inquiries";
-const LOCAL_CONTACT_INQUIRIES_KEY = "soloraid_local_contact_inquiries_v1";
 const SCORE_DISPLAY_MODE_KEY = "soloraid_score_display_mode_v1";
 const USAGE_POSTS_TABLE = "usage_posts";
 const PEAK_USER_COUNT_KEY = "peak_user_count";
@@ -929,19 +915,6 @@ function mapSoloRaidTipRow(row: SoloRaidTipRow): SoloRaidTip | null {
   };
 }
 
-function mapContactInquiryRow(row: ContactInquiryRow): ContactInquiry | null {
-  if (!row?.id || !row.content || !row.created_at) return null;
-
-  const createdAt = Date.parse(row.created_at);
-  return {
-    id: row.id,
-    content: row.content.trim(),
-    userId: row.user_id ?? null,
-    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
-    source: "remote",
-  };
-}
-
 function createUsageBlockId(prefix: "text" | "image" = "text") {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -1059,45 +1032,6 @@ function loadLocalTips(): SoloRaidTip[] {
 function saveLocalTips(tips: SoloRaidTip[]) {
   try {
     localStorage.setItem(LOCAL_TIPS_KEY, JSON.stringify(tips));
-  } catch { }
-}
-
-function loadLocalContactInquiries(): ContactInquiry[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_CONTACT_INQUIRIES_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown[];
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .map((item): ContactInquiry | null => {
-        if (!item || typeof item !== "object") return null;
-        const candidate = item as Record<string, unknown>;
-        if (
-          typeof candidate.id !== "string" ||
-          typeof candidate.content !== "string" ||
-          typeof candidate.createdAt !== "number"
-        ) {
-          return null;
-        }
-
-        return {
-          id: candidate.id,
-          content: candidate.content,
-          userId: typeof candidate.userId === "string" ? candidate.userId : null,
-          createdAt: candidate.createdAt,
-          source: "local" as const,
-        };
-      })
-      .filter((inquiry): inquiry is ContactInquiry => inquiry !== null);
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalContactInquiries(inquiries: ContactInquiry[]) {
-  try {
-    localStorage.setItem(LOCAL_CONTACT_INQUIRIES_KEY, JSON.stringify(inquiries));
   } catch { }
 }
 
@@ -1431,8 +1365,9 @@ export default function Page() {
   const [tipRaidKey, setTipRaidKey] = useState<string | null>(null);
   const [soloRaidTips, setSoloRaidTips] = useState<SoloRaidTip[]>([]);
   const [loadingSoloRaidTips, setLoadingSoloRaidTips] = useState(false);
-  const [contactInquiries, setContactInquiries] = useState<ContactInquiry[]>([]);
-  const [loadingContactInquiries, setLoadingContactInquiries] = useState(false);
+  const [contactPosts, setContactPosts] = useState<ContactPostSummary[]>([]);
+  const [loadingContactPosts, setLoadingContactPosts] = useState(false);
+  const [contactBoardSetupRequired, setContactBoardSetupRequired] = useState(false);
   const [usagePosts, setUsagePosts] = useState<UsagePost[]>([]);
   const [loadingUsagePosts, setLoadingUsagePosts] = useState(false);
   const [savingUsagePost, setSavingUsagePost] = useState(false);
@@ -1720,16 +1655,26 @@ export default function Page() {
     return ((data ?? []) as SoloRaidTipRow[]).map(mapSoloRaidTipRow).filter((tip): tip is SoloRaidTip => tip !== null);
   }
 
-  async function fetchContactInquiries() {
-    const { data, error } = await supabase
-      .from(CONTACT_INQUIRIES_TABLE)
-      .select("id,content,user_id,created_at")
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-    return ((data ?? []) as ContactInquiryRow[])
-      .map(mapContactInquiryRow)
-      .filter((inquiry): inquiry is ContactInquiry => inquiry !== null);
+  async function fetchContactPosts() {
+    const response = await fetch("/api/contact/posts", {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      posts?: ContactPostSummary[];
+      error?: string;
+      setupRequired?: boolean;
+    };
+    if (payload.setupRequired) {
+      setContactBoardSetupRequired(true);
+      return [];
+    }
+      if (!response.ok) {
+      setContactBoardSetupRequired(true);
+      return [];
+    }
+    setContactBoardSetupRequired(false);
+    return Array.isArray(payload.posts) ? payload.posts : [];
   }
 
   async function fetchUsagePosts(categoryKey: UsageBoardCategoryKey) {
@@ -2093,47 +2038,34 @@ export default function Page() {
   useEffect(() => {
     let cancelled = false;
 
-    async function loadContactInquiries() {
-      if (tab !== "mypage") return;
-      if (process.env.NODE_ENV !== "production" && !userId) {
-        if (!cancelled) {
-          setContactInquiries(loadLocalContactInquiries().sort((a, b) => b.createdAt - a.createdAt));
-        }
-        return;
-      }
+    async function loadContactPosts() {
+      if (tab !== "contact") return;
 
-      if (!isMasterUser) {
-        if (!cancelled) {
-          setContactInquiries([]);
-        }
-        return;
-      }
-
-      setLoadingContactInquiries(true);
+      setLoadingContactPosts(true);
       try {
-        const inquiries = await fetchContactInquiries();
+        const posts = await fetchContactPosts();
         if (!cancelled) {
-          setContactInquiries(inquiries);
+          setContactPosts(posts);
         }
       } catch (error) {
-        console.error(error);
+        console.warn(error);
         if (!cancelled) {
-          setContactInquiries([]);
-          showToast("문의 불러오기 실패");
+          setContactPosts([]);
+          setContactBoardSetupRequired(true);
         }
       } finally {
         if (!cancelled) {
-          setLoadingContactInquiries(false);
+          setLoadingContactPosts(false);
         }
       }
     }
 
-    void loadContactInquiries();
+    void loadContactPosts();
 
     return () => {
       cancelled = true;
     };
-  }, [isMasterUser, tab, userId]);
+  }, [tab, userId, isMasterUser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -4339,97 +4271,107 @@ export default function Page() {
     }
   }
 
-  async function submitContactInquiry(payload: { content: string }) {
-    const trimmedContent = payload.content.trim();
-
-    if (!trimmedContent) {
-      showToast("문의 내용을 입력해줘");
-      return false;
-    }
-
-    if (process.env.NODE_ENV !== "production" && !userId) {
-      const nextInquiry: ContactInquiry = {
-        id: createLocalTipId(),
-        content: trimmedContent,
-        userId: null,
-        createdAt: Date.now(),
-        source: "local",
-      };
-
-      const nextInquiries = [nextInquiry, ...loadLocalContactInquiries()];
-      saveLocalContactInquiries(nextInquiries);
-      setContactInquiries((prev) => [nextInquiry, ...prev]);
-      showToast("로컬 문의 저장 완료");
-      return true;
-    }
-
+  async function createContactPost(payload: {
+    title: string;
+    content: string;
+    visibility: ContactPostVisibility;
+    password: string;
+  }) {
     try {
-      const currentUserId = userId ? await getCurrentUserId() : null;
-      const insertPayload = {
-        content: trimmedContent,
-        user_id: currentUserId,
+      const response = await fetch("/api/contact/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        post?: ContactPostSummary;
+        error?: string;
       };
-
-      if (isMasterUser) {
-        const { data, error } = await supabase
-          .from(CONTACT_INQUIRIES_TABLE)
-          .insert(insertPayload)
-          .select("id,content,user_id,created_at")
-          .single();
-
-        if (error) throw error;
-
-        const inserted = mapContactInquiryRow(data as ContactInquiryRow);
-        if (!inserted) throw new Error("Invalid contact inquiry row");
-        setContactInquiries((prev) => [inserted, ...prev]);
-      } else {
-        const { error } = await supabase.from(CONTACT_INQUIRIES_TABLE).insert(insertPayload);
-        if (error) throw error;
+      if (!response.ok || !data.post) {
+        throw new Error(data.error ?? "문의 등록에 실패했습니다.");
       }
 
-      showToast("문의 전송 완료");
+      setContactPosts((prev) => [data.post!, ...prev]);
+      showToast("문의 등록 완료");
       return true;
     } catch (error) {
       console.error(error);
-      showToast("문의 전송 실패");
+      showToast(error instanceof Error ? error.message : "문의 등록 실패");
       return false;
     }
   }
 
-  async function deleteContactInquiry(id: string) {
-    if (process.env.NODE_ENV !== "production" && !userId) {
-      const nextInquiries = loadLocalContactInquiries().filter((inquiry) => inquiry.id !== id);
-      saveLocalContactInquiries(nextInquiries);
-      setContactInquiries((prev) => prev.filter((inquiry) => inquiry.id !== id));
-      showToast("로컬 문의 삭제 완료");
-      return true;
-    }
-
-    if (!isMasterUser) {
-      showToast("마스터 계정만 삭제 가능");
-      return false;
-    }
-
-    const currentUserId = await getCurrentUserId();
-    if (!currentUserId) {
-      showToast("로그인 후 삭제 가능");
-      return false;
-    }
-
+  async function openContactPost(id: string, password?: string) {
     try {
-      const { error } = await supabase
-        .from(CONTACT_INQUIRIES_TABLE)
-        .delete()
-        .eq("id", id);
+      const response = await fetch(`/api/contact/posts/${id}/open`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ password: password ?? "" }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        post?: ContactPostDetail;
+        error?: string;
+      };
+      if (!response.ok || !data.post) {
+        throw new Error(data.error ?? "문의 글을 열지 못했습니다.");
+      }
+      return data.post;
+    } catch (error) {
+      console.error(error);
+      showToast(error instanceof Error ? error.message : "문의 글 열기 실패");
+      return null;
+    }
+  }
 
-      if (error) throw error;
+  async function updateContactPost(
+    id: string,
+    payload: {
+      replyContent?: string;
+      visibility?: ContactPostVisibility;
+      status?: ContactPostStatus;
+    }
+  ) {
+    try {
+      const response = await fetch(`/api/contact/posts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        post?: ContactPostDetail;
+        error?: string;
+      };
+      if (!response.ok || !data.post) {
+        throw new Error(data.error ?? "문의 글 수정에 실패했습니다.");
+      }
 
-      setContactInquiries((prev) => prev.filter((inquiry) => inquiry.id !== id));
-      showToast("문의 삭제 완료");
+      setContactPosts((prev) => prev.map((post) => (post.id === id ? data.post! : post)));
+      showToast("문의 글 수정 완료");
+      return data.post;
+    } catch (error) {
+      console.error(error);
+      showToast(error instanceof Error ? error.message : "문의 글 수정 실패");
+      return null;
+    }
+  }
+
+  async function deleteContactPost(id: string) {
+    try {
+      const response = await fetch(`/api/contact/posts/${id}`, {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) {
+        throw new Error(data.error ?? "문의 글 삭제에 실패했습니다.");
+      }
+
+      setContactPosts((prev) => prev.filter((post) => post.id !== id));
+      showToast("문의 글 삭제 완료");
       return true;
     } catch (error) {
       console.error(error);
-      showToast("문의 삭제 실패");
+      showToast(error instanceof Error ? error.message : "문의 글 삭제 실패");
       return false;
     }
   }
@@ -4862,6 +4804,7 @@ export default function Page() {
             <SettingsTab
               nikkes={nikkes}
               selectedNames={selectedNames}
+              selectedNamesReady={selectedNamesReady}
               toggleSelect={toggleSelect}
               setSelectedNames={setSelectedNames}
               favoriteNames={favoriteNames}
@@ -4970,7 +4913,16 @@ export default function Page() {
 
         {tab === "contact" && (
           <div className="mx-auto w-full lg:max-w-6xl">
-            <ContactTab onSubmitInquiry={submitContactInquiry} />
+            <ContactTab
+              posts={contactPosts}
+              loading={loadingContactPosts}
+              isMaster={isMaster}
+              setupRequired={contactBoardSetupRequired}
+              onCreatePost={createContactPost}
+              onOpenPost={openContactPost}
+              onUpdatePost={updateContactPost}
+              onDeletePost={deleteContactPost}
+            />
           </div>
         )}
 
@@ -5000,10 +4952,7 @@ export default function Page() {
             onRestartSoloRaid={restartSoloRaid}
             recommendedVideoUrl={recommendedVideoUrl}
             onSaveRecommendedVideo={saveRecommendedVideo}
-            inquiries={contactInquiries}
-            loadingInquiries={loadingContactInquiries}
             showInquirySection={canManageBosses}
-            onDeleteInquiry={deleteContactInquiry}
             fmt={fmt}
             scoreDisplayMode={scoreDisplayMode}
             onScoreDisplayModeChange={updateScoreDisplayMode}

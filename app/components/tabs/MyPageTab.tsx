@@ -34,13 +34,6 @@ type FilterOption = {
   readonly v: string;
   readonly label: string;
 };
-type ContactInquiry = {
-  id: string;
-  content: string;
-  userId: string | null;
-  createdAt: number;
-  source: "remote" | "local";
-};
 type NikkeRow = {
   id: string;
   name: string;
@@ -100,10 +93,7 @@ type MyPageTabProps = {
   onRestartSoloRaid: () => Promise<boolean>;
   recommendedVideoUrl: string;
   onSaveRecommendedVideo: (url: string) => Promise<boolean>;
-  inquiries: ContactInquiry[];
-  loadingInquiries: boolean;
   showInquirySection: boolean;
-  onDeleteInquiry: (id: string) => Promise<boolean>;
   fmt: (value: number) => string;
   scoreDisplayMode: ScoreDisplayMode;
   onScoreDisplayModeChange: (mode: ScoreDisplayMode) => void;
@@ -159,10 +149,7 @@ export default function MyPageTab({
   onRestartSoloRaid,
   recommendedVideoUrl,
   onSaveRecommendedVideo,
-  inquiries,
-  loadingInquiries,
   showInquirySection,
-  onDeleteInquiry,
   fmt,
   scoreDisplayMode,
   onScoreDisplayModeChange,
@@ -190,19 +177,6 @@ export default function MyPageTab({
   const [recFilterElements, setRecFilterElements] = useState<Set<string>>(new Set());
   const [recListFilterBursts, setRecListFilterBursts] = useState<Set<number>>(new Set());
   const [recListFilterElements, setRecListFilterElements] = useState<Set<string>>(new Set());
-  const [deletingInquiryId, setDeletingInquiryId] = useState<string | null>(null);
-  const inquiryDateFormatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat("ko-KR", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    []
-  );
-
   const [nikkeName, setNikkeName] = useState("");
   const [nikkeBurst, setNikkeBurst] = useState<number | null>(null);
   const [nikkeElement, setNikkeElement] = useState<NikkeElementValue>(null);
@@ -490,17 +464,6 @@ export default function MyPageTab({
         <div className="mt-1 h-[2.4em] overflow-hidden break-words text-xs font-medium leading-tight">{displayName}</div>
       </div>
     );
-  }
-
-  async function handleDeleteInquiry(id: string) {
-    if (deletingInquiryId) return;
-
-    setDeletingInquiryId(id);
-    try {
-      await onDeleteInquiry(id);
-    } finally {
-      setDeletingInquiryId(null);
-    }
   }
 
   return (
@@ -1296,42 +1259,8 @@ export default function MyPageTab({
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">문의</h2>
-              <div className="mt-1 text-sm text-neutral-400">하단 문의하기 탭에서 보낸 메시지입니다.</div>
+              <div className="mt-1 text-sm text-neutral-400">문의하기 탭의 게시판에서 답글, 공개 여부, 해결 상태를 관리합니다.</div>
             </div>
-            <div className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">{inquiries.length}개</div>
-          </div>
-
-          <div className="mt-3 space-y-3">
-            {loadingInquiries ? (
-              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
-                문의 불러오는 중...
-              </div>
-            ) : inquiries.length === 0 ? (
-              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
-                아직 들어온 문의가 없습니다.
-              </div>
-            ) : (
-              inquiries.map((inquiry) => (
-                <article key={inquiry.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="text-xs text-neutral-400">
-                      {inquiryDateFormatter.format(new Date(inquiry.createdAt))}
-                      {inquiry.userId ? " · 로그인 사용자" : " · 익명"}
-                      {inquiry.source === "local" ? " · 로컬 테스트" : ""}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteInquiry(inquiry.id)}
-                      disabled={deletingInquiryId === inquiry.id}
-                      className="shrink-0 rounded-xl border border-red-800/70 px-3 py-1 text-xs text-red-300 active:scale-[0.99] disabled:opacity-50"
-                    >
-                      {deletingInquiryId === inquiry.id ? "삭제 중..." : "삭제"}
-                    </button>
-                  </div>
-                  <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-200">{inquiry.content}</div>
-                </article>
-              ))
-            )}
           </div>
         </section>
       ) : null}

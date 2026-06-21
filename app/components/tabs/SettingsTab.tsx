@@ -24,6 +24,7 @@ type FilterOption = {
 type SettingsTabProps = {
   nikkes: NikkeRow[];
   selectedNames: string[];
+  selectedNamesReady: boolean;
   toggleSelect: (name: string) => void;
   setSelectedNames: React.Dispatch<React.SetStateAction<string[]>>;
   favoriteNames: Set<string>;
@@ -179,6 +180,7 @@ function NikkeSection({ title, open, onToggle, children }: NikkeSectionProps) {
 export default function SettingsTab({
   nikkes,
   selectedNames,
+  selectedNamesReady,
   toggleSelect,
   setSelectedNames,
   favoriteNames,
@@ -265,7 +267,7 @@ export default function SettingsTab({
     <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold">사용할 니케 선택</h2>
-        <div className="text-xs text-neutral-400">{selectedNames.length}개 선택됨</div>
+        <div className="text-xs text-neutral-400">{selectedNamesReady ? `${selectedNames.length}개 선택됨` : ""}</div>
       </div>
 
       <div className="mt-3 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1.35fr)_300px] lg:items-start lg:gap-3">
