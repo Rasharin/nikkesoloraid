@@ -43,7 +43,7 @@ const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
 function statusClass(status: ContactPostStatus) {
   return status === "resolved"
     ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200"
-    : "border-amber-500/50 bg-amber-500/10 text-amber-200";
+    : "border-amber-500/50 bg-amber-500/10 text-amber-200 light:text-black";
 }
 
 function ContactTab({
@@ -157,15 +157,13 @@ function ContactTab({
       <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">문의 게시판</h2>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowWriteForm((prev) => !prev)}
-              className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99]"
-            >
-              {showWriteForm ? "닫기" : "문의하기"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowWriteForm((prev) => !prev)}
+            className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99]"
+          >
+            {showWriteForm ? "닫기" : "문의하기"}
+          </button>
         </div>
 
         {showWriteForm ? (
@@ -256,7 +254,7 @@ function ContactTab({
                         </span>
                         {post.hasReply ? (
                           <span className="rounded-full border border-sky-500/50 bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-200">
-                            답글
+                            답변완료
                           </span>
                         ) : null}
                       </div>
@@ -317,7 +315,7 @@ function ContactTab({
                               <div className="flex flex-wrap gap-2">
                                 <button
                                   type="button"
-                                  onClick={() => void handleUpdate(post, { replyContent: replyDrafts[post.id] ?? "" })}
+                                  onClick={() => void handleUpdate(post, { replyContent: replyDrafts[post.id] ?? "", status: "resolved" })}
                                   disabled={busyPostId === post.id}
                                   className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99] disabled:opacity-50"
                                 >
