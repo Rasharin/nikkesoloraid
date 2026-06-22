@@ -24,6 +24,7 @@ type DeckBuilderSectionProps = {
   onScoreChange: (value: string) => void;
   onRemoveFromDraft: (index: number) => void;
   onSaveDeck: () => void;
+  onCopyDeck?: () => void;
   onClearDraft: () => void;
   onDeleteDeck?: () => void;
   onSaveAllDecks?: () => void;
@@ -50,6 +51,7 @@ function DeckBuilderSectionComponent({
   onScoreChange,
   onRemoveFromDraft,
   onSaveDeck,
+  onCopyDeck,
   onClearDraft,
   onDeleteDeck,
   onSaveAllDecks,
@@ -115,19 +117,28 @@ function DeckBuilderSectionComponent({
           ) : null}
         </div>
 
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-nowrap gap-1.5">
           <button
             type="button"
             onClick={onSaveDeck}
-            className="deck-save-button flex-1 rounded-xl border border-transparent bg-white px-4 py-1.5 text-sm font-semibold text-neutral-900 transition hover:bg-neutral-200 active:scale-[0.99] dark:border-transparent"
+            className="deck-save-button min-w-0 flex-[1.2] whitespace-nowrap rounded-xl border border-transparent bg-white px-2 py-1.5 text-xs font-semibold text-neutral-900 transition hover:bg-neutral-200 active:scale-[0.99] dark:border-transparent sm:text-sm"
           >
             덱 저장
           </button>
+          {onCopyDeck ? (
+            <button
+              type="button"
+              onClick={onCopyDeck}
+              className="min-w-0 whitespace-nowrap rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-2 py-1.5 text-xs font-semibold text-[var(--text)] transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99] sm:text-sm"
+            >
+              복사
+            </button>
+          ) : null}
           {onToggleSelected ? (
             <button
               type="button"
               onClick={onToggleSelected}
-              className={`rounded-xl border px-4 py-1.5 text-sm font-semibold transition active:scale-[0.99] ${
+              className={`min-w-0 whitespace-nowrap rounded-xl border px-2 py-1.5 text-xs font-semibold transition active:scale-[0.99] sm:text-sm ${
                 selected
                   ? "border-yellow-500/60 bg-yellow-400/20 text-[var(--text)]"
                   : "border-[var(--border)] text-[var(--text)] hover:border-[var(--theme-border-strong)]"
@@ -140,7 +151,7 @@ function DeckBuilderSectionComponent({
           <button
             type="button"
             onClick={onClearDraft}
-            className="rounded-xl border border-[var(--border)] px-4 py-1.5 text-sm text-[var(--text)] transition hover:border-[var(--theme-border-strong)] hover:bg-[var(--card)] active:scale-[0.99]"
+            className="min-w-0 whitespace-nowrap rounded-xl border border-[var(--border)] px-2 py-1.5 text-xs text-[var(--text)] transition hover:border-[var(--theme-border-strong)] hover:bg-[var(--card)] active:scale-[0.99] sm:text-sm"
           >
             비우기
           </button>
@@ -148,7 +159,7 @@ function DeckBuilderSectionComponent({
             <button
               type="button"
               onClick={onDeleteDeck}
-              className="rounded-xl border border-red-500/40 px-4 py-1.5 text-sm text-[var(--text)] transition hover:border-red-400 hover:bg-red-500/15 active:scale-[0.99]"
+              className="min-w-0 whitespace-nowrap rounded-xl border border-red-500/40 px-2 py-1.5 text-xs text-[var(--text)] transition hover:border-red-400 hover:bg-red-500/15 active:scale-[0.99] sm:text-sm"
             >
               삭제
             </button>

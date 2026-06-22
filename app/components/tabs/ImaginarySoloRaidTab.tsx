@@ -19,8 +19,8 @@ import {
 import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { buildCopiedRecommendedDeckDrafts, copyDeckDraftAfterIndex } from "../../../lib/deck-building-copy";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
-import { buildDeckKey } from "../../../lib/recommend";
 import { formatPlainScoreText, formatScore, parseScoreInput, type ScoreDisplayMode } from "../../../lib/score-format";
 import DeckBuilderSection, {
   getDroppedDeckSlotTarget,
@@ -1104,6 +1104,11 @@ export default function ImaginarySoloRaidTab({
     scoreRefs.current.splice(deckIndex, 1);
   }
 
+  function copyDeckDraft(deckIndex: number) {
+    setActiveDeckDrafts((prev) => copyDeckDraftAfterIndex(prev, deckIndex));
+    onShowToast("덱 복사 완료");
+  }
+
   function toggleDeckDraftSelected(deckId: number) {
     setSelectedDeckDraftIds((prev) => {
       const next = new Set(prev);
@@ -1357,30 +1362,40 @@ export default function ImaginarySoloRaidTab({
     }
 
     setActiveDeckDrafts((prev) => {
-      const existingDeckKeys = new Set(
-        prev
-          .map((deck) => {
-            const chars = deck.draft.filter((slot): slot is string => typeof slot === "string" && slot.trim().length > 0);
-            return chars.length === MAX_DECK_CHARS ? buildDeckKey(chars) : null;
-          })
-          .filter((key): key is string => key !== null)
-      );
-      const filteredRecommendedDecks = recommendedDecks.filter((deck) => !existingDeckKeys.has(buildDeckKey(deck.chars)));
-      if (filteredRecommendedDecks.length === 0) return prev;
-
-      const maxId = prev.reduce((currentMax, deck) => Math.max(currentMax, deck.id), 0);
-      const copiedDecks = filteredRecommendedDecks.map((deck, index) => ({
-          id: maxId + index + 1,
-          draft: normalizeDraftSlots(deck.chars, MAX_DECK_CHARS),
-          score: displayScore(deck.score),
-          note: deck.note ?? "",
-          editingId: null,
-      }));
-
-      return [...copiedDecks, ...prev];
+      return buildCopiedRecommendedDeckDrafts({
+        existingDrafts: prev,
+        recommendedDecks: recommendedDecks.map((deck) => ({
+          chars: deck.chars,
+          scoreText: displayScore(deck.score),
+          note: deck.note,
+        })),
+        maxDecks: DECK_DRAFT_COUNT,
+        deckSize: MAX_DECK_CHARS,
+      });
     });
     setDeckOpen(true);
     onShowToast("복사 완료");
+  }
+
+  function copyRecommendedDeckToBuilder(deck: Deck) {
+    const nextDeckDrafts = buildCopiedRecommendedDeckDrafts({
+      existingDrafts: deckDrafts,
+      recommendedDecks: [
+        {
+          chars: deck.chars,
+          scoreText: displayScore(deck.score),
+          note: deck.note,
+        },
+      ],
+      maxDecks: 1,
+      deckSize: MAX_DECK_CHARS,
+    });
+    const copied = nextDeckDrafts !== deckDrafts;
+    if (copied) {
+      setActiveDeckDrafts(() => nextDeckDrafts);
+    }
+    setDeckOpen(true);
+    onShowToast(copied ? "추천 덱 복사 완료" : "이미 덱 만들기에 있는 덱이야");
   }
 
   function renderRecommendedDeckCard(deck: Deck) {
@@ -1412,7 +1427,7 @@ export default function ImaginarySoloRaidTab({
           </div>
         </SortableContext>
 
-        <div className="mt-2 flex items-end gap-2">
+        <div className="mt-2 flex items-end gap-1.5">
           <textarea
             value={noteText}
             onFocus={() => {
@@ -1438,6 +1453,13 @@ export default function ImaginarySoloRaidTab({
             className="min-h-8 min-w-0 flex-1 resize-none overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950/40 px-2 py-1.5 text-xs text-neutral-200 outline-none transition placeholder:text-neutral-600 focus:border-neutral-600 focus:bg-neutral-950/70"
             title={noteText || "메모 수정"}
           />
+          <button
+            type="button"
+            onClick={() => copyRecommendedDeckToBuilder(deck)}
+            className="min-h-8 shrink-0 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1.5 text-xs font-semibold text-[var(--text)] transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
+          >
+            복사
+          </button>
           {editingRecommendedDeckId === deck.id ? (
             <input
               autoFocus
@@ -1573,6 +1595,7 @@ export default function ImaginarySoloRaidTab({
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-sm font-semibold">메모장</h3>
                     <button
+                      type="button"
                       onClick={clearDeckMemo}
                       className="rounded-xl border border-neutral-700 px-2 py-1 text-xs transition hover:border-neutral-500 hover:bg-neutral-800/40 active:scale-[0.99]"
                     >
@@ -2194,6 +2217,7 @@ export default function ImaginarySoloRaidTab({
                       onScoreChange={(value) => updateDeckScore(deckIndex, value)}
                       onRemoveFromDraft={(slotIndex) => removeFromDraft(deckIndex, slotIndex)}
                       onSaveDeck={() => void handleSaveDeck(deckIndex)}
+                      onCopyDeck={() => copyDeckDraft(deckIndex)}
                       onClearDraft={() => clearDraft(deckIndex)}
                       onDeleteDeck={() => removeDeckDraft(deckIndex)}
                       selected={selectedDeckDraftIds.has(deck.id)}
