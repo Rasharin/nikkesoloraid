@@ -147,6 +147,9 @@ type NoticePostsCache = {
   rows: NoticePostRow[];
   cachedAt: number;
 };
+type ContactPostsCache = {
+  postsByCacheKey: Record<string, { posts: ContactPostSummary[]; cachedAt: number }>;
+};
 type CommunityRaidDecksCache = {
   decksByRaidKey: Record<string, { decks: Deck[]; cachedAt: number }>;
 };
@@ -304,7 +307,9 @@ const APP_CONFIG_CACHE_KEY = "soloraid_app_config_cache_v1";
 const APP_CONFIG_CACHE_TTL = 1000 * 60;
 const USAGE_POSTS_CACHE_KEY = "soloraid_usage_posts_cache_v1";
 const BOARD_POSTS_CACHE_TTL = 1000 * 60 * 10;
-const CONTACT_POSTS_CACHE_TTL = 1000 * 30;
+const CONTACT_POSTS_CACHE_KEY = "soloraid_contact_posts_cache_v1";
+const CONTACT_POSTS_MEMORY_CACHE_TTL = 1000 * 30;
+const CONTACT_POSTS_CACHE_TTL = 1000 * 60 * 5;
 const NOTICE_POSTS_CACHE_KEY = "soloraid_notice_posts_cache_v1";
 const COMMUNITY_RAID_DECKS_CACHE_KEY = "soloraid_community_raid_decks_cache_v1";
 const COMMUNITY_RAID_DECKS_CACHE_TTL = 1000 * 60 * 5;
@@ -672,6 +677,66 @@ function removeCachedNoticePosts() {
 
   try {
     localStorage.removeItem(NOTICE_POSTS_CACHE_KEY);
+  } catch {}
+}
+
+function readRawContactPostsCache(): ContactPostsCache {
+  if (typeof window === "undefined") return { postsByCacheKey: {} };
+
+  try {
+    const raw = localStorage.getItem(CONTACT_POSTS_CACHE_KEY);
+    if (!raw) return { postsByCacheKey: {} };
+    const parsed = JSON.parse(raw) as Partial<ContactPostsCache>;
+    return parsed.postsByCacheKey && typeof parsed.postsByCacheKey === "object"
+      ? { postsByCacheKey: parsed.postsByCacheKey }
+      : { postsByCacheKey: {} };
+  } catch {
+    return { postsByCacheKey: {} };
+  }
+}
+
+function mapCachedContactPostSummary(value: unknown): ContactPostSummary | null {
+  if (!value || typeof value !== "object") return null;
+  const row = value as Partial<ContactPostSummary>;
+  if (typeof row.id !== "string" || !row.id.trim()) return null;
+  const visibility: ContactPostVisibility = row.visibility === "public" ? "public" : "private";
+  const status: ContactPostStatus = row.status === "resolved" ? "resolved" : "received";
+  const createdAt = typeof row.createdAt === "number" && Number.isFinite(row.createdAt) ? row.createdAt : Date.now();
+  const updatedAt = typeof row.updatedAt === "number" && Number.isFinite(row.updatedAt) ? row.updatedAt : createdAt;
+
+  return {
+    id: row.id,
+    title: typeof row.title === "string" && row.title.trim() ? row.title : "제목 없음",
+    visibility,
+    status,
+    createdAt,
+    updatedAt,
+    userId: typeof row.userId === "string" ? row.userId : null,
+    hasReply: Boolean(row.hasReply),
+    canOpen: Boolean(row.canOpen),
+  };
+}
+
+function readCachedContactPosts(cacheKey: string): ContactPostSummary[] | null {
+  if (typeof window === "undefined" || !cacheKey) return null;
+
+  const entry = readRawContactPostsCache().postsByCacheKey[cacheKey];
+  if (!entry || !entry.cachedAt || Date.now() - entry.cachedAt > CONTACT_POSTS_CACHE_TTL) return null;
+  if (!Array.isArray(entry.posts)) return null;
+
+  return entry.posts.map(mapCachedContactPostSummary).filter((post): post is ContactPostSummary => post !== null);
+}
+
+function writeCachedContactPosts(cacheKey: string, posts: readonly ContactPostSummary[]) {
+  if (typeof window === "undefined" || !cacheKey) return;
+
+  try {
+    const cache = readRawContactPostsCache();
+    cache.postsByCacheKey[cacheKey] = {
+      posts: [...posts],
+      cachedAt: Date.now(),
+    };
+    localStorage.setItem(CONTACT_POSTS_CACHE_KEY, JSON.stringify(cache));
   } catch {}
 }
 
@@ -1368,6 +1433,7 @@ export default function Page() {
   const [loadingSoloRaidTips, setLoadingSoloRaidTips] = useState(false);
   const [contactPosts, setContactPosts] = useState<ContactPostSummary[]>([]);
   const [loadingContactPosts, setLoadingContactPosts] = useState(false);
+  const [refreshingContactPosts, setRefreshingContactPosts] = useState(false);
   const [contactPostsLoadedAt, setContactPostsLoadedAt] = useState(0);
   const [contactPostsLoadedFor, setContactPostsLoadedFor] = useState("");
   const [contactBoardSetupRequired, setContactBoardSetupRequired] = useState(false);
@@ -2047,11 +2113,27 @@ export default function Page() {
       const hasFreshPosts =
         contactPostsLoadedFor === contactPostsCacheKey &&
         contactPostsLoadedAt > 0 &&
-        Date.now() - contactPostsLoadedAt < CONTACT_POSTS_CACHE_TTL;
+        Date.now() - contactPostsLoadedAt < CONTACT_POSTS_MEMORY_CACHE_TTL;
       if (hasFreshPosts) return;
 
-      if (contactPosts.length === 0) {
+      const cachedPosts = readCachedContactPosts(contactPostsCacheKey);
+      const canUseCachedPosts = cachedPosts !== null;
+      const hasPostsForCurrentCache = contactPostsLoadedFor === contactPostsCacheKey;
+      if (canUseCachedPosts && !hasPostsForCurrentCache) {
+        setContactPosts(cachedPosts);
+        setContactPostsLoadedAt(0);
+        setContactPostsLoadedFor(contactPostsCacheKey);
+      } else if (!canUseCachedPosts && !hasPostsForCurrentCache) {
+        setContactPosts([]);
+        setContactPostsLoadedAt(0);
+        setContactPostsLoadedFor("");
+      }
+
+      const hasVisiblePosts = canUseCachedPosts || (hasPostsForCurrentCache && contactPosts.length > 0);
+      if (!hasVisiblePosts) {
         setLoadingContactPosts(true);
+      } else {
+        setRefreshingContactPosts(true);
       }
       try {
         const posts = await fetchContactPosts();
@@ -2059,11 +2141,12 @@ export default function Page() {
           setContactPosts(posts);
           setContactPostsLoadedAt(Date.now());
           setContactPostsLoadedFor(contactPostsCacheKey);
+          writeCachedContactPosts(contactPostsCacheKey, posts);
         }
       } catch (error) {
         console.warn(error);
         if (!cancelled) {
-          if (contactPosts.length === 0) {
+          if (!hasVisiblePosts) {
             setContactPosts([]);
           }
           setContactBoardSetupRequired(true);
@@ -2071,6 +2154,7 @@ export default function Page() {
       } finally {
         if (!cancelled) {
           setLoadingContactPosts(false);
+          setRefreshingContactPosts(false);
         }
       }
     }
@@ -4306,7 +4390,11 @@ export default function Page() {
         throw new Error(data.error ?? "문의 등록에 실패했습니다.");
       }
 
-      setContactPosts((prev) => [data.post!, ...prev]);
+      setContactPosts((prev) => {
+        const nextPosts = [data.post!, ...prev.filter((post) => post.id !== data.post!.id)];
+        writeCachedContactPosts(contactPostsCacheKey, nextPosts);
+        return nextPosts;
+      });
       setContactPostsLoadedAt(Date.now());
       setContactPostsLoadedFor(contactPostsCacheKey);
       showToast("문의 등록 완료");
@@ -4362,7 +4450,11 @@ export default function Page() {
         throw new Error(data.error ?? "문의 글 수정에 실패했습니다.");
       }
 
-      setContactPosts((prev) => prev.map((post) => (post.id === id ? data.post! : post)));
+      setContactPosts((prev) => {
+        const nextPosts = prev.map((post) => (post.id === id ? data.post! : post));
+        writeCachedContactPosts(contactPostsCacheKey, nextPosts);
+        return nextPosts;
+      });
       setContactPostsLoadedAt(Date.now());
       setContactPostsLoadedFor(contactPostsCacheKey);
       showToast("문의 글 수정 완료");
@@ -4385,7 +4477,11 @@ export default function Page() {
         throw new Error(data.error ?? "문의 글 삭제에 실패했습니다.");
       }
 
-      setContactPosts((prev) => prev.filter((post) => post.id !== id));
+      setContactPosts((prev) => {
+        const nextPosts = prev.filter((post) => post.id !== id);
+        writeCachedContactPosts(contactPostsCacheKey, nextPosts);
+        return nextPosts;
+      });
       setContactPostsLoadedAt(Date.now());
       setContactPostsLoadedFor(contactPostsCacheKey);
       showToast("문의 글 삭제 완료");
@@ -4937,6 +5033,7 @@ export default function Page() {
             <ContactTab
               posts={contactPosts}
               loading={loadingContactPosts}
+              refreshing={refreshingContactPosts}
               isMaster={isMaster}
               setupRequired={contactBoardSetupRequired}
               onCreatePost={createContactPost}

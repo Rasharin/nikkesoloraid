@@ -13,6 +13,7 @@ import {
 type ContactTabProps = {
   posts: ContactPostSummary[];
   loading: boolean;
+  refreshing?: boolean;
   isMaster: boolean;
   setupRequired: boolean;
   onCreatePost: (payload: {
@@ -49,6 +50,7 @@ function statusClass(status: ContactPostStatus) {
 function ContactTab({
   posts,
   loading,
+  refreshing = false,
   isMaster,
   setupRequired,
   onCreatePost,
@@ -157,13 +159,16 @@ function ContactTab({
       <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">문의 게시판</h2>
-          <button
-            type="button"
-            onClick={() => setShowWriteForm((prev) => !prev)}
-            className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99]"
-          >
-            {showWriteForm ? "닫기" : "문의하기"}
-          </button>
+          <div className="flex items-center gap-3">
+            {refreshing && !loading ? <span className="text-xs text-neutral-500">새로고침 중...</span> : null}
+            <button
+              type="button"
+              onClick={() => setShowWriteForm((prev) => !prev)}
+              className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm active:scale-[0.99]"
+            >
+              {showWriteForm ? "닫기" : "문의하기"}
+            </button>
+          </div>
         </div>
 
         {showWriteForm ? (

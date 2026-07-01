@@ -15,6 +15,9 @@ export const runtime = "nodejs";
 const CONTACT_POST_COLUMNS =
   "id,title,content,visibility,status,password_hash,user_id,reply_content,replied_by,replied_at,created_at,updated_at";
 const CONTACT_POST_SUMMARY_COLUMNS = "id,title,visibility,status,user_id,reply_content,created_at,updated_at";
+const CONTACT_POSTS_CACHE_HEADERS = {
+  "Cache-Control": "private, max-age=30, stale-while-revalidate=120",
+};
 
 function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -45,7 +48,7 @@ export async function GET() {
   const userId = await getOptionalUserId(env);
 
   try {
-    const master = await isMasterUser(admin, userId);
+    const master = userId ? await isMasterUser(admin, userId) : false;
     const { data, error } = await admin
       .from("contact_posts")
       .select(CONTACT_POST_SUMMARY_COLUMNS)
@@ -55,14 +58,17 @@ export async function GET() {
     if (error) throw error;
 
     const posts = ((data ?? []) as ContactPostRow[]).map((row) => mapContactPostSummary(row, userId, master));
-    return NextResponse.json({ posts, isMaster: master });
+    return NextResponse.json({ posts, isMaster: master }, { headers: CONTACT_POSTS_CACHE_HEADERS });
   } catch (error) {
     if (isMissingContactPostsError(error)) {
-      return NextResponse.json({
-        posts: [],
-        isMaster: false,
-        setupRequired: true,
-      });
+      return NextResponse.json(
+        {
+          posts: [],
+          isMaster: false,
+          setupRequired: true,
+        },
+        { headers: CONTACT_POSTS_CACHE_HEADERS }
+      );
     }
 
     console.warn("[contact/posts] list failed", error);
