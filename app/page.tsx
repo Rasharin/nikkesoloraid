@@ -1376,7 +1376,8 @@ export default function Page() {
   const pathname = usePathname();
   const router = useRouter();
   const pathnameRef = useRef(pathname);
-  pathnameRef.current = pathname;
+  const [currentPath, setCurrentPath] = useState(pathname);
+  pathnameRef.current = currentPath;
   const [tab, setTab] = useState<TabKey>(() => PATH_TAB_MAP[pathname] ?? "home");
   const [usageBoardTab, setUsageBoardTab] = useState<UsageBoardCategoryKey>("home");
   const [deckTabs, setDeckTabs] = useState<DeckTabItem[]>(DEFAULT_DECK_TABS);
@@ -1458,10 +1459,10 @@ export default function Page() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredThemeMode());
   const [persistSessionState, setPersistSessionState] = useState<boolean>(() => readStoredPersistSession());
   const contactPostsCacheKey = `${userId ?? "anonymous"}:${isMasterUser ? "master" : "user"}`;
-  const isLicensePage = pathname === "/license";
-  const isNoticePage = pathname === "/notice";
-  const isPrivacyPage = pathname === "/privacy";
-  const isTermsPage = pathname === "/terms";
+  const isLicensePage = currentPath === "/license";
+  const isNoticePage = currentPath === "/notice";
+  const isPrivacyPage = currentPath === "/privacy";
+  const isTermsPage = currentPath === "/terms";
   const isLegalPage = isLicensePage || isNoticePage || isPrivacyPage || isTermsPage;
   const showInitialDataLoading = !isLegalPage && loadingData && nikkes.length === 0 && bosses.length === 0;
   const canAccessCalculator = process.env.NODE_ENV !== "production";
@@ -1469,10 +1470,26 @@ export default function Page() {
 
   useEffect(() => {
     if (!calculatorAccessResolved) return;
-    const pathTab = PATH_TAB_MAP[pathname] ?? "home";
+    const pathTab = PATH_TAB_MAP[currentPath] ?? "home";
     const nextTab = pathTab === "calculator" && !canAccessCalculator ? "home" : pathTab;
     setTab((current) => (current === nextTab ? current : nextTab));
-  }, [calculatorAccessResolved, canAccessCalculator, pathname]);
+  }, [calculatorAccessResolved, canAccessCalculator, currentPath]);
+
+  useEffect(() => {
+    setCurrentPath(pathname);
+  }, [pathname]);
+
+  useEffect(() => {
+    function handlePopState() {
+      const nextPath = window.location.pathname;
+      pathnameRef.current = nextPath;
+      setCurrentPath(nextPath);
+      setTab(PATH_TAB_MAP[nextPath] ?? "home");
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   useEffect(() => {
     const cached = readCachedSupabaseData();
@@ -1486,10 +1503,10 @@ export default function Page() {
 
   useEffect(() => {
     if (!calculatorAccessResolved) return;
-    if (pathname !== "/calculator") return;
+    if (currentPath !== "/calculator") return;
     if (canAccessCalculator) return;
     router.replace("/");
-  }, [calculatorAccessResolved, canAccessCalculator, pathname, router]);
+  }, [calculatorAccessResolved, canAccessCalculator, currentPath, router]);
 
   async function fetchUserDecks(currentUserId: string) {
     const { data, error } = await supabase
@@ -2201,7 +2218,7 @@ export default function Page() {
     let cancelled = false;
 
     async function loadNoticePosts() {
-      if (pathname !== "/notice") return;
+      if (currentPath !== "/notice") return;
 
       setLoadingNoticePosts(true);
       try {
@@ -3026,9 +3043,11 @@ export default function Page() {
     const nextPath = TAB_ROUTE_MAP[nextTab];
     setTab(nextTab);
     if (pathnameRef.current !== nextPath) {
-      router.push(nextPath);
+      window.history.pushState(null, "", nextPath);
+      pathnameRef.current = nextPath;
+      setCurrentPath(nextPath);
     }
-  }, [router]);
+  }, []);
 
   const handleProfileClick = useCallback(() => setTab("mypage"), []);
 

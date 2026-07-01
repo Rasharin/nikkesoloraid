@@ -130,7 +130,10 @@ function HeaderContent({ tab, shouldShowCalculator, onTabChange, onProfileClick 
         <div className="flex flex-col items-start">
           <Link
             href="/"
-            onClick={() => onTabChange("home")}
+            onClick={(event) => {
+              event.preventDefault();
+              onTabChange("home");
+            }}
             className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           >
             <Image src="/logo-nideck.png" alt="니케 솔로레이드 덱 도우미" width={320} height={80} className="h-16 w-auto object-contain lg:h-20" style={{ width: "auto" }} />
