@@ -177,6 +177,9 @@ export default function MyPageTab({
   const [recFilterElements, setRecFilterElements] = useState<Set<string>>(new Set());
   const [recListFilterBursts, setRecListFilterBursts] = useState<Set<number>>(new Set());
   const [recListFilterElements, setRecListFilterElements] = useState<Set<string>>(new Set());
+  const [adminNikkeSearch, setAdminNikkeSearch] = useState("");
+  const [adminNikkeFilterBursts, setAdminNikkeFilterBursts] = useState<Set<number>>(new Set());
+  const [adminNikkeFilterElements, setAdminNikkeFilterElements] = useState<Set<string>>(new Set());
   const [nikkeName, setNikkeName] = useState("");
   const [nikkeBurst, setNikkeBurst] = useState<number | null>(null);
   const [nikkeElement, setNikkeElement] = useState<NikkeElementValue>(null);
@@ -224,6 +227,25 @@ export default function MyPageTab({
       return true;
     });
   }, [recommendedNikkes, recListFilterBursts, recListFilterElements]);
+  const adminFilteredNikkes = useMemo(() => {
+    const query = adminNikkeSearch.trim().toLowerCase();
+
+    return nikkes.filter((nikke) => {
+      if (query) {
+        const matchesName = nikke.name.toLowerCase().includes(query);
+        const matchesAlias = nikke.aliases.some((alias) => alias.toLowerCase().includes(query));
+        if (!matchesName && !matchesAlias) return false;
+      }
+      if (adminNikkeFilterBursts.size > 0) {
+        const burst = nikke.burst ?? -1;
+        if (!adminNikkeFilterBursts.has(burst)) return false;
+      }
+      if (adminNikkeFilterElements.size > 0) {
+        if (!nikke.element || !adminNikkeFilterElements.has(nikke.element)) return false;
+      }
+      return true;
+    });
+  }, [adminNikkeFilterBursts, adminNikkeFilterElements, adminNikkeSearch, nikkes]);
   const bossUserStatsByKey = useMemo(() => new Map(bossUserStats.map((stat) => [stat.raidKey, stat])), [bossUserStats]);
   const displayBossUserStats = useMemo(() => {
     const fromTabs = deckTabs.map((tab) => {
@@ -687,27 +709,92 @@ export default function MyPageTab({
               <div className="text-sm font-medium text-neutral-100">3. 니케 목록 및 수정</div>
               <div className="mt-3 grid gap-3 lg:grid-cols-2">
                 <section className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
-                  <div className="mb-2 text-sm font-semibold text-neutral-100">전체 니케 목록</div>
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-neutral-100">전체 니케 목록</div>
+                    <input
+                      value={adminNikkeSearch}
+                      onChange={(event) => setAdminNikkeSearch(event.target.value)}
+                      placeholder="니케 검색"
+                      className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-sm text-neutral-100 outline-none placeholder:text-neutral-500 focus:border-sky-500/60 sm:w-44"
+                    />
+                  </div>
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {[
+                      { n: 1, label: "I" },
+                      { n: 2, label: "II" },
+                      { n: 3, label: "III" },
+                    ].map((burst) => (
+                      <button
+                        key={burst.n}
+                        type="button"
+                        onClick={() =>
+                          setAdminNikkeFilterBursts((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(burst.n)) next.delete(burst.n); else next.add(burst.n);
+                            return next;
+                          })
+                        }
+                        className={recFilterBtnClass(adminNikkeFilterBursts.has(burst.n))}
+                      >
+                        {burst.label}
+                      </button>
+                    ))}
+                    {elements.map((el) => (
+                      <button
+                        key={el.v}
+                        type="button"
+                        onClick={() =>
+                          setAdminNikkeFilterElements((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(el.v)) next.delete(el.v); else next.add(el.v);
+                            return next;
+                          })
+                        }
+                        className={recFilterBtnClass(adminNikkeFilterElements.has(el.v))}
+                      >
+                        {el.label}
+                      </button>
+                    ))}
+                    {(adminNikkeSearch.trim() || adminNikkeFilterBursts.size > 0 || adminNikkeFilterElements.size > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAdminNikkeSearch("");
+                          setAdminNikkeFilterBursts(new Set());
+                          setAdminNikkeFilterElements(new Set());
+                        }}
+                        className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-[var(--text)] transition hover:border-red-400 hover:bg-red-500/15 active:scale-[0.99]"
+                      >
+                        초기화
+                      </button>
+                    )}
+                  </div>
                   <div className="max-h-[480px] overflow-y-auto pr-1">
-                    <div className="grid grid-cols-5 gap-1.5">
-                      {nikkes.map((nikke) =>
-                        renderAdminNikkeTile(nikke, {
-                          selected: selectedNikkeForEdit?.id === nikke.id,
-                          onClick: () => {
-                            setSelectedNikkeForEdit(nikke);
-                            setEditingNikkeValues({
-                              name: nikke.name,
-                              image_path: nikke.image_path ?? "",
-                              burst: nikke.burst ? String(nikke.burst) : "",
-                              aliases: nikke.aliases.join(", "),
-                              element: nikke.element ?? "",
-                              role: nikke.role ?? "",
-                            });
-                            setEditingNikkeField(null);
-                          },
-                        })
-                      )}
-                    </div>
+                    {adminFilteredNikkes.length === 0 ? (
+                      <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
+                        해당 조건에 맞는 니케가 없습니다.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {adminFilteredNikkes.map((nikke) =>
+                          renderAdminNikkeTile(nikke, {
+                            selected: selectedNikkeForEdit?.id === nikke.id,
+                            onClick: () => {
+                              setSelectedNikkeForEdit(nikke);
+                              setEditingNikkeValues({
+                                name: nikke.name,
+                                image_path: nikke.image_path ?? "",
+                                burst: nikke.burst ? String(nikke.burst) : "",
+                                aliases: nikke.aliases.join(", "),
+                                element: nikke.element ?? "",
+                                role: nikke.role ?? "",
+                              });
+                              setEditingNikkeField(null);
+                            },
+                          })
+                        )}
+                      </div>
+                    )}
                   </div>
                 </section>
 
