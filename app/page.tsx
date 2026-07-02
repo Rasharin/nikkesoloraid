@@ -130,6 +130,7 @@ type AppConfigRow = {
   active_raid_key: string | null;
   solo_raid_active: boolean | null;
   solo_raid_tabs: unknown;
+  nikke_cache_version: string | null;
 };
 type CachedSiteSettingRow = SiteSettingRow & {
   cachedAt: number;
@@ -315,6 +316,7 @@ const COMMUNITY_RAID_DECKS_CACHE_KEY = "soloraid_community_raid_decks_cache_v1";
 const COMMUNITY_RAID_DECKS_CACHE_TTL = 1000 * 60 * 5;
 const USER_DECKS_CACHE_KEY = "soloraid_user_decks_cache_v1";
 const USER_DECKS_CACHE_TTL = 1000 * 60 * 5;
+const NIKKE_CACHE_VERSION_KEY = "soloraid_nikke_cache_version_v1";
 const STORAGE_IMAGE_CACHE_CONTROL_SECONDS = "31536000";
 const THEME_MODE_KEY = "soloraid_theme_mode_v1";
 const PERSIST_SESSION_KEY = "soloraid_persist_session_v1";
@@ -511,6 +513,66 @@ function writeCachedSupabaseData(cache: SupabaseDataCache) {
   } catch {}
 }
 
+function removeCachedSupabaseData() {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.removeItem(SUPABASE_DATA_CACHE_KEY);
+    sessionStorage.removeItem(SUPABASE_DATA_CACHE_KEY);
+  } catch {}
+}
+
+function readStoredNikkeCacheVersion(): string {
+  if (typeof window === "undefined") return "";
+
+  try {
+    return window.localStorage.getItem(NIKKE_CACHE_VERSION_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStoredNikkeCacheVersion(version: string) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(NIKKE_CACHE_VERSION_KEY, version);
+  } catch {}
+}
+
+async function clearNikkeImageCache() {
+  if (typeof window === "undefined") return;
+
+  try {
+    const message = { type: "CLEAR_NIKKE_IMAGE_CACHE" };
+    navigator.serviceWorker?.controller?.postMessage(message);
+    const registrations = await navigator.serviceWorker?.getRegistrations?.();
+    registrations?.forEach((registration) => {
+      registration.active?.postMessage(message);
+      registration.waiting?.postMessage(message);
+      registration.installing?.postMessage(message);
+    });
+  } catch {}
+
+  try {
+    if (!("caches" in window)) return;
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((key) => key.startsWith("nideck-static-"))
+        .map(async (key) => {
+          const cache = await caches.open(key);
+          const requests = await cache.keys();
+          await Promise.all(
+            requests
+              .filter((request) => new URL(request.url).pathname.includes("/nikke-images/"))
+              .map((request) => cache.delete(request))
+          );
+        })
+    );
+  } catch {}
+}
+
 function readRawSiteSettingsCache(): SiteSettingsCache {
   if (typeof window === "undefined") return { settings: {} };
 
@@ -576,6 +638,7 @@ function readCachedAppConfig(): AppConfigRow | null {
       active_raid_key: typeof parsed.active_raid_key === "string" ? parsed.active_raid_key : null,
       solo_raid_active: typeof parsed.solo_raid_active === "boolean" ? parsed.solo_raid_active : null,
       solo_raid_tabs: parsed.solo_raid_tabs,
+      nikke_cache_version: typeof parsed.nikke_cache_version === "string" ? parsed.nikke_cache_version : "",
     };
   } catch {
     return null;
@@ -1940,18 +2003,18 @@ export default function Page() {
     setSoloRaidActive(config?.solo_raid_active ?? true);
   }
 
-  async function refreshAppConfig(options: { force?: boolean } = {}) {
+  async function refreshAppConfig(options: { force?: boolean } = {}): Promise<AppConfigRow | null> {
     if (!options.force) {
       const cachedConfig = readCachedAppConfig();
       if (cachedConfig) {
         applyAppConfig(cachedConfig);
-        return;
+        return cachedConfig;
       }
     }
 
     const { data, error } = await supabase
       .from("app_config")
-      .select("master_user_id,active_raid_key,solo_raid_active,solo_raid_tabs")
+      .select("master_user_id,active_raid_key,solo_raid_active,solo_raid_tabs,nikke_cache_version")
       .limit(1)
       .maybeSingle();
 
@@ -1960,6 +2023,38 @@ export default function Page() {
     const config = data as AppConfigRow | null;
     writeCachedAppConfig(config);
     applyAppConfig(config);
+    return config;
+  }
+
+  async function applyNikkeCacheVersion(version: string | null | undefined) {
+    const nextVersion = typeof version === "string" ? version.trim() : "";
+    if (!nextVersion) return;
+    if (readStoredNikkeCacheVersion() === nextVersion) return;
+
+    writeStoredNikkeCacheVersion(nextVersion);
+    removeCachedSupabaseData();
+    await clearNikkeImageCache();
+    await refreshSupabase();
+  }
+
+  async function bumpNikkeCacheVersion(currentUserId: string) {
+    const nextVersion = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("app_config")
+      .update({
+        nikke_cache_version: nextVersion,
+      })
+      .eq("master_user_id", currentUserId)
+      .select("nikke_cache_version")
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) throw new Error("app_config 업데이트 대상이 없어");
+
+    const version = typeof data?.nikke_cache_version === "string" ? data.nikke_cache_version : nextVersion;
+    writeStoredNikkeCacheVersion(version);
+    removeCachedSupabaseData();
+    await clearNikkeImageCache();
   }
 
   useEffect(() => {
@@ -1999,6 +2094,32 @@ export default function Page() {
       cancelled = true;
     };
   }, [userId]);
+
+  useEffect(() => {
+    if (!appConfigLoaded) return;
+
+    let cancelled = false;
+
+    async function checkNikkeCacheVersion() {
+      try {
+        const config = await refreshAppConfig({ force: true });
+        if (!cancelled) {
+          await applyNikkeCacheVersion(config?.nikke_cache_version);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    void checkNikkeCacheVersion();
+    const intervalId = window.setInterval(checkNikkeCacheVersion, 1000 * 60);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appConfigLoaded]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3521,6 +3642,11 @@ export default function Page() {
       if (syncing) return;
       setSyncing(true);
       const count = await syncnikkesFromBucket();
+      if (count > 0) {
+        const currentUserId = await getCurrentUserId();
+        if (!currentUserId) throw new Error("로그인 후 가능");
+        await bumpNikkeCacheVersion(currentUserId);
+      }
       await refreshSupabase();
       showToast(count ? `버킷에서 ${count}개 자동 등록` : "등록할 이미지가 없어");
     } catch (e) {
@@ -3895,6 +4021,7 @@ export default function Page() {
 
       if (upsertError) throw upsertError;
 
+      await bumpNikkeCacheVersion(currentUserId);
       await refreshSupabase();
       showToast("니케 등록 완료");
       return true;

@@ -26,6 +26,28 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "CLEAR_NIKKE_IMAGE_CACHE") return;
+
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((key) => key.startsWith("nideck-static-"))
+          .map(async (key) => {
+            const cache = await caches.open(key);
+            const requests = await cache.keys();
+            await Promise.all(
+              requests
+                .filter((request) => new URL(request.url).pathname.includes("/nikke-images/"))
+                .map((request) => cache.delete(request))
+            );
+          })
+      )
+    )
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;

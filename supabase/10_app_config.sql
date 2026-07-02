@@ -7,6 +7,7 @@ create table if not exists public.app_config (
   active_raid_key text,
   solo_raid_active boolean not null default true,
   solo_raid_tabs jsonb not null default '[]'::jsonb,
+  nikke_cache_version text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint app_config_singleton check (id = 1)
@@ -23,6 +24,9 @@ alter table public.app_config
 
 alter table public.app_config
   add column if not exists solo_raid_tabs jsonb not null default '[]'::jsonb;
+
+alter table public.app_config
+  add column if not exists nikke_cache_version text not null default '';
 
 alter table public.app_config
   add column if not exists created_at timestamptz not null default now();
