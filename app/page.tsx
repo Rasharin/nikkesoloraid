@@ -1937,7 +1937,10 @@ export default function Page() {
   }
 
   async function refreshSoloRaidScheduleState(options: { processDue?: boolean } = {}) {
-    if (!canManageBosses) return;
+    if (!userId || !isMasterUser) {
+      setSoloRaidSchedules([]);
+      return;
+    }
     setLoadingSoloRaidSchedules(true);
     try {
       if (options.processDue) {
@@ -3144,13 +3147,13 @@ export default function Page() {
   }, [canManageBosses, tab, onlineUserCount, soloRaidInProgress, currentDeckRaidKey]);
 
   useEffect(() => {
-    if (!canManageBosses || tab !== "mypage") return;
+    if (!isMasterUser || tab !== "mypage") return;
     void refreshSoloRaidScheduleState({ processDue: true }).catch((error) => {
       console.error(error);
       showToast("예약 목록 불러오기 실패");
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canManageBosses, tab]);
+  }, [isMasterUser, tab]);
 
 	  useEffect(() => {
 	    if (soloRaidInProgress) return;
