@@ -34,6 +34,30 @@ export type RecommendationRankRow = {
   total: number;
 };
 
+export function shouldLoadRecommendationRank({
+  soloRaidInProgress,
+  raidKey,
+  userId,
+  canRecommend,
+  total,
+}: {
+  soloRaidInProgress: boolean;
+  raidKey: string | null | undefined;
+  userId: string | null | undefined;
+  canRecommend: boolean;
+  total: number;
+  refreshTick?: number;
+}) {
+  return Boolean(
+    soloRaidInProgress &&
+      raidKey?.trim() &&
+      userId?.trim() &&
+      canRecommend &&
+      Number.isFinite(total) &&
+      total > 0
+  );
+}
+
 type DeckRow = {
   id: string;
   user_id: string;

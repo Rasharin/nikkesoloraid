@@ -3,6 +3,12 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
+import {
+  canDeleteSoloRaidSchedule,
+  canEditSoloRaidScheduleWindow,
+  formatIsoToKstDateTimeInput,
+  type SoloRaidScheduleStatus,
+} from "../../../lib/solo-raid-schedule";
 import type { ScoreDisplayMode } from "../../../lib/score-format";
 
 type RecommendationDeck = {
@@ -23,6 +29,22 @@ type BossUserStat = {
   userCount: number;
   active: boolean;
   endedAt: number | null;
+};
+
+type SoloRaidSchedule = {
+  id: string;
+  raidKey: string;
+  raidLabel: string;
+  description: string;
+  imagePath: string;
+  startsAt: string;
+  endsAt: string;
+  status: SoloRaidScheduleStatus;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
 };
 
 type DeckTabItem = {
@@ -88,7 +110,20 @@ type MyPageTabProps = {
     title: string;
     description: string;
     imageFile: File | null;
+    startsAtInput?: string;
+    endsAtInput?: string;
   }) => Promise<boolean>;
+  soloRaidSchedules: SoloRaidSchedule[];
+  loadingSoloRaidSchedules: boolean;
+  onAddSoloRaidSchedule: (payload: {
+    title: string;
+    description: string;
+    imageFile: File | null;
+    startsAtInput: string;
+    endsAtInput: string;
+  }) => Promise<boolean>;
+  onUpdateSoloRaidSchedule: (payload: { id: string; startsAtInput: string; endsAtInput: string }) => Promise<boolean>;
+  onDeleteSoloRaidSchedule: (id: string) => Promise<boolean>;
   onEndSoloRaid: () => Promise<boolean>;
   onRestartSoloRaid: () => Promise<boolean>;
   recommendedVideoUrl: string;
@@ -124,6 +159,19 @@ function recFilterBtnClass(active: boolean) {
     : "rounded-2xl border border-neutral-700 px-3 py-2 text-sm text-neutral-200";
 }
 
+function scheduleStatusLabel(status: SoloRaidScheduleStatus) {
+  if (status === "scheduled") return "예약";
+  if (status === "active") return "진행 중";
+  if (status === "completed") return "완료";
+  return "취소";
+}
+
+function formatScheduleDateTime(value: string) {
+  const input = formatIsoToKstDateTimeInput(value);
+  if (!input) return "-";
+  return input.replace("T", " ");
+}
+
 export default function MyPageTab({
   deckTabs,
   isMaster,
@@ -145,6 +193,11 @@ export default function MyPageTab({
   roles,
   getPublicUrl,
   onAddSoloRaid,
+  soloRaidSchedules,
+  loadingSoloRaidSchedules,
+  onAddSoloRaidSchedule,
+  onUpdateSoloRaidSchedule,
+  onDeleteSoloRaidSchedule,
   onEndSoloRaid,
   onRestartSoloRaid,
   recommendedVideoUrl,
@@ -165,8 +218,16 @@ export default function MyPageTab({
   const [newRaidName, setNewRaidName] = useState("");
   const [newRaidDescription, setNewRaidDescription] = useState("");
   const [newRaidImageFile, setNewRaidImageFile] = useState<File | null>(null);
+  const [newRaidStartsAt, setNewRaidStartsAt] = useState("");
+  const [newRaidEndsAt, setNewRaidEndsAt] = useState("");
   const [raidImageInputKey, setRaidImageInputKey] = useState(0);
   const [savingRaid, setSavingRaid] = useState(false);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [editingScheduleStartsAt, setEditingScheduleStartsAt] = useState("");
+  const [editingScheduleEndsAt, setEditingScheduleEndsAt] = useState("");
+  const [savingScheduleEditId, setSavingScheduleEditId] = useState<string | null>(null);
+  const [deletingScheduleId, setDeletingScheduleId] = useState<string | null>(null);
   const [endingRaid, setEndingRaid] = useState(false);
   const [restartingRaid, setRestartingRaid] = useState(false);
   const [videoUrlInput, setVideoUrlInput] = useState(recommendedVideoUrl);
@@ -287,14 +348,75 @@ export default function MyPageTab({
         title: newRaidName,
         description: newRaidDescription,
         imageFile: newRaidImageFile,
+        startsAtInput: newRaidStartsAt,
+        endsAtInput: newRaidEndsAt,
       });
       if (!saved) return;
       setNewRaidName("");
       setNewRaidDescription("");
       setNewRaidImageFile(null);
+      setNewRaidStartsAt("");
+      setNewRaidEndsAt("");
       setRaidImageInputKey((prev) => prev + 1);
     } finally {
       setSavingRaid(false);
+    }
+  }
+
+  async function handleAddSoloRaidSchedule() {
+    if (savingSchedule) return;
+    setSavingSchedule(true);
+    try {
+      const saved = await onAddSoloRaidSchedule({
+        title: newRaidName,
+        description: newRaidDescription,
+        imageFile: newRaidImageFile,
+        startsAtInput: newRaidStartsAt,
+        endsAtInput: newRaidEndsAt,
+      });
+      if (!saved) return;
+      setNewRaidName("");
+      setNewRaidDescription("");
+      setNewRaidImageFile(null);
+      setNewRaidStartsAt("");
+      setNewRaidEndsAt("");
+      setRaidImageInputKey((prev) => prev + 1);
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
+
+  function startEditingSchedule(schedule: SoloRaidSchedule) {
+    setEditingScheduleId(schedule.id);
+    setEditingScheduleStartsAt(formatIsoToKstDateTimeInput(schedule.startsAt));
+    setEditingScheduleEndsAt(formatIsoToKstDateTimeInput(schedule.endsAt));
+  }
+
+  async function handleUpdateSoloRaidSchedule(scheduleId: string) {
+    if (savingScheduleEditId) return;
+    setSavingScheduleEditId(scheduleId);
+    try {
+      const saved = await onUpdateSoloRaidSchedule({
+        id: scheduleId,
+        startsAtInput: editingScheduleStartsAt,
+        endsAtInput: editingScheduleEndsAt,
+      });
+      if (!saved) return;
+      setEditingScheduleId(null);
+      setEditingScheduleStartsAt("");
+      setEditingScheduleEndsAt("");
+    } finally {
+      setSavingScheduleEditId(null);
+    }
+  }
+
+  async function handleDeleteSoloRaidSchedule(scheduleId: string) {
+    if (deletingScheduleId) return;
+    setDeletingScheduleId(scheduleId);
+    try {
+      await onDeleteSoloRaidSchedule(scheduleId);
+    } finally {
+      setDeletingScheduleId(null);
     }
   }
 
@@ -1141,6 +1263,9 @@ export default function MyPageTab({
             <div className="mt-4 space-y-4">
               <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
                 <div className="text-sm font-medium text-neutral-100">1. 솔로레이드 보스 추가</div>
+                <div className="mt-1 text-xs text-neutral-400">
+                  예약 추가는 시작/종료 시각을 사용하고, 즉시 추가는 종료 시각이 있으면 해당 시각에 자동 종료됩니다.
+                </div>
                 <div className="mt-2 space-y-2">
                   <input
                     value={newRaidName}
@@ -1161,18 +1286,48 @@ export default function MyPageTab({
                     onChange={(event) => setNewRaidImageFile(event.target.files?.[0] ?? null)}
                     className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none file:mr-3 file:rounded-xl file:border-0 file:bg-neutral-800 file:px-3 file:py-2 file:text-sm file:text-neutral-100"
                   />
+                  <div className="grid gap-2 lg:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-1 block text-xs text-neutral-400">시작 시각</span>
+                      <input
+                        type="datetime-local"
+                        value={newRaidStartsAt}
+                        onChange={(event) => setNewRaidStartsAt(event.target.value)}
+                        className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-xs text-neutral-400">종료 시각</span>
+                      <input
+                        type="datetime-local"
+                        value={newRaidEndsAt}
+                        onChange={(event) => setNewRaidEndsAt(event.target.value)}
+                        className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                      />
+                    </label>
+                  </div>
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-xs text-neutral-400">
                       {newRaidImageFile ? `선택된 이미지: ${newRaidImageFile.name}` : "보스 이미지 파일을 선택해주세요"}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void handleAddSoloRaid()}
-                      disabled={savingRaid}
-                      className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
-                    >
-                      {savingRaid ? "저장 중..." : "보스 추가"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleAddSoloRaid()}
+                        disabled={savingRaid || savingSchedule}
+                        className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
+                      >
+                        {savingRaid ? "추가 중..." : "즉시 추가"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleAddSoloRaidSchedule()}
+                        disabled={savingSchedule || savingRaid}
+                        className="rounded-2xl border border-sky-700/70 px-4 py-3 text-sm text-sky-200 active:scale-[0.99] disabled:opacity-50"
+                      >
+                        {savingSchedule ? "예약 중..." : "예약 추가"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1180,7 +1335,91 @@ export default function MyPageTab({
               <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-medium text-neutral-100">2. 솔로레이드 종료</div>
+                    <div className="text-sm font-medium text-neutral-100">2. 예약된 레이드 관리</div>
+                    <div className="mt-1 text-xs text-neutral-400">예약 상태만 기간 정정과 삭제가 가능합니다.</div>
+                  </div>
+                  <div className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">
+                    {loadingSoloRaidSchedules ? "불러오는 중" : `${soloRaidSchedules.length}개`}
+                  </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  {soloRaidSchedules.length === 0 ? (
+                    <div className="rounded-2xl border border-neutral-800 px-4 py-3 text-sm text-neutral-400">
+                      예약된 레이드가 없습니다.
+                    </div>
+                  ) : (
+                    soloRaidSchedules.map((schedule) => {
+                      const editable = canEditSoloRaidScheduleWindow(schedule.status);
+                      const deletable = canDeleteSoloRaidSchedule(schedule.status);
+                      const isEditing = editingScheduleId === schedule.id;
+                      return (
+                        <div key={schedule.id} className="rounded-2xl border border-neutral-800 px-3 py-3">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-semibold text-neutral-100">{schedule.raidLabel}</span>
+                                <span className="rounded-full border border-neutral-700 px-2 py-0.5 text-[11px] text-neutral-300">
+                                  {scheduleStatusLabel(schedule.status)}
+                                </span>
+                              </div>
+                              <div className="mt-1 text-xs text-neutral-400">
+                                {formatScheduleDateTime(schedule.startsAt)} - {formatScheduleDateTime(schedule.endsAt)}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => (isEditing ? setEditingScheduleId(null) : startEditingSchedule(schedule))}
+                                disabled={!editable}
+                                className="rounded-2xl border border-neutral-700 px-3 py-2 text-xs active:scale-[0.99] disabled:opacity-50"
+                              >
+                                {isEditing ? "취소" : "기간 정정"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteSoloRaidSchedule(schedule.id)}
+                                disabled={!deletable || deletingScheduleId === schedule.id}
+                                className="rounded-2xl border border-red-800/60 px-3 py-2 text-xs text-red-300 active:scale-[0.99] disabled:opacity-50"
+                              >
+                                {deletingScheduleId === schedule.id ? "삭제 중..." : "삭제"}
+                              </button>
+                            </div>
+                          </div>
+                          {isEditing ? (
+                            <div className="mt-3 grid gap-2 lg:grid-cols-[1fr_1fr_auto]">
+                              <input
+                                type="datetime-local"
+                                value={editingScheduleStartsAt}
+                                onChange={(event) => setEditingScheduleStartsAt(event.target.value)}
+                                className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                              />
+                              <input
+                                type="datetime-local"
+                                value={editingScheduleEndsAt}
+                                onChange={(event) => setEditingScheduleEndsAt(event.target.value)}
+                                className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => void handleUpdateSoloRaidSchedule(schedule.id)}
+                                disabled={savingScheduleEditId === schedule.id}
+                                className="rounded-2xl border border-emerald-800/60 px-4 py-3 text-sm text-emerald-300 active:scale-[0.99] disabled:opacity-50"
+                              >
+                                {savingScheduleEditId === schedule.id ? "저장 중..." : "저장"}
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-neutral-100">3. 솔로레이드 종료</div>
                     <div className="mt-1 text-xs text-neutral-400">
                       종료하면 현재 활성 레이드가 비활성화되고 기본 화면으로 돌아갑니다.
                     </div>

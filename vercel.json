@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/admin/solo-raid-schedules/process",
+      "schedule": "* * * * *"
+    }
+  ]
+}

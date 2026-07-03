@@ -24,10 +24,17 @@ import {
   getCommunityRaidDecksCacheKey,
   MIN_RECOMMENDED_DECK_SCORE,
   pickBest5,
+  shouldLoadRecommendationRank,
   type AggregatedRecommendedDeck,
   type RecommendationRankData,
 } from "../lib/recommend";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
+import {
+  buildImmediateSoloRaidScheduleWindow,
+  parseKstDateTimeInput,
+  validateSoloRaidScheduleWindow,
+  type SoloRaidScheduleStatus,
+} from "../lib/solo-raid-schedule";
 import type { ContactPostDetail, ContactPostStatus, ContactPostSummary, ContactPostVisibility } from "../lib/contact-board";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
@@ -179,6 +186,32 @@ type AddSoloRaidPayload = {
   title: string;
   description: string;
   imageFile: File | null;
+  startsAtInput?: string;
+  endsAtInput?: string;
+};
+type AddSoloRaidSchedulePayload = AddSoloRaidPayload & {
+  startsAtInput: string;
+  endsAtInput: string;
+};
+type UpdateSoloRaidSchedulePayload = {
+  id: string;
+  startsAtInput: string;
+  endsAtInput: string;
+};
+type SoloRaidSchedule = {
+  id: string;
+  raidKey: string;
+  raidLabel: string;
+  description: string;
+  imagePath: string;
+  startsAt: string;
+  endsAt: string;
+  status: SoloRaidScheduleStatus;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
 };
 type AddNikkePayload = {
   name: string;
@@ -656,6 +689,14 @@ function writeCachedAppConfig(config: AppConfigRow | null) {
         cachedAt: Date.now(),
       })
     );
+  } catch {}
+}
+
+function removeCachedAppConfig() {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.removeItem(APP_CONFIG_CACHE_KEY);
   } catch {}
 }
 
@@ -1514,7 +1555,10 @@ export default function Page() {
   const [bossUserStats, setBossUserStats] = useState<BossUserStat[]>([]);
   const [rankingByRaidKey, setRankingByRaidKey] = useState<Record<string, { rank: number; total: number }>>({});
   const [myRankingData, setMyRankingData] = useState<RecommendationRankData | null>(null);
+  const [myRankingRefreshTick, setMyRankingRefreshTick] = useState(0);
   const [loadingUserStats, setLoadingUserStats] = useState(false);
+  const [soloRaidSchedules, setSoloRaidSchedules] = useState<SoloRaidSchedule[]>([]);
+  const [loadingSoloRaidSchedules, setLoadingSoloRaidSchedules] = useState(false);
   const [termsText, setTermsText] = useState("");
   const [privacyText, setPrivacyText] = useState("");
   const [savingLegalTextKey, setSavingLegalTextKey] = useState<string | null>(null);
@@ -1857,6 +1901,56 @@ export default function Page() {
     const rows = (data ?? []) as NoticePostRow[];
     writeCachedNoticePosts(rows);
     return rows.map(mapNoticePostRow).filter((post): post is NoticePost => post !== null);
+  }
+
+  async function fetchSoloRaidSchedules(): Promise<SoloRaidSchedule[]> {
+    const response = await fetch("/api/admin/solo-raid-schedules", {
+      credentials: "same-origin",
+    });
+    if (!response.ok) throw new Error(`solo raid schedules failed: ${response.status}`);
+    const payload = (await response.json()) as { schedules?: unknown };
+    if (!Array.isArray(payload.schedules)) return [];
+    return payload.schedules.filter((schedule): schedule is SoloRaidSchedule => {
+      if (!schedule || typeof schedule !== "object") return false;
+      const candidate = schedule as Partial<SoloRaidSchedule>;
+      return (
+        typeof candidate.id === "string" &&
+        typeof candidate.raidKey === "string" &&
+        typeof candidate.raidLabel === "string" &&
+        typeof candidate.imagePath === "string" &&
+        typeof candidate.startsAt === "string" &&
+        typeof candidate.endsAt === "string" &&
+        (candidate.status === "scheduled" ||
+          candidate.status === "active" ||
+          candidate.status === "completed" ||
+          candidate.status === "cancelled")
+      );
+    });
+  }
+
+  async function processDueSoloRaidSchedules() {
+    const response = await fetch("/api/admin/solo-raid-schedules/process", {
+      method: "POST",
+      credentials: "same-origin",
+    });
+    if (!response.ok) throw new Error(`solo raid schedule process failed: ${response.status}`);
+  }
+
+  async function refreshSoloRaidScheduleState(options: { processDue?: boolean } = {}) {
+    if (!canManageBosses) return;
+    setLoadingSoloRaidSchedules(true);
+    try {
+      if (options.processDue) {
+        await processDueSoloRaidSchedules();
+        removeCachedAppConfig();
+        await refreshAppConfig({ force: true });
+        await refreshSupabase();
+      }
+      const schedules = await fetchSoloRaidSchedules();
+      setSoloRaidSchedules(schedules);
+    } finally {
+      setLoadingSoloRaidSchedules(false);
+    }
   }
 
   function shouldIgnoreNoticeLoadError(error: unknown) {
@@ -2875,19 +2969,30 @@ export default function Page() {
   const canRecommend = best.picked.length === 5;
 
   useEffect(() => {
-    if (!soloRaidInProgress || !currentDeckRaidKey || !userId || !canRecommend || best.total <= 0) {
+    if (
+      !shouldLoadRecommendationRank({
+        soloRaidInProgress,
+        raidKey: currentDeckRaidKey,
+        userId,
+        canRecommend,
+        total: best.total,
+        refreshTick: myRankingRefreshTick,
+      })
+    ) {
       setMyRankingData(null);
       return;
     }
 
-    const rankingRaidKey = currentDeckRaidKey;
+    const rankingRaidKey = currentDeckRaidKey?.trim() ?? "";
+    const rankingTotal = best.total;
     let cancelled = false;
+    setMyRankingData(null);
 
     async function loadMyRankingData() {
       try {
         const params = new URLSearchParams({
           raidKey: rankingRaidKey,
-          currentTotal: String(best.total),
+          currentTotal: String(rankingTotal),
         });
         const response = await fetch(`/api/recommendations/rank?${params.toString()}`, {
           credentials: "same-origin",
@@ -2911,7 +3016,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [best.total, canRecommend, currentDeckRaidKey, soloRaidInProgress, userId]);
+  }, [best.total, canRecommend, currentDeckRaidKey, myRankingRefreshTick, soloRaidInProgress, userId]);
 	  const activeRaidLabel = useMemo(
 	    () =>
 	      currentDeckRaidKey === SEASON_OFF_RAID_KEY
@@ -3038,6 +3143,15 @@ export default function Page() {
 	    void refreshUserStats();
   }, [canManageBosses, tab, onlineUserCount, soloRaidInProgress, currentDeckRaidKey]);
 
+  useEffect(() => {
+    if (!canManageBosses || tab !== "mypage") return;
+    void refreshSoloRaidScheduleState({ processDue: true }).catch((error) => {
+      console.error(error);
+      showToast("예약 목록 불러오기 실패");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManageBosses, tab]);
+
 	  useEffect(() => {
 	    if (soloRaidInProgress) return;
 	    if (offSeasonRaidKey === SEASON_OFF_RAID_KEY || (offSeasonRaidKey && deckTabs.some((tab) => tab.key === offSeasonRaidKey))) return;
@@ -3148,6 +3262,7 @@ export default function Page() {
             [currentRaidKey]: nextRecord,
           };
         });
+        setMyRankingRefreshTick((prev) => prev + 1);
       } catch (error) {
         console.error(error);
       }
@@ -3887,6 +4002,13 @@ export default function Page() {
     const trimmed = payload.title.trim();
     const trimmedDescription = payload.description.trim();
     const imageFile = payload.imageFile;
+    const nowIso = new Date().toISOString();
+    const immediateEndInput = payload.endsAtInput?.trim() ?? "";
+    const immediateEndsAt = immediateEndInput ? parseKstDateTimeInput(immediateEndInput) : null;
+    const immediateWindow =
+      immediateEndInput && !immediateEndsAt
+        ? ({ ok: false, reason: "종료 시각을 확인해줘" } as const)
+        : buildImmediateSoloRaidScheduleWindow(nowIso, immediateEndsAt);
 
     if (!canManageBosses) {
       showToast("마스터 계정만 가능");
@@ -3907,6 +4029,10 @@ export default function Page() {
     }
     if (!imageFile) {
       showToast("보스 이미지를 선택해줘");
+      return false;
+    }
+    if (!immediateWindow.ok) {
+      showToast(immediateWindow.reason);
       return false;
     }
 
@@ -3945,11 +4071,13 @@ export default function Page() {
           title: trimmed,
           description: trimmedDescription,
           image_path: imagePath,
+          starts_at: nowIso,
+          ends_at: immediateWindow.window?.endsAt ?? null,
         });
 
       if (bossInsertError) throw bossInsertError;
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("app_config")
         .update({
           solo_raid_tabs: nextTabs,
@@ -3961,15 +4089,178 @@ export default function Page() {
         .maybeSingle();
 
 	      if (error) throw error;
+	      if (!data) throw new Error("app_config 업데이트 대상이 없어");
 
+        if (immediateWindow.window) {
+          const { error: scheduleError } = await supabase.from("solo_raid_schedules").upsert(
+            {
+              raid_key: nextKey,
+              raid_label: trimmed,
+              description: trimmedDescription,
+              image_path: imagePath,
+              starts_at: immediateWindow.window.startsAt,
+              ends_at: immediateWindow.window.endsAt,
+              status: "active",
+              created_by: currentUserId,
+              updated_at: nowIso,
+              started_at: nowIso,
+            },
+            { onConflict: "raid_key" }
+          );
+          if (scheduleError) throw scheduleError;
+        }
+
+	      removeCachedAppConfig();
 	      removeCachedCommunityRaidDecks([nextKey]);
+	      setRecommendRaidKey(nextKey);
+	      setTipRaidKey(nextKey);
+	      setMyRankingData(null);
+	      setMyRankingRefreshTick((prev) => prev + 1);
 	      await refreshAppConfig({ force: true });
 	      await refreshSupabase(true);
+        await refreshSoloRaidScheduleState();
       showToast("새 솔로레이드 추가 완료");
       return true;
     } catch (error) {
       console.error(error);
       const message = error instanceof Error ? error.message : "솔로레이드 추가 실패";
+      showToast(message);
+      return false;
+    }
+  }
+
+  async function addSoloRaidSchedule(payload: AddSoloRaidSchedulePayload) {
+    const trimmed = payload.title.trim();
+    const trimmedDescription = payload.description.trim();
+    const imageFile = payload.imageFile;
+    const startsAt = parseKstDateTimeInput(payload.startsAtInput);
+    const endsAt = parseKstDateTimeInput(payload.endsAtInput);
+    const validation = validateSoloRaidScheduleWindow(startsAt, endsAt);
+
+    if (!canManageBosses) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+    if (!trimmed) {
+      showToast("보스명을 입력해줘");
+      return false;
+    }
+    if (!trimmedDescription) {
+      showToast("보스 설명을 입력해줘");
+      return false;
+    }
+    if (!imageFile) {
+      showToast("보스 이미지를 선택해줘");
+      return false;
+    }
+    if (!validation.ok || !startsAt || !endsAt) {
+      showToast(validation.ok ? "예약 시각을 확인해줘" : validation.reason);
+      return false;
+    }
+
+    const extension = imageFile.name.includes(".")
+      ? imageFile.name.split(".").pop()?.toLowerCase() ?? "png"
+      : "png";
+    const imagePath = `${slugifyStorageKey(trimmed) || "boss"}-schedule-${Date.now()}.${extension}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from("boss-images")
+        .upload(imagePath, imageFile, {
+          cacheControl: STORAGE_IMAGE_CACHE_CONTROL_SECONDS,
+          upsert: false,
+        });
+      if (uploadError) throw uploadError;
+
+      const response = await fetch("/api/admin/solo-raid-schedules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          raidLabel: trimmed,
+          description: trimmedDescription,
+          imagePath,
+          startsAt,
+          endsAt,
+        }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "예약 저장 실패");
+
+      await refreshSoloRaidScheduleState({ processDue: true });
+      showToast("솔로레이드 예약 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "솔로레이드 예약 실패";
+      showToast(message);
+      return false;
+    }
+  }
+
+  async function updateSoloRaidSchedule(payload: UpdateSoloRaidSchedulePayload) {
+    const startsAt = parseKstDateTimeInput(payload.startsAtInput);
+    const endsAt = parseKstDateTimeInput(payload.endsAtInput);
+    const validation = validateSoloRaidScheduleWindow(startsAt, endsAt);
+
+    if (!canManageBosses) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+    if (!payload.id) {
+      showToast("수정할 예약을 찾을 수 없어");
+      return false;
+    }
+    if (!validation.ok || !startsAt || !endsAt) {
+      showToast(validation.ok ? "예약 시각을 확인해줘" : validation.reason);
+      return false;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/solo-raid-schedules/${encodeURIComponent(payload.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ startsAt, endsAt }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "예약 수정 실패");
+
+      await refreshSoloRaidScheduleState({ processDue: true });
+      showToast("예약 기간 수정 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "예약 수정 실패";
+      showToast(message);
+      return false;
+    }
+  }
+
+  async function deleteSoloRaidSchedule(id: string) {
+    if (!canManageBosses) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+    if (!id) {
+      showToast("삭제할 예약을 찾을 수 없어");
+      return false;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/solo-raid-schedules/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      const data = (await response.json().catch(() => ({}))) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "예약 삭제 실패");
+
+      await refreshSoloRaidScheduleState();
+      showToast("예약 삭제 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "예약 삭제 실패";
       showToast(message);
       return false;
     }
@@ -5119,7 +5410,7 @@ export default function Page() {
               nikkeMap={nikkeMap}
               getPublicUrl={getPublicUrl}
               fmt={fmt}
-              myRankingData={myRankingData}
+              myRankingData={selectedRecommendRaidKey === currentDeckRaidKey ? myRankingData : null}
             />
           </div>
         )}
@@ -5212,6 +5503,11 @@ export default function Page() {
             roles={roles}
             getPublicUrl={getPublicUrl}
             onAddSoloRaid={addSoloRaid}
+            soloRaidSchedules={soloRaidSchedules}
+            loadingSoloRaidSchedules={loadingSoloRaidSchedules}
+            onAddSoloRaidSchedule={addSoloRaidSchedule}
+            onUpdateSoloRaidSchedule={updateSoloRaidSchedule}
+            onDeleteSoloRaidSchedule={deleteSoloRaidSchedule}
             onEndSoloRaid={endSoloRaid}
             onRestartSoloRaid={restartSoloRaid}
             recommendedVideoUrl={recommendedVideoUrl}

@@ -12,6 +12,7 @@ const {
   chooseDisplayedRecommendedDecks,
   formatRecommendationRankLabel,
   getCommunityRaidDecksCacheKey,
+  shouldLoadRecommendationRank,
   MIN_RECOMMENDED_DECK_SCORE,
 } = jiti("../lib/recommend.ts");
 
@@ -132,6 +133,34 @@ test("calculateRecommendationRank ranks current score against saved recommendati
     }),
     { rank: 2, total: 3 }
   );
+});
+
+test("shouldLoadRecommendationRank requests ranking after a saved recommendation refresh tick changes", () => {
+  const base = {
+    soloRaidInProgress: true,
+    raidKey: "raid-1",
+    userId: "me",
+    canRecommend: true,
+    total: 500,
+  };
+
+  assert.equal(shouldLoadRecommendationRank({ ...base, refreshTick: 1 }), true);
+  assert.equal(shouldLoadRecommendationRank({ ...base, refreshTick: 2 }), true);
+});
+
+test("shouldLoadRecommendationRank keeps ineligible ranking states disabled", () => {
+  const base = {
+    soloRaidInProgress: true,
+    raidKey: "raid-1",
+    userId: "me",
+    canRecommend: true,
+    total: 500,
+    refreshTick: 1,
+  };
+
+  assert.equal(shouldLoadRecommendationRank({ ...base, canRecommend: false }), false);
+  assert.equal(shouldLoadRecommendationRank({ ...base, total: 0 }), false);
+  assert.equal(shouldLoadRecommendationRank({ ...base, userId: "" }), false);
 });
 
 test("formatRecommendationRankLabel shows top 100 as rank and others as percentile", () => {

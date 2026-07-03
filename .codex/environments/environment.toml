@@ -4,3 +4,24 @@ name = "nikkesoloraid"
 
 [setup]
 script = ""
+
+[setup.win32]
+script = '''
+cd "$env:CODEX_WORKTREE_PATH"
+npm install
+'''
+
+[[actions]]
+name = "커밋 앤 푸시"
+icon = "run"
+command = '''
+git status
+git add .
+git commit -m "update"
+git push
+'''
+
+[[actions]]
+name = "개발 서버 실행"
+icon = "run"
+command = "npm run dev"
