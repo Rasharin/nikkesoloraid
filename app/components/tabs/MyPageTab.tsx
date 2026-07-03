@@ -81,8 +81,8 @@ type MyPageTabProps = {
   bossUserStats: readonly BossUserStat[];
   loadingUserStats: boolean;
   soloRaidActive: boolean;
-  onSyncNikkes: () => Promise<void>;
-  syncingNikkes: boolean;
+  onRefreshAllUsers: () => Promise<void>;
+  refreshingAllUsers: boolean;
   onAddNikke: (payload: {
     name: string;
     burst: number | null;
@@ -184,8 +184,8 @@ export default function MyPageTab({
   bossUserStats,
   loadingUserStats,
   soloRaidActive,
-  onSyncNikkes,
-  syncingNikkes,
+  onRefreshAllUsers,
+  refreshingAllUsers,
   onAddNikke,
   onUpdateNikke,
   nikkes,
@@ -772,18 +772,18 @@ export default function MyPageTab({
               <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-medium text-neutral-100">1. 이미지 버킷 동기화</div>
+                    <div className="text-sm font-medium text-neutral-100">1. 전체 새로고침</div>
                     <div className="mt-1 text-xs text-neutral-400">
-                      `nikke-images` 버킷에 있는 파일들을 니케 테이블에 자동 등록합니다.
+                      모든 접속자가 최신 니케/보스 데이터를 다시 불러오도록 새로고침 신호를 보냅니다.
                     </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => void onSyncNikkes()}
-                    disabled={syncingNikkes}
+                    onClick={() => void onRefreshAllUsers()}
+                    disabled={refreshingAllUsers}
                     className="rounded-2xl border border-neutral-700 px-4 py-3 text-sm active:scale-[0.99] disabled:opacity-50"
                   >
-                    {syncingNikkes ? "동기화 중..." : "이미지 동기화"}
+                    {refreshingAllUsers ? "새로고침 중..." : "전체 새로고침"}
                   </button>
                 </div>
               </div>

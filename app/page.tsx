@@ -29,6 +29,7 @@ import {
   type RecommendationRankData,
 } from "../lib/recommend";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
+import { createGlobalRefreshVersion, shouldApplyGlobalRefreshVersion } from "../lib/global-refresh";
 import {
   buildActiveSoloRaidEndScheduleWindow,
   buildImmediateSoloRaidScheduleWindow,
@@ -942,30 +943,6 @@ function getPublicUrl(bucket: "nikke-images" | "boss-images" | "usage-board-imag
   return data.publicUrl;
 }
 
-/** Storage 버킷 파일명 -> (name, image_path) 자동 upsert */
-async function syncnikkesFromBucket(): Promise<number> {
-  const { data, error } = await supabase.storage.from("nikke-images").list("", {
-    limit: 1000,
-    sortBy: { column: "name", order: "asc" },
-  });
-  if (error) throw error;
-
-  const rows =
-    (data ?? [])
-      .filter((f) => f?.name && /\.(png|jpg|jpeg|webp)$/i.test(f.name))
-      .map((f) => ({
-        name: f.name.replace(/\.(png|jpg|jpeg|webp)$/i, ""),
-        image_path: f.name,
-      })) ?? [];
-
-  if (rows.length === 0) return 0;
-
-  const { error: upErr } = await supabase.from("nikkes").upsert(rows, { onConflict: "name" });
-  if (upErr) throw upErr;
-
-  return rows.length;
-}
-
 /** 텍스트 입력으로 덱 여러 개 파싱(선택 기능) */
 function parseSingleDeckLine(line: string): { chars: string[]; score: number } | null {
   const trimmed = line.trim();
@@ -1509,8 +1486,8 @@ export default function Page() {
 
   const [homeEditRequest, setHomeEditRequest] = useState<Deck | null>(null);
 
-  // sync state
-  const [syncing, setSyncing] = useState(false);
+  // admin refresh state
+  const [refreshingAllUsers, setRefreshingAllUsers] = useState(false);
 
   // toast
   const [toast, setToast] = useState<string | null>(null);
@@ -2140,8 +2117,7 @@ export default function Page() {
 
   async function applyNikkeCacheVersion(version: string | null | undefined) {
     const nextVersion = typeof version === "string" ? version.trim() : "";
-    if (!nextVersion) return;
-    if (readStoredNikkeCacheVersion() === nextVersion) return;
+    if (!shouldApplyGlobalRefreshVersion(nextVersion, readStoredNikkeCacheVersion())) return;
 
     writeStoredNikkeCacheVersion(nextVersion);
     removeCachedSupabaseData();
@@ -2149,8 +2125,8 @@ export default function Page() {
     await refreshSupabase();
   }
 
-  async function bumpNikkeCacheVersion(currentUserId: string) {
-    const nextVersion = new Date().toISOString();
+  async function requestGlobalRefresh(currentUserId: string) {
+    const nextVersion = createGlobalRefreshVersion();
     const { data, error } = await supabase
       .from("app_config")
       .update({
@@ -2167,6 +2143,7 @@ export default function Page() {
     writeStoredNikkeCacheVersion(version);
     removeCachedSupabaseData();
     await clearNikkeImageCache();
+    await refreshSupabase();
   }
 
   useEffect(() => {
@@ -3770,23 +3747,19 @@ export default function Page() {
     }
   }
 
-  async function onSyncBucket() {
+  async function refreshAllUsers() {
     try {
-      if (syncing) return;
-      setSyncing(true);
-      const count = await syncnikkesFromBucket();
-      if (count > 0) {
-        const currentUserId = await getCurrentUserId();
-        if (!currentUserId) throw new Error("로그인 후 가능");
-        await bumpNikkeCacheVersion(currentUserId);
-      }
-      await refreshSupabase();
-      showToast(count ? `버킷에서 ${count}개 자동 등록` : "등록할 이미지가 없어");
+      if (refreshingAllUsers) return;
+      setRefreshingAllUsers(true);
+      const currentUserId = await getCurrentUserId();
+      if (!currentUserId) throw new Error("로그인 후 가능");
+      await requestGlobalRefresh(currentUserId);
+      showToast("전체 새로고침 신호 전송 완료");
     } catch (e) {
       console.error(e);
-      showToast("자동 등록 실패(권한/버킷/파일 확인)");
+      showToast("전체 새로고침 실패");
     } finally {
-      setSyncing(false);
+      setRefreshingAllUsers(false);
     }
   }
 
@@ -4423,8 +4396,7 @@ export default function Page() {
 
       if (upsertError) throw upsertError;
 
-      await bumpNikkeCacheVersion(currentUserId);
-      await refreshSupabase();
+      await requestGlobalRefresh(currentUserId);
       showToast("니케 등록 완료");
       return true;
     } catch (error) {
@@ -5603,8 +5575,8 @@ export default function Page() {
             bossUserStats={bossUserStats}
             loadingUserStats={loadingUserStats}
             soloRaidActive={soloRaidActive}
-            onSyncNikkes={onSyncBucket}
-            syncingNikkes={syncing}
+            onRefreshAllUsers={refreshAllUsers}
+            refreshingAllUsers={refreshingAllUsers}
             onAddNikke={addNikke}
             onUpdateNikke={updateNikke}
             nikkes={nikkes}
