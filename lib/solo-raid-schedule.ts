@@ -69,6 +69,22 @@ export function buildImmediateSoloRaidScheduleWindow(
   };
 }
 
+export function buildActiveSoloRaidEndScheduleWindow(
+  startsAt: string | null | undefined,
+  endsAt: string | null | undefined
+): { ok: true; window: { startsAt: string; endsAt: string } } | { ok: false; reason: string } {
+  const validation = validateSoloRaidScheduleWindow(startsAt, endsAt);
+  if (!validation.ok) return validation;
+
+  return {
+    ok: true,
+    window: {
+      startsAt: new Date(Date.parse(startsAt as string)).toISOString(),
+      endsAt: new Date(Date.parse(endsAt as string)).toISOString(),
+    },
+  };
+}
+
 function compareScheduleStart(a: SoloRaidScheduleActionCandidate, b: SoloRaidScheduleActionCandidate) {
   const startDiff = Date.parse(a.startsAt) - Date.parse(b.startsAt);
   if (startDiff !== 0) return startDiff;

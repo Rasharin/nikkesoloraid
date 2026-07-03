@@ -123,6 +123,7 @@ type MyPageTabProps = {
     endsAtInput: string;
   }) => Promise<boolean>;
   onUpdateSoloRaidSchedule: (payload: { id: string; startsAtInput: string; endsAtInput: string }) => Promise<boolean>;
+  onUpdateActiveSoloRaidEndSchedule: (payload: { endsAtInput: string }) => Promise<boolean>;
   onDeleteSoloRaidSchedule: (id: string) => Promise<boolean>;
   onEndSoloRaid: () => Promise<boolean>;
   onRestartSoloRaid: () => Promise<boolean>;
@@ -137,6 +138,7 @@ type MyPageTabProps = {
   persistSession: boolean;
   onPersistSessionChange: (persist: boolean) => void;
   activeRaidKey: string | null;
+  activeRaidPeriod: { startsAt: string | null; endsAt: string | null };
   rankingByRaidKey: Record<string, { rank: number; total: number }>;
 };
 
@@ -197,6 +199,7 @@ export default function MyPageTab({
   loadingSoloRaidSchedules,
   onAddSoloRaidSchedule,
   onUpdateSoloRaidSchedule,
+  onUpdateActiveSoloRaidEndSchedule,
   onDeleteSoloRaidSchedule,
   onEndSoloRaid,
   onRestartSoloRaid,
@@ -211,6 +214,7 @@ export default function MyPageTab({
   persistSession,
   onPersistSessionChange,
   activeRaidKey,
+  activeRaidPeriod,
   rankingByRaidKey,
 }: MyPageTabProps) {
   const [openRaidKey, setOpenRaidKey] = useState<string>("");
@@ -228,6 +232,9 @@ export default function MyPageTab({
   const [editingScheduleEndsAt, setEditingScheduleEndsAt] = useState("");
   const [savingScheduleEditId, setSavingScheduleEditId] = useState<string | null>(null);
   const [deletingScheduleId, setDeletingScheduleId] = useState<string | null>(null);
+  const [editingActiveRaidEnd, setEditingActiveRaidEnd] = useState(false);
+  const [activeRaidEndInput, setActiveRaidEndInput] = useState("");
+  const [savingActiveRaidEnd, setSavingActiveRaidEnd] = useState(false);
   const [endingRaid, setEndingRaid] = useState(false);
   const [restartingRaid, setRestartingRaid] = useState(false);
   const [videoUrlInput, setVideoUrlInput] = useState(recommendedVideoUrl);
@@ -325,6 +332,20 @@ export default function MyPageTab({
     const tabKeys = new Set(deckTabs.map((tab) => tab.key));
     return [...fromTabs, ...bossUserStats.filter((stat) => !tabKeys.has(stat.raidKey) && stat.endedAt)];
   }, [activeRaidKey, bossUserStats, bossUserStatsByKey, deckTabs, soloRaidActive]);
+  const activeRaidSchedule = useMemo(
+    () => soloRaidSchedules.find((schedule) => schedule.status === "active" && schedule.raidKey === activeRaidKey) ?? null,
+    [activeRaidKey, soloRaidSchedules]
+  );
+  const scheduledRaidSchedules = useMemo(
+    () => soloRaidSchedules.filter((schedule) => schedule.status === "scheduled"),
+    [soloRaidSchedules]
+  );
+  const activeRaidLabel = useMemo(
+    () => deckTabs.find((tab) => tab.key === activeRaidKey)?.label ?? activeRaidSchedule?.raidLabel ?? activeRaidKey ?? "",
+    [activeRaidKey, activeRaidSchedule, deckTabs]
+  );
+  const activeRaidStartsAt = activeRaidSchedule?.startsAt ?? activeRaidPeriod.startsAt ?? "";
+  const activeRaidEndsAt = activeRaidSchedule?.endsAt ?? activeRaidPeriod.endsAt ?? "";
 
   useEffect(() => {
     if (!deckTabs.some((tab) => tab.key === openRaidKey)) {
@@ -335,6 +356,12 @@ export default function MyPageTab({
   useEffect(() => {
     setVideoUrlInput(recommendedVideoUrl);
   }, [recommendedVideoUrl]);
+
+  useEffect(() => {
+    if (!editingActiveRaidEnd) {
+      setActiveRaidEndInput(formatIsoToKstDateTimeInput(activeRaidEndsAt));
+    }
+  }, [activeRaidEndsAt, editingActiveRaidEnd]);
 
   function toggleRaid(key: string) {
     setOpenRaidKey((prev) => (prev === key ? "" : key));
@@ -417,6 +444,23 @@ export default function MyPageTab({
       await onDeleteSoloRaidSchedule(scheduleId);
     } finally {
       setDeletingScheduleId(null);
+    }
+  }
+
+  function startEditingActiveRaidEnd() {
+    setActiveRaidEndInput(formatIsoToKstDateTimeInput(activeRaidEndsAt));
+    setEditingActiveRaidEnd(true);
+  }
+
+  async function handleUpdateActiveSoloRaidEndSchedule() {
+    if (savingActiveRaidEnd) return;
+    setSavingActiveRaidEnd(true);
+    try {
+      const saved = await onUpdateActiveSoloRaidEndSchedule({ endsAtInput: activeRaidEndInput });
+      if (!saved) return;
+      setEditingActiveRaidEnd(false);
+    } finally {
+      setSavingActiveRaidEnd(false);
     }
   }
 
@@ -1335,20 +1379,74 @@ export default function MyPageTab({
               <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-medium text-neutral-100">2. 예약된 레이드 관리</div>
+                    <div className="text-sm font-medium text-neutral-100">2. 진행중인 레이드 관리</div>
+                    <div className="mt-1 text-xs text-neutral-400">진행중인 레이드의 종료 예약을 추가하거나 수정할 수 있습니다.</div>
+                  </div>
+                  <div className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">
+                    {soloRaidActive && activeRaidKey ? "진행 중" : "없음"}
+                  </div>
+                </div>
+                <div className="mt-3">
+                  {!soloRaidActive || !activeRaidKey ? (
+                    <div className="rounded-2xl border border-neutral-800 px-4 py-3 text-sm text-neutral-400">
+                      진행중인 레이드가 없습니다.
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-neutral-800 px-3 py-3">
+                      <div className="grid gap-3 lg:grid-cols-[minmax(140px,1fr)_auto_minmax(120px,auto)_auto_minmax(220px,auto)_auto] lg:items-center">
+                        <div className="min-w-0 text-sm font-semibold text-neutral-100">{activeRaidLabel}</div>
+                        <div className="text-xs font-medium text-neutral-400">기간:</div>
+                        <div className="text-sm text-neutral-300">
+                          {formatScheduleDateTime(activeRaidStartsAt)}
+                        </div>
+                        <div className="hidden text-sm text-neutral-500 lg:block">~</div>
+                        {editingActiveRaidEnd ? (
+                          <input
+                            type="datetime-local"
+                            value={activeRaidEndInput}
+                            onChange={(event) => setActiveRaidEndInput(event.target.value)}
+                            className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                          />
+                        ) : (
+                          <div className="text-sm text-neutral-300">
+                            {activeRaidEndsAt ? formatScheduleDateTime(activeRaidEndsAt) : "종료 예약 없음"}
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            editingActiveRaidEnd
+                              ? void handleUpdateActiveSoloRaidEndSchedule()
+                              : startEditingActiveRaidEnd()
+                          }
+                          disabled={savingActiveRaidEnd}
+                          className="rounded-2xl border border-emerald-800/60 px-4 py-3 text-sm text-emerald-300 active:scale-[0.99] disabled:opacity-50"
+                        >
+                          {savingActiveRaidEnd ? "저장 중..." : editingActiveRaidEnd ? "수정완료" : "수정"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium text-neutral-100">3. 예약된 레이드 관리</div>
                     <div className="mt-1 text-xs text-neutral-400">예약 상태만 기간 정정과 삭제가 가능합니다.</div>
                   </div>
                   <div className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">
-                    {loadingSoloRaidSchedules ? "불러오는 중" : `${soloRaidSchedules.length}개`}
+                    {loadingSoloRaidSchedules ? "불러오는 중" : `${scheduledRaidSchedules.length}개`}
                   </div>
                 </div>
                 <div className="mt-3 space-y-2">
-                  {soloRaidSchedules.length === 0 ? (
+                  {scheduledRaidSchedules.length === 0 ? (
                     <div className="rounded-2xl border border-neutral-800 px-4 py-3 text-sm text-neutral-400">
                       예약된 레이드가 없습니다.
                     </div>
                   ) : (
-                    soloRaidSchedules.map((schedule) => {
+                    scheduledRaidSchedules.map((schedule) => {
                       const editable = canEditSoloRaidScheduleWindow(schedule.status);
                       const deletable = canDeleteSoloRaidSchedule(schedule.status);
                       const isEditing = editingScheduleId === schedule.id;
@@ -1419,7 +1517,7 @@ export default function MyPageTab({
               <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-medium text-neutral-100">3. 솔로레이드 종료</div>
+                    <div className="text-sm font-medium text-neutral-100">4. 솔로레이드 종료</div>
                     <div className="mt-1 text-xs text-neutral-400">
                       종료하면 현재 활성 레이드가 비활성화되고 기본 화면으로 돌아갑니다.
                     </div>

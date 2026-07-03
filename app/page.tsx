@@ -30,6 +30,7 @@ import {
 } from "../lib/recommend";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
 import {
+  buildActiveSoloRaidEndScheduleWindow,
   buildImmediateSoloRaidScheduleWindow,
   parseKstDateTimeInput,
   validateSoloRaidScheduleWindow,
@@ -196,6 +197,9 @@ type AddSoloRaidSchedulePayload = AddSoloRaidPayload & {
 type UpdateSoloRaidSchedulePayload = {
   id: string;
   startsAtInput: string;
+  endsAtInput: string;
+};
+type UpdateActiveSoloRaidEndSchedulePayload = {
   endsAtInput: string;
 };
 type SoloRaidSchedule = {
@@ -1574,6 +1578,17 @@ export default function Page() {
   const showInitialDataLoading = !isLegalPage && loadingData && nikkes.length === 0 && bosses.length === 0;
   const canAccessCalculator = process.env.NODE_ENV !== "production";
   const calculatorAccessResolved = true;
+  const activeRaidTabLabel = useMemo(
+    () => deckTabs.find((deckTab) => deckTab.key === activeRaidKey)?.label ?? null,
+    [activeRaidKey, deckTabs]
+  );
+  const activeRaidBoss = useMemo(
+    () =>
+      bosses.find(
+        (item) => slugifyRaidLabel(item.title) === activeRaidKey || (activeRaidTabLabel ? item.title === activeRaidTabLabel : false)
+      ) ?? null,
+    [activeRaidKey, activeRaidTabLabel, bosses]
+  );
 
   useEffect(() => {
     if (!calculatorAccessResolved) return;
@@ -4240,6 +4255,99 @@ export default function Page() {
     }
   }
 
+  async function updateActiveSoloRaidEndSchedule(payload: UpdateActiveSoloRaidEndSchedulePayload) {
+    const activeKey = activeRaidKey?.trim() ?? "";
+    const endsAt = parseKstDateTimeInput(payload.endsAtInput);
+    const activeSchedule = soloRaidSchedules.find(
+      (schedule) => schedule.status === "active" && schedule.raidKey === activeKey
+    );
+    const activeTab = deckTabs.find((tab) => tab.key === activeKey);
+    const activeBoss = bosses.find((item) => slugifyRaidLabel(item.title) === activeKey || item.title === activeTab?.label);
+    const startsAt = activeSchedule?.startsAt ?? activeBoss?.starts_at ?? new Date().toISOString();
+    const validation = buildActiveSoloRaidEndScheduleWindow(startsAt, endsAt);
+    const nowMs = Date.now();
+
+    if (!canManageBosses) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+    const currentUserId = await getCurrentUserId();
+    if (!currentUserId) {
+      showToast("로그인 후 가능");
+      return false;
+    }
+    if (!soloRaidActive || !activeKey) {
+      showToast("진행중인 레이드를 찾을 수 없어");
+      return false;
+    }
+    if (!payload.endsAtInput.trim() || !endsAt) {
+      showToast("종료 시각을 입력해줘");
+      return false;
+    }
+    if (!validation.ok) {
+      showToast(validation.reason);
+      return false;
+    }
+    if (Date.parse(validation.window.endsAt) <= nowMs) {
+      showToast("종료 시각은 현재 시각보다 늦어야 해");
+      return false;
+    }
+    if (!activeSchedule && (!activeTab || !activeBoss?.image_path)) {
+      showToast("활성 보스 정보를 찾을 수 없어");
+      return false;
+    }
+
+    try {
+      const updatedAt = new Date().toISOString();
+      if (activeSchedule) {
+        const { error } = await supabase
+          .from("solo_raid_schedules")
+          .update({
+            ends_at: validation.window.endsAt,
+            updated_at: updatedAt,
+          })
+          .eq("id", activeSchedule.id)
+          .eq("status", "active");
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("solo_raid_schedules").upsert(
+          {
+            raid_key: activeKey,
+            raid_label: activeTab?.label ?? activeBoss?.title ?? activeKey,
+            description: activeBoss?.description ?? "",
+            image_path: activeBoss?.image_path,
+            starts_at: validation.window.startsAt,
+            ends_at: validation.window.endsAt,
+            status: "active",
+            created_by: currentUserId,
+            updated_at: updatedAt,
+            started_at: validation.window.startsAt,
+          },
+          { onConflict: "raid_key" }
+        );
+        if (error) throw error;
+      }
+
+      if (activeBoss) {
+        const { error: bossUpdateError } = await supabase
+          .from("bosses")
+          .update({ ends_at: validation.window.endsAt })
+          .eq("id", activeBoss.id);
+        if (bossUpdateError) throw bossUpdateError;
+      }
+
+      await refreshSoloRaidScheduleState({ processDue: true });
+      await refreshSupabase(true);
+      showToast("진행중 레이드 종료 예약 수정 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "종료 예약 수정 실패";
+      showToast(message);
+      return false;
+    }
+  }
+
   async function deleteSoloRaidSchedule(id: string) {
     if (!canManageBosses) {
       showToast("마스터 계정만 가능");
@@ -5510,6 +5618,7 @@ export default function Page() {
             loadingSoloRaidSchedules={loadingSoloRaidSchedules}
             onAddSoloRaidSchedule={addSoloRaidSchedule}
             onUpdateSoloRaidSchedule={updateSoloRaidSchedule}
+            onUpdateActiveSoloRaidEndSchedule={updateActiveSoloRaidEndSchedule}
             onDeleteSoloRaidSchedule={deleteSoloRaidSchedule}
             onEndSoloRaid={endSoloRaid}
             onRestartSoloRaid={restartSoloRaid}
@@ -5524,6 +5633,7 @@ export default function Page() {
             persistSession={persistSessionState}
             onPersistSessionChange={updatePersistSession}
             activeRaidKey={soloRaidInProgress ? activeRaidKey : null}
+            activeRaidPeriod={{ startsAt: activeRaidBoss?.starts_at ?? null, endsAt: activeRaidBoss?.ends_at ?? null }}
             rankingByRaidKey={rankingByRaidKey}
           />
         )}

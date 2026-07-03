@@ -6,6 +6,7 @@ const jiti = createJiti(import.meta.url);
 const {
   canDeleteSoloRaidSchedule,
   canEditSoloRaidScheduleWindow,
+  buildActiveSoloRaidEndScheduleWindow,
   buildImmediateSoloRaidScheduleWindow,
   formatIsoToKstDateTimeInput,
   parseKstDateTimeInput,
@@ -63,6 +64,25 @@ test("buildImmediateSoloRaidScheduleWindow rejects end times before now", () => 
     ok: false,
     reason: "종료 시각은 현재 시각보다 늦어야 합니다.",
   });
+});
+
+test("buildActiveSoloRaidEndScheduleWindow updates an active raid end time", () => {
+  assert.deepEqual(
+    buildActiveSoloRaidEndScheduleWindow("2026-07-03T09:30:00.000Z", "2026-07-10T09:30:00.000Z"),
+    {
+      ok: true,
+      window: {
+        startsAt: "2026-07-03T09:30:00.000Z",
+        endsAt: "2026-07-10T09:30:00.000Z",
+      },
+    }
+  );
+});
+
+test("buildActiveSoloRaidEndScheduleWindow rejects end times before the active raid start", () => {
+  const result = buildActiveSoloRaidEndScheduleWindow("2026-07-03T09:30:00.000Z", "2026-07-03T09:29:00.000Z");
+
+  assert.equal(result.ok, false);
 });
 
 test("selectDueSoloRaidScheduleActions selects one due start and all due ends", () => {
