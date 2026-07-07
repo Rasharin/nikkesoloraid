@@ -2233,7 +2233,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tab]);
 
   useEffect(() => {
     let cancelled = false;
