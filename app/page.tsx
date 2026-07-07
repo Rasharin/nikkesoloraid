@@ -31,6 +31,14 @@ import {
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
 import { createGlobalRefreshVersion, shouldApplyGlobalRefreshVersion } from "../lib/global-refresh";
 import {
+  HEARTBEAT_INTERVAL_MS,
+  RECOMMENDATION_REFRESH_INTERVAL_MS,
+  shouldClearCommunityRecommendationDecks,
+  shouldLoadCommunityRecommendations,
+  shouldRefreshAdminStats,
+  shouldRefreshVisibleData,
+} from "../lib/request-scheduling";
+import {
   buildActiveSoloRaidEndScheduleWindow,
   buildImmediateSoloRaidScheduleWindow,
   parseKstDateTimeInput,
@@ -351,7 +359,7 @@ const CONTACT_POSTS_MEMORY_CACHE_TTL = 1000 * 30;
 const CONTACT_POSTS_CACHE_TTL = 1000 * 60 * 5;
 const NOTICE_POSTS_CACHE_KEY = "soloraid_notice_posts_cache_v1";
 const COMMUNITY_RAID_DECKS_CACHE_KEY = "soloraid_community_raid_decks_cache_v1";
-const COMMUNITY_RAID_DECKS_CACHE_TTL = 1000 * 60 * 5;
+const COMMUNITY_RAID_DECKS_CACHE_TTL = RECOMMENDATION_REFRESH_INTERVAL_MS;
 const USER_DECKS_CACHE_KEY = "soloraid_user_decks_cache_v1";
 const USER_DECKS_CACHE_TTL = 1000 * 60 * 5;
 const NIKKE_CACHE_VERSION_KEY = "soloraid_nikke_cache_version_v1";
@@ -1540,12 +1548,15 @@ export default function Page() {
   const [loadingUserStats, setLoadingUserStats] = useState(false);
   const [soloRaidSchedules, setSoloRaidSchedules] = useState<SoloRaidSchedule[]>([]);
   const [loadingSoloRaidSchedules, setLoadingSoloRaidSchedules] = useState(false);
+  const [isPageVisible, setIsPageVisible] = useState(true);
   const [termsText, setTermsText] = useState("");
   const [privacyText, setPrivacyText] = useState("");
   const [savingLegalTextKey, setSavingLegalTextKey] = useState<string | null>(null);
   const [scoreDisplayMode, setScoreDisplayModeState] = useState<ScoreDisplayMode>(() => readStoredScoreDisplayMode());
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readStoredThemeMode());
   const [persistSessionState, setPersistSessionState] = useState<boolean>(() => readStoredPersistSession());
+  const lastCommunityDeckRefreshRef = useRef<{ cacheKey: string; at: number }>({ cacheKey: "", at: 0 });
+  const lastUserStatsRefreshRef = useRef(0);
   const contactPostsCacheKey = `${userId ?? "anonymous"}:${isMasterUser ? "master" : "user"}`;
   const isLicensePage = currentPath === "/license";
   const isNoticePage = currentPath === "/notice";
@@ -1618,35 +1629,25 @@ export default function Page() {
     return ((data ?? []) as DeckRow[]).map(mapDeckRow).filter((d): d is Deck => d !== null);
   }
 
-  async function fetchCommunityRaidDecks(raidKey: string, options: { forceRefresh?: boolean } = {}) {
+  const fetchCommunityRaidDecks = useCallback(async (raidKey: string, options: { forceRefresh?: boolean } = {}) => {
     const isAuthenticated = Boolean(userId);
     const cachedDecks = options.forceRefresh ? null : readCachedCommunityRaidDecks(raidKey, isAuthenticated);
     if (cachedDecks) return cachedDecks;
 
-    let rows: DeckRow[] = [];
-    if (isAuthenticated) {
-      const response = await fetch(`/api/recommendations/decks?raidKey=${encodeURIComponent(raidKey)}`, {
-        credentials: "same-origin",
-      });
-      if (!response.ok) throw new Error(`recommendation decks failed: ${response.status}`);
-      const payload = (await response.json()) as { decks?: unknown };
-      rows = Array.isArray(payload.decks) ? (payload.decks as DeckRow[]) : [];
-    } else {
-      const { data, error } = await supabase
-        .from("decks")
-        .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
-        .eq("raid_key", raidKey)
-        .not("user_id", "is", null)
-        .order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("decks")
+      .select("id,user_id,raid_key,deck_key,chars,score,created_at")
+      .eq("raid_key", raidKey)
+      .not("user_id", "is", null)
+      .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      rows = (data ?? []) as DeckRow[];
-    }
+    if (error) throw error;
+    const rows = ((data ?? []) as Array<Omit<DeckRow, "note">>).map((row) => ({ ...row, note: null }));
 
     const decks = rows.map(mapDeckRow).filter((d): d is Deck => d !== null);
     writeCachedCommunityRaidDecks(raidKey, decks, isAuthenticated);
     return decks;
-  }
+  }, [userId]);
 
   async function trackSiteUser() {
     try {
@@ -2050,6 +2051,16 @@ export default function Page() {
     document.body.classList.toggle("theme-light", themeMode === "light");
     document.body.classList.toggle("theme-dark", themeMode === "dark");
   }, [themeMode]);
+
+  useEffect(() => {
+    function syncVisibilityState() {
+      setIsPageVisible(document.visibilityState !== "hidden");
+    }
+
+    syncVisibilityState();
+    document.addEventListener("visibilitychange", syncVisibilityState);
+    return () => document.removeEventListener("visibilitychange", syncVisibilityState);
+  }, []);
 
   useEffect(() => {
     migrateAuthCookies(persistSessionState);
@@ -2893,7 +2904,7 @@ export default function Page() {
     if (tipRaidKey && deckTabs.some((deckTab) => deckTab.key === tipRaidKey)) return tipRaidKey;
     return defaultSelectableRaidKey;
   }, [defaultSelectableRaidKey, deckTabs, tipRaidKey]);
-  const recommendDeckLoadRaidKey = tab === "recommend" ? selectedRecommendRaidKey : currentDeckRaidKey;
+  const recommendDeckLoadRaidKey = tab === "recommend" ? selectedRecommendRaidKey : null;
 		  const savedDeckSource = useMemo(() => {
 	    if (soloRaidInProgress) return decks;
 	    const seen = new Set<string>();
@@ -2911,44 +2922,71 @@ export default function Page() {
 	  );
 	  useEffect(() => {
 	    let cancelled = false;
-	
-	    async function loadCommunityRaidDecks() {
-	      if (!authResolved) {
-	        setCommunityRaidDecks([]);
-	        setLoadingCommunityRaidDecks(false);
-	        return;
-	      }
-	      if (!recommendDeckLoadRaidKey || recommendDeckLoadRaidKey === SEASON_OFF_RAID_KEY) {
-			        setCommunityRaidDecks([]);
-			        setLoadingCommunityRaidDecks(false);
-		        return;
-		      }
+      const targetRaidKey = recommendDeckLoadRaidKey?.trim() ?? "";
+      const canLoadRecommendations = shouldLoadCommunityRecommendations({
+        tab,
+        raidKey: targetRaidKey,
+        authResolved,
+        isVisible: isPageVisible,
+      });
 
-      setLoadingCommunityRaidDecks(true);
-      try {
-	        const nextDecks = await fetchCommunityRaidDecks(recommendDeckLoadRaidKey);
-        if (!cancelled) {
-          setCommunityRaidDecks(nextDecks);
+      if (!canLoadRecommendations) {
+        setCommunityRaidDecks((prev) => (shouldClearCommunityRecommendationDecks(prev) ? [] : prev));
+        setLoadingCommunityRaidDecks(false);
+        return () => {
+          cancelled = true;
+        };
+      }
+      const targetCacheKey = getCommunityRaidDecksCacheKey(targetRaidKey, Boolean(userId));
+	
+	    async function loadCommunityRaidDecks(options: { forceRefresh?: boolean; respectInterval?: boolean } = {}) {
+        const lastRefreshAt = lastCommunityDeckRefreshRef.current.cacheKey === targetCacheKey
+          ? lastCommunityDeckRefreshRef.current.at
+          : 0;
+        const now = Date.now();
+        if (
+          options.respectInterval &&
+          !options.forceRefresh &&
+          !shouldRefreshVisibleData({
+            now,
+            lastRefreshAt,
+            intervalMs: RECOMMENDATION_REFRESH_INTERVAL_MS,
+            isVisible: isPageVisible,
+          })
+        ) {
+          return;
         }
-      } catch (error) {
-        console.error(error);
-        if (!cancelled) {
-          setCommunityRaidDecks([]);
-          showToast("추천 덱 불러오기 실패");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingCommunityRaidDecks(false);
+
+        setLoadingCommunityRaidDecks(true);
+        try {
+	        const nextDecks = await fetchCommunityRaidDecks(targetRaidKey, options);
+          if (!cancelled) {
+            lastCommunityDeckRefreshRef.current = { cacheKey: targetCacheKey, at: Date.now() };
+            setCommunityRaidDecks(nextDecks);
+          }
+        } catch (error) {
+          console.error(error);
+          if (!cancelled) {
+            setCommunityRaidDecks([]);
+            showToast("추천 덱 불러오기 실패");
+          }
+        } finally {
+          if (!cancelled) {
+            setLoadingCommunityRaidDecks(false);
+          }
         }
       }
-    }
 
-    void loadCommunityRaidDecks();
+      void loadCommunityRaidDecks();
+      const intervalId = window.setInterval(() => {
+        void loadCommunityRaidDecks({ forceRefresh: true, respectInterval: true });
+      }, RECOMMENDATION_REFRESH_INTERVAL_MS);
 
 	    return () => {
 	      cancelled = true;
+        window.clearInterval(intervalId);
 	    };
-		  }, [authResolved, recommendDeckLoadRaidKey, userId]);
+		  }, [authResolved, fetchCommunityRaidDecks, isPageVisible, recommendDeckLoadRaidKey, tab, userId]);
 	  const recommendedDecks = useMemo(() => {
 	    return aggregateRecommendedDecks(communityRaidDecks);
 	  }, [communityRaidDecks]);
@@ -3100,15 +3138,28 @@ export default function Page() {
   const shouldShowCalculator = canAccessCalculator;
   const canManageBosses = isMaster || process.env.NODE_ENV !== "production";
 
+  useEffect(() => {
+    const clientId = getStatsClientId();
+    if (!clientId || !isPageVisible) return;
+
+    let cancelled = false;
+    const runHeartbeat = () => {
+      if (!cancelled) void trackSiteUser();
+    };
+
+    runHeartbeat();
+    const intervalId = window.setInterval(runHeartbeat, HEARTBEAT_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeRaidKey, isPageVisible, soloRaidInProgress, userId]);
+
 	  useEffect(() => {
 	    const clientId = getStatsClientId();
 	    if (!clientId) return;
 	
-	    void trackSiteUser();
-	    const intervalId = window.setInterval(() => {
-	      void trackSiteUser();
-	    }, 1000 * 60);
-
     const channel = supabase.channel("site-online-users", {
       config: {
         presence: {
@@ -3128,15 +3179,16 @@ export default function Page() {
       });
 
     return () => {
-      window.clearInterval(intervalId);
       void supabase.removeChannel(channel);
     };
   }, [userId]);
 
 	  useEffect(() => {
-	    if (!canManageBosses) return;
+      const now = Date.now();
+	    if (!shouldRefreshAdminStats({ canManageBosses, tab, now, lastRefreshAt: lastUserStatsRefreshRef.current })) return;
+      lastUserStatsRefreshRef.current = now;
 	    void refreshUserStats();
-  }, [canManageBosses, tab, onlineUserCount, soloRaidInProgress, currentDeckRaidKey]);
+  }, [canManageBosses, tab, soloRaidInProgress, currentDeckRaidKey]);
 
   useEffect(() => {
     if (!isMasterUser || tab !== "mypage") return;
