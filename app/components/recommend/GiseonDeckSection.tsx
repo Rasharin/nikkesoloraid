@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
-import { getSubmasterDecks, pickBest5, type RecommendationSourceDeck } from "../../../lib/recommend";
+import { getSubmasterDecks, MAX_RECOMMENDED_DECK_COUNT, pickBest5, type RecommendationSourceDeck } from "../../../lib/recommend";
 
 type NikkeRow = {
   id: string;
@@ -103,6 +103,7 @@ export default function GiseonDeckSection({
 
   if (!soloRaidActive) return null;
   if (!SUBMASTER_USER_ID) return null;
+  if (!loading && best.picked.length < MAX_RECOMMENDED_DECK_COUNT) return null;
 
   return (
     <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-3">
@@ -136,12 +137,6 @@ export default function GiseonDeckSection({
           </div>
         ) : (
           <>
-            {best.picked.length < 5 ? (
-              <div className="rounded-2xl border border-amber-800/70 bg-amber-950/20 p-3 text-sm text-amber-100 md:col-span-2">
-                추천 가능한 덱이 부족합니다
-              </div>
-            ) : null}
-
             {best.picked.map((deck) => (
               <article key={deck.id} className="flex flex-col gap-2 rounded-xl border border-neutral-800 bg-neutral-950/40 p-2">
                 <div className="grid w-full grid-cols-5 gap-1.5">
