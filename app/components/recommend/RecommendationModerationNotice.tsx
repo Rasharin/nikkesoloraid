@@ -1,8 +1,11 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
+import { RECOMMENDATION_MODERATION_NOTICE } from "../../../lib/recommendation-moderation";
 
 type Notice = { id: string; message: string };
+
+const LOCAL_NOTICE_ACK_KEY = "soloraid_local_moderation_notice_ack_v1";
 
 function RecommendationModerationNoticeContent({
   userId,
@@ -11,7 +14,13 @@ function RecommendationModerationNoticeContent({
   userId: string | null;
   localPreview?: boolean;
 }) {
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(() => {
+    if (!localPreview || typeof window === "undefined") return null;
+    try {
+      if (sessionStorage.getItem(LOCAL_NOTICE_ACK_KEY) === "true") return null;
+    } catch {}
+    return { id: "local-preview", message: RECOMMENDATION_MODERATION_NOTICE };
+  });
 
   useEffect(() => {
     if (!userId || localPreview) return;
@@ -24,9 +33,17 @@ function RecommendationModerationNoticeContent({
     return () => { cancelled = true; };
   }, [localPreview, userId]);
 
-  if (!userId || localPreview || !notice) return null;
+  if ((!userId && !localPreview) || !notice) return null;
 
   async function acknowledge() {
+    if (localPreview) {
+      try {
+        sessionStorage.setItem(LOCAL_NOTICE_ACK_KEY, "true");
+      } catch {}
+      setNotice(null);
+      return;
+    }
+
     const response = await fetch("/api/recommendation-notices", {
       method: "PATCH",
       credentials: "same-origin",
