@@ -22,6 +22,10 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { toPng } from "html-to-image";
 import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
 import { formatPlainScoreText } from "../../../lib/score-format";
+import {
+  isHomeAnnouncementDismissed,
+  type HomeAnnouncement,
+} from "../../../lib/home-announcement";
 import DeckBuilderSection, {
   getDroppedDeckSlotTarget,
   getHoveredDeckSlotTarget,
@@ -61,6 +65,11 @@ type DeckSlotTarget = {
 };
 
 type HomeTabProps = {
+  announcement: HomeAnnouncement | null;
+  canManageAnnouncement: boolean;
+  savingAnnouncement: boolean;
+  onSaveAnnouncement: (content: string) => Promise<boolean>;
+  onDeleteAnnouncement: () => Promise<boolean>;
   boss: BossRow | null;
   bosses: BossRow[];
   decksCount: number;
@@ -163,6 +172,7 @@ function getRecommendedScoreTextClass(scoreText: string, compact: boolean): stri
 
 const HOME_DRAFT_STORAGE_KEY = "soloraid_home_draft_v1";
 const HOME_MEMO_STORAGE_KEY = "soloraid_home_memo_v1";
+const HOME_ANNOUNCEMENT_DISMISSED_VERSION_KEY = "soloraid_home_announcement_dismissed_version_v1";
 
 function swapDraftSlots(draft: DraftSlot[], fromIndex: number, toIndex: number): DraftSlot[] {
   const next = [...draft];
@@ -173,6 +183,11 @@ function swapDraftSlots(draft: DraftSlot[], fromIndex: number, toIndex: number):
 }
 
 export default function HomeTab({
+  announcement,
+  canManageAnnouncement,
+  savingAnnouncement,
+  onSaveAnnouncement,
+  onDeleteAnnouncement,
   boss,
   bosses,
   decksCount,
@@ -208,6 +223,16 @@ export default function HomeTab({
   const [isMemoEditing, setIsMemoEditing] = useState(false);
   const [deckNote, setDeckNote] = useState("");
   const [bossInfoOpen, setBossInfoOpen] = useState(false);
+  const [dismissedAnnouncementVersion, setDismissedAnnouncementVersion] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      return window.localStorage.getItem(HOME_ANNOUNCEMENT_DISMISSED_VERSION_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const [isAnnouncementEditing, setIsAnnouncementEditing] = useState(false);
+  const [announcementDraft, setAnnouncementDraft] = useState("");
   const [draftStorageReady, setDraftStorageReady] = useState(false);
   const [isDesktopDnd, setIsDesktopDnd] = useState(false);
   const scoreRef = useRef<HTMLInputElement | null>(null);
@@ -584,6 +609,158 @@ export default function HomeTab({
     setIsMemoEditing(true);
   }
 
+  function startAnnouncementEditing() {
+    setAnnouncementDraft(announcement?.content ?? "");
+    setIsAnnouncementEditing(true);
+  }
+
+  async function saveAnnouncement() {
+    const saved = await onSaveAnnouncement(announcementDraft);
+    if (saved) {
+      setIsAnnouncementEditing(false);
+    }
+  }
+
+  async function deleteAnnouncement() {
+    if (!window.confirm("홈 알림을 삭제할까요?")) return;
+    const deleted = await onDeleteAnnouncement();
+    if (deleted) {
+      setIsAnnouncementEditing(false);
+      setAnnouncementDraft("");
+    }
+  }
+
+  function closeAnnouncement() {
+    if (!announcement) return;
+    try {
+      window.localStorage.setItem(HOME_ANNOUNCEMENT_DISMISSED_VERSION_KEY, announcement.version);
+    } catch {}
+    setDismissedAnnouncementVersion(announcement.version);
+  }
+
+  function renderHomeAnnouncement() {
+    if (isAnnouncementEditing && canManageAnnouncement) {
+      return (
+        <section className="mb-5 rounded-2xl border border-neutral-700 bg-neutral-900/50 p-3">
+          <textarea
+            autoFocus
+            rows={2}
+            value={announcementDraft}
+            onChange={(event) => setAnnouncementDraft(event.target.value)}
+            placeholder="홈에 노출할 알림을 입력해 주세요."
+            className="min-h-[64px] w-full resize-y rounded-xl border border-neutral-700 bg-neutral-950/50 px-3 py-2 text-sm leading-5 outline-none focus:border-cyan-400"
+          />
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsAnnouncementEditing(false)}
+              disabled={savingAnnouncement}
+              className="rounded-lg border border-neutral-700 px-3 py-1.5 text-xs transition hover:border-neutral-500 disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={() => void saveAnnouncement()}
+              disabled={savingAnnouncement || !announcementDraft.trim()}
+              className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-neutral-950 transition hover:bg-cyan-400 disabled:opacity-50"
+            >
+              {savingAnnouncement ? "저장 중" : "저장"}
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    const isDismissed = announcement
+      ? isHomeAnnouncementDismissed(dismissedAnnouncementVersion, announcement.version)
+      : false;
+
+    if (announcement && !isDismissed) {
+      return (
+        <section className="mb-5 flex items-start gap-2 rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-sm">
+          <div className="min-w-0 flex-1 whitespace-pre-wrap break-words leading-5 text-neutral-100">
+            {announcement.content}
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            {canManageAnnouncement ? (
+              <>
+                <button
+                  type="button"
+                  onClick={startAnnouncementEditing}
+                  className="rounded-lg px-2 py-1 text-xs text-cyan-200 transition hover:bg-cyan-400/10"
+                >
+                  수정
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void deleteAnnouncement()}
+                  disabled={savingAnnouncement}
+                  className="rounded-lg px-2 py-1 text-xs text-red-300 transition hover:bg-red-400/10 disabled:opacity-50"
+                >
+                  삭제
+                </button>
+              </>
+            ) : null}
+            <button
+              type="button"
+              onClick={closeAnnouncement}
+              aria-label="현재 알림 닫기"
+              title="현재 알림 닫기"
+              className="grid h-7 w-7 place-items-center rounded-lg text-neutral-300 transition hover:bg-white/10 hover:text-white"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M6 6L18 18M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    if (!canManageAnnouncement) return null;
+
+    return (
+      <section className="mb-5 flex min-h-10 items-center gap-2 rounded-xl border border-dashed border-neutral-700 bg-neutral-900/30 px-3 py-2 text-sm">
+        <div className="min-w-0 flex-1 text-neutral-400">
+          {announcement ? "현재 홈 알림을 닫았습니다." : "등록된 홈 알림이 없습니다."}
+        </div>
+        {announcement ? (
+          <>
+            <button
+              type="button"
+              onClick={startAnnouncementEditing}
+              className="shrink-0 rounded-lg border border-neutral-700 px-2.5 py-1 text-xs transition hover:border-neutral-500"
+            >
+              수정
+            </button>
+            <button
+              type="button"
+              onClick={() => void deleteAnnouncement()}
+              disabled={savingAnnouncement}
+              className="shrink-0 rounded-lg border border-red-500/40 px-2.5 py-1 text-xs text-red-300 transition hover:bg-red-400/10 disabled:opacity-50"
+            >
+              삭제
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={startAnnouncementEditing}
+            className="shrink-0 rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-neutral-950 transition hover:bg-cyan-400"
+          >
+            작성
+          </button>
+        )}
+      </section>
+    );
+  }
+
   const handleCapture = useCallback(async (ref: React.RefObject<HTMLDivElement | null>) => {
     if (!ref.current) return;
     try {
@@ -856,6 +1033,8 @@ export default function HomeTab({
 
   return (
     <>
+      {renderHomeAnnouncement()}
+
       <div className="space-y-5 lg:hidden">
         <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
           <button

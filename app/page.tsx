@@ -20,6 +20,11 @@ import RecommendationModerationNotice from "./components/recommend/Recommendatio
 import type { ImageBlock, TextBlock, UsageBlock, UsageEditorBlock, UsagePost } from "./components/tabs/usage/types";
 import { supabase, migrateAuthCookies } from "../lib/supabase";
 import {
+  parseHomeAnnouncementSetting,
+  serializeHomeAnnouncement,
+  type HomeAnnouncement,
+} from "../lib/home-announcement";
+import {
   aggregateRecommendedDecks,
   chooseDisplayedRecommendedDecks,
   getCommunityRaidDecksCacheKey,
@@ -334,6 +339,8 @@ const RECOMMENDATION_TABLE = "solo_raid_recommendations";
 const LOCAL_FAVORITES_KEY = "soloraid_favorite_nikkes_v1";
 const FAVORITES_TABLE = "favorite_nikkes";
 const SITE_SETTINGS_TABLE = "site_settings";
+const HOME_ANNOUNCEMENT_KEY = "home_announcement_v1";
+const DEV_HOME_ANNOUNCEMENT_OVERRIDE_KEY = "soloraid_dev_home_announcement_override_v1";
 const RECOMMENDED_VIDEO_KEY = "recommended_video_url";
 const RECOMMENDED_NIKKES_KEY = "recommended_nikkes";
 const TERMS_TEXT_KEY = "terms_text";
@@ -1514,6 +1521,8 @@ export default function Page() {
   const [appConfigLoaded, setAppConfigLoaded] = useState(false);
   const [recommendationHistory, setRecommendationHistory] = useState<Record<string, RecommendationRecord>>({});
   const [recommendationLoaded, setRecommendationLoaded] = useState(false);
+  const [homeAnnouncement, setHomeAnnouncement] = useState<HomeAnnouncement | null>(null);
+  const [savingHomeAnnouncement, setSavingHomeAnnouncement] = useState(false);
   const [recommendedVideoUrl, setRecommendedVideoUrl] = useState<string>("");
   const [recommendedNikkeNames, setRecommendedNikkeNames] = useState<string[]>([]);
   const [communityRaidDecks, setCommunityRaidDecks] = useState<Deck[]>([]);
@@ -1730,6 +1739,25 @@ export default function Page() {
     const row = (data as SiteSettingRow | null) ?? { key: RECOMMENDED_VIDEO_KEY, value: null, updated_at: null, updated_by: null };
     writeCachedSiteSettings([row]);
     return (row.value ?? "").trim();
+  }
+
+  async function fetchHomeAnnouncement() {
+    if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+      const localOverride = window.localStorage.getItem(DEV_HOME_ANNOUNCEMENT_OVERRIDE_KEY);
+      if (localOverride !== null) {
+        return parseHomeAnnouncementSetting(localOverride);
+      }
+    }
+
+    const { data, error } = await supabase
+      .from(SITE_SETTINGS_TABLE)
+      .select("key,value,updated_at,updated_by")
+      .eq("key", HOME_ANNOUNCEMENT_KEY)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return parseHomeAnnouncementSetting((data as SiteSettingRow | null)?.value ?? null);
   }
 
   async function fetchRecommendedNikkeNames() {
@@ -2221,6 +2249,31 @@ export default function Page() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appConfigLoaded]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadHomeAnnouncement() {
+      if (tab !== "home") return;
+      try {
+        const nextAnnouncement = await fetchHomeAnnouncement();
+        if (!cancelled) {
+          setHomeAnnouncement(nextAnnouncement);
+        }
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) {
+          setHomeAnnouncement(null);
+        }
+      }
+    }
+
+    void loadHomeAnnouncement();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -4681,6 +4734,127 @@ export default function Page() {
     }
   }
 
+  async function saveHomeAnnouncementContent(nextContent: string) {
+    const canManageHomeAnnouncement = isMaster || process.env.NODE_ENV !== "production";
+    if (!canManageHomeAnnouncement) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+
+    const trimmed = nextContent.trim();
+    if (!trimmed) {
+      showToast("알림 내용을 입력해줘");
+      return false;
+    }
+
+    setSavingHomeAnnouncement(true);
+    try {
+      const version = crypto.randomUUID();
+      const settingValue = serializeHomeAnnouncement(trimmed, version);
+
+      if (process.env.NODE_ENV !== "production") {
+        window.localStorage.setItem(DEV_HOME_ANNOUNCEMENT_OVERRIDE_KEY, settingValue);
+        setHomeAnnouncement({ content: trimmed, version });
+        showToast("로컬 알림 저장 완료");
+        return true;
+      }
+
+      const currentUserId = await getCurrentUserId();
+      if (!currentUserId || !isMaster) {
+        showToast("마스터 계정만 가능");
+        return false;
+      }
+
+      const updatedAt = new Date().toISOString();
+      const { error } = await supabase
+        .from(SITE_SETTINGS_TABLE)
+        .upsert(
+          {
+            key: HOME_ANNOUNCEMENT_KEY,
+            value: settingValue,
+            updated_by: currentUserId,
+            updated_at: updatedAt,
+          },
+          { onConflict: "key" }
+        );
+
+      if (error) throw error;
+      writeCachedSiteSettings([
+        {
+          key: HOME_ANNOUNCEMENT_KEY,
+          value: settingValue,
+          updated_at: updatedAt,
+          updated_by: currentUserId,
+        },
+      ]);
+      setHomeAnnouncement({ content: trimmed, version });
+      showToast("홈 알림 저장 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("홈 알림 저장 실패");
+      return false;
+    } finally {
+      setSavingHomeAnnouncement(false);
+    }
+  }
+
+  async function deleteHomeAnnouncement() {
+    const canManageHomeAnnouncement = isMaster || process.env.NODE_ENV !== "production";
+    if (!canManageHomeAnnouncement) {
+      showToast("마스터 계정만 가능");
+      return false;
+    }
+
+    setSavingHomeAnnouncement(true);
+    try {
+      if (process.env.NODE_ENV !== "production") {
+        window.localStorage.setItem(DEV_HOME_ANNOUNCEMENT_OVERRIDE_KEY, "");
+        setHomeAnnouncement(null);
+        showToast("로컬 알림 삭제 완료");
+        return true;
+      }
+
+      const currentUserId = await getCurrentUserId();
+      if (!currentUserId || !isMaster) {
+        showToast("마스터 계정만 가능");
+        return false;
+      }
+
+      const updatedAt = new Date().toISOString();
+      const { error } = await supabase
+        .from(SITE_SETTINGS_TABLE)
+        .upsert(
+          {
+            key: HOME_ANNOUNCEMENT_KEY,
+            value: null,
+            updated_by: currentUserId,
+            updated_at: updatedAt,
+          },
+          { onConflict: "key" }
+        );
+
+      if (error) throw error;
+      writeCachedSiteSettings([
+        {
+          key: HOME_ANNOUNCEMENT_KEY,
+          value: null,
+          updated_at: updatedAt,
+          updated_by: currentUserId,
+        },
+      ]);
+      setHomeAnnouncement(null);
+      showToast("홈 알림 삭제 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("홈 알림 삭제 실패");
+      return false;
+    } finally {
+      setSavingHomeAnnouncement(false);
+    }
+  }
+
   async function saveRecommendedNikkes(nextNames: string[]) {
     if (!isMaster) {
       showToast("마스터 계정만 가능");
@@ -5438,6 +5612,11 @@ export default function Page() {
           <>
             {tab === "home" && (
               <HomeTab
+                announcement={homeAnnouncement}
+                canManageAnnouncement={isMaster || process.env.NODE_ENV !== "production"}
+                savingAnnouncement={savingHomeAnnouncement}
+                onSaveAnnouncement={saveHomeAnnouncementContent}
+                onDeleteAnnouncement={deleteHomeAnnouncement}
                 boss={boss}
                 bosses={bosses}
 	                decksCount={activeRaidDecks.length}
