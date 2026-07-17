@@ -407,22 +407,24 @@ export default function RecommendTab({
                       <span className="mr-1 text-xs text-neutral-400 sm:text-sm">평균</span>
                       {fmt(Math.round(deck.avgScore))}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => onCopyDeckToBuilder(deck)}
-                      className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-2 text-base font-medium leading-5 text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
-                    >
-                      복사
-                    </button>
-                    {isMaster || localModerationPreview ? (
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setOpenedRecommendationRecordKey((current) => current === deck.deckKey ? null : deck.deckKey)}
-                        className="rounded-xl border border-sky-500/40 bg-sky-500/10 px-3.5 py-2 text-base font-medium leading-5 text-sky-100 transition hover:border-sky-300/70"
+                        onClick={() => onCopyDeckToBuilder(deck)}
+                        className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-2 text-base font-medium leading-5 text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
                       >
-                        기록
+                        복사
                       </button>
-                    ) : null}
+                      {isMaster || localModerationPreview ? (
+                        <button
+                          type="button"
+                          onClick={() => setOpenedRecommendationRecordKey((current) => current === deck.deckKey ? null : deck.deckKey)}
+                          className="rounded-xl border border-sky-500/40 bg-sky-500/10 px-3.5 py-2 text-base font-medium leading-5 text-sky-100 transition hover:border-sky-300/70"
+                        >
+                          기록
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </article>
