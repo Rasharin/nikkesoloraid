@@ -121,7 +121,7 @@ function RecommendationRecordPanelContent({ raidKey, deckKey, fmt, onChanged, lo
               {record.blocked ? <span className="text-[11px] text-red-300">차단 유저</span> : null}
             </div>
             <div className="flex flex-wrap justify-end gap-1.5">
-              <button disabled={Boolean(busyId) || record.hidden} onClick={() => void act(record, "hide")} className="rounded-lg border border-amber-500/40 px-2.5 py-1.5 text-xs text-amber-200 disabled:opacity-40">숨김</button>
+              <button disabled={Boolean(busyId) || record.hidden} onClick={() => void act(record, "hide")} className="rounded-lg border border-amber-500/40 px-2.5 py-1.5 text-xs text-amber-200 light:text-black disabled:opacity-40">숨김</button>
               <button disabled={Boolean(busyId)} onClick={() => { setEditingId(record.id); setScoreText(String(record.score)); }} className="rounded-lg border border-sky-500/40 px-2.5 py-1.5 text-xs text-sky-200">수정</button>
               <button disabled={Boolean(busyId) || record.blocked} onClick={() => void act(record, "block_user")} className="rounded-lg border border-red-500/40 px-2.5 py-1.5 text-xs text-red-200 disabled:opacity-40">차단</button>
               <button disabled={Boolean(busyId)} onClick={() => void act(record, "delete")} className="rounded-lg border border-neutral-600 px-2.5 py-1.5 text-xs text-neutral-300">삭제</button>
