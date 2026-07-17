@@ -6,6 +6,7 @@ const jiti = createJiti(import.meta.url);
 const {
   parseModerationAction,
   parsePositiveSafeScore,
+  formatModeratedDeckSummary,
   RECOMMENDATION_MODERATION_NOTICE,
 } = jiti("../lib/recommendation-moderation.ts");
 
@@ -27,6 +28,13 @@ test("parsePositiveSafeScore rejects invalid and unsafe scores", () => {
 test("moderation notice uses the approved copy", () => {
   assert.equal(
     RECOMMENDATION_MODERATION_NOTICE,
-    "저장된 덱이 현재 서버에 추천 조합에 적용되지 않도록 조치 되었습니다.\n수정 후 다시 적용이 가능합니다."
+    "저장된 덱이 현재 서버에 적용되지 않도록 조치 되었습니다.\n수정 후 다시 적용이 가능합니다."
+  );
+});
+
+test("formatModeratedDeckSummary shows the hidden deck characters and score in eok", () => {
+  assert.equal(
+    formatModeratedDeckSummary(["라피", "나유타", "헬름", "레이븐", "이브"], 30_000_000_000),
+    "라피/나유타/헬름/레이븐/이브   300억"
   );
 });

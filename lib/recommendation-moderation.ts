@@ -1,5 +1,5 @@
 export const RECOMMENDATION_MODERATION_NOTICE =
-  "저장된 덱이 현재 서버에 추천 조합에 적용되지 않도록 조치 되었습니다.\n수정 후 다시 적용이 가능합니다.";
+  "저장된 덱이 현재 서버에 적용되지 않도록 조치 되었습니다.\n수정 후 다시 적용이 가능합니다.";
 
 export type ModerationAction = "hide" | "update_score" | "delete" | "block_user";
 
@@ -17,3 +17,10 @@ export function parsePositiveSafeScore(value: unknown): number | null {
   return Number.isSafeInteger(score) && score > 0 ? score : null;
 }
 
+export function formatModeratedDeckSummary(chars: readonly string[], score: number): string {
+  const names = chars.map((name) => name.trim()).filter(Boolean).join("/");
+  const eokScore = Number.isFinite(score) && score > 0
+    ? `${Math.round(score / 100_000_000).toLocaleString("ko-KR")}억`
+    : "-";
+  return `${names}   ${eokScore}`;
+}

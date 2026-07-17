@@ -14,14 +14,28 @@ export async function GET() {
   const admin = createRecommendationAdminClient(env);
   const { data, error } = await admin
     .from("recommendation_moderation_notices")
-    .select("id")
+    .select("id,deck_id")
     .eq("user_id", userId)
     .is("acknowledged_at", null)
     .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
   if (error) return NextResponse.json({ error: "Failed to load notice." }, { status: 500 });
-  return NextResponse.json({ notice: data ? { id: data.id, message: RECOMMENDATION_MODERATION_NOTICE } : null });
+  if (!data) return NextResponse.json({ notice: null });
+
+  const { data: deck, error: deckError } = data.deck_id
+    ? await admin.from("decks").select("chars,score").eq("id", data.deck_id).maybeSingle()
+    : { data: null, error: null };
+  if (deckError) return NextResponse.json({ error: "Failed to load notice deck." }, { status: 500 });
+
+  return NextResponse.json({
+    notice: {
+      id: data.id,
+      message: RECOMMENDATION_MODERATION_NOTICE,
+      deckChars: Array.isArray(deck?.chars) ? deck.chars : [],
+      deckScore: deck ? Number(deck.score) : null,
+    },
+  });
 }
 
 export async function PATCH(request: Request) {

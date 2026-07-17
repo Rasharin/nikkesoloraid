@@ -1,11 +1,19 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
-import { RECOMMENDATION_MODERATION_NOTICE } from "../../../lib/recommendation-moderation";
+import {
+  formatModeratedDeckSummary,
+  RECOMMENDATION_MODERATION_NOTICE,
+} from "../../../lib/recommendation-moderation";
 
-type Notice = { id: string; message: string };
+type Notice = {
+  id: string;
+  message: string;
+  deckChars: string[];
+  deckScore: number | null;
+};
 
-const LOCAL_NOTICE_ACK_KEY = "soloraid_local_moderation_notice_ack_v1";
+const LOCAL_NOTICE_ACK_KEY = "soloraid_local_moderation_notice_ack_v2";
 
 function RecommendationModerationNoticeContent({
   userId,
@@ -19,7 +27,12 @@ function RecommendationModerationNoticeContent({
     try {
       if (sessionStorage.getItem(LOCAL_NOTICE_ACK_KEY) === "true") return null;
     } catch {}
-    return { id: "local-preview", message: RECOMMENDATION_MODERATION_NOTICE };
+    return {
+      id: "local-preview",
+      message: RECOMMENDATION_MODERATION_NOTICE,
+      deckChars: ["라피", "나유타", "헬름", "레이븐", "이브"],
+      deckScore: 30_000_000_000,
+    };
   });
 
   useEffect(() => {
@@ -34,6 +47,11 @@ function RecommendationModerationNoticeContent({
   }, [localPreview, userId]);
 
   if ((!userId && !localPreview) || !notice) return null;
+
+  const hasDeckDetails =
+    notice.deckChars.length > 0 &&
+    notice.deckScore !== null &&
+    Number.isFinite(notice.deckScore);
 
   async function acknowledge() {
     if (localPreview) {
@@ -58,6 +76,14 @@ function RecommendationModerationNoticeContent({
       <div className="w-full max-w-md rounded-2xl border border-amber-500/30 bg-neutral-950 p-5 shadow-2xl">
         <h2 className="text-lg font-semibold text-neutral-100">추천 조합 적용 안내</h2>
         <p className="mt-3 whitespace-pre-line text-sm leading-6 text-neutral-300">{notice.message}</p>
+        {hasDeckDetails ? (
+          <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+            <div className="text-xs font-semibold text-amber-200 light:text-black">숨김 조치 덱</div>
+            <div className="mt-2 break-words text-sm font-medium text-neutral-100">
+              {formatModeratedDeckSummary(notice.deckChars, notice.deckScore!)}
+            </div>
+          </div>
+        ) : null}
         <button type="button" onClick={() => void acknowledge()} className="mt-5 w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black">
           확인
         </button>
