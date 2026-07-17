@@ -1,9 +1,11 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   formatModeratedDeckSummary,
   RECOMMENDATION_MODERATION_NOTICE,
+  shouldPersistNoticeAcknowledgement,
 } from "../../../lib/recommendation-moderation";
 
 type Notice = {
@@ -13,7 +15,7 @@ type Notice = {
   deckScore: number | null;
 };
 
-const LOCAL_NOTICE_ACK_KEY = "soloraid_local_moderation_notice_ack_v2";
+const LOCAL_NOTICE_ACK_KEY = "soloraid_local_moderation_notice_ack_v3";
 
 function RecommendationModerationNoticeContent({
   userId,
@@ -22,10 +24,12 @@ function RecommendationModerationNoticeContent({
   userId: string | null;
   localPreview?: boolean;
 }) {
+  const router = useRouter();
+  const [doNotShowAgain, setDoNotShowAgain] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(() => {
     if (!localPreview || typeof window === "undefined") return null;
     try {
-      if (sessionStorage.getItem(LOCAL_NOTICE_ACK_KEY) === "true") return null;
+      if (localStorage.getItem(LOCAL_NOTICE_ACK_KEY) === "true") return null;
     } catch {}
     return {
       id: "local-preview",
@@ -53,13 +57,20 @@ function RecommendationModerationNoticeContent({
     notice.deckScore !== null &&
     Number.isFinite(notice.deckScore);
 
-  async function acknowledge() {
+  async function closeNotice(): Promise<boolean> {
+    const persistAcknowledgement = shouldPersistNoticeAcknowledgement(doNotShowAgain);
+
+    if (!persistAcknowledgement) {
+      setNotice(null);
+      return true;
+    }
+
     if (localPreview) {
       try {
-        sessionStorage.setItem(LOCAL_NOTICE_ACK_KEY, "true");
+        localStorage.setItem(LOCAL_NOTICE_ACK_KEY, "true");
       } catch {}
       setNotice(null);
-      return;
+      return true;
     }
 
     const response = await fetch("/api/recommendation-notices", {
@@ -68,7 +79,14 @@ function RecommendationModerationNoticeContent({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: notice?.id }),
     });
-    if (response.ok) setNotice(null);
+    if (!response.ok) return false;
+    setNotice(null);
+    return true;
+  }
+
+  async function moveToSavedDeck() {
+    const closed = await closeNotice();
+    if (closed) router.push("/saved-deck");
   }
 
   return (
@@ -84,9 +102,23 @@ function RecommendationModerationNoticeContent({
             </div>
           </div>
         ) : null}
-        <button type="button" onClick={() => void acknowledge()} className="mt-5 w-full rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black">
-          확인
-        </button>
+        <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-neutral-300">
+          <input
+            type="checkbox"
+            checked={doNotShowAgain}
+            onChange={(event) => setDoNotShowAgain(event.target.checked)}
+            className="h-4 w-4 rounded border-neutral-600"
+          />
+          다시 보지 않기
+        </label>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => void moveToSavedDeck()} className="rounded-xl border border-neutral-600 px-4 py-2.5 text-sm font-semibold text-neutral-200">
+            수정하기
+          </button>
+          <button type="button" onClick={() => void closeNotice()} className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black">
+            확인
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -24,3 +24,7 @@ export function formatModeratedDeckSummary(chars: readonly string[], score: numb
     : "-";
   return `${names}   ${eokScore}`;
 }
+
+export function shouldPersistNoticeAcknowledgement(doNotShowAgain: boolean): boolean {
+  return doNotShowAgain;
+}

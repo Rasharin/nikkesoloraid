@@ -87,7 +87,7 @@ export async function PATCH(request: Request) {
 
     const { data: deck, error: deckError } = await ctx.admin
       .from("decks")
-      .select("id,user_id,updated_at")
+      .select("id,user_id,chars,score,updated_at")
       .eq("id", deckId)
       .maybeSingle();
     if (deckError) throw deckError;
@@ -103,7 +103,14 @@ export async function PATCH(request: Request) {
       });
       if (error) throw error;
       const { error: noticeError } = await ctx.admin.from("recommendation_moderation_notices").upsert(
-        { user_id: deck.user_id, deck_id: deck.id, created_at: new Date().toISOString(), acknowledged_at: null },
+        {
+          user_id: deck.user_id,
+          deck_id: deck.id,
+          deck_chars: deck.chars,
+          deck_score: deck.score,
+          created_at: new Date().toISOString(),
+          acknowledged_at: null,
+        },
         { onConflict: "user_id,deck_id" }
       );
       if (noticeError) throw noticeError;

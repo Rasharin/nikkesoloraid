@@ -7,6 +7,7 @@ const {
   parseModerationAction,
   parsePositiveSafeScore,
   formatModeratedDeckSummary,
+  shouldPersistNoticeAcknowledgement,
   RECOMMENDATION_MODERATION_NOTICE,
 } = jiti("../lib/recommendation-moderation.ts");
 
@@ -37,4 +38,9 @@ test("formatModeratedDeckSummary shows the hidden deck characters and score in e
     formatModeratedDeckSummary(["라피", "나유타", "헬름", "레이븐", "이브"], 30_000_000_000),
     "라피/나유타/헬름/레이븐/이브   300억"
   );
+});
+
+test("notice is acknowledged only when do-not-show-again is checked", () => {
+  assert.equal(shouldPersistNoticeAcknowledgement(true), true);
+  assert.equal(shouldPersistNoticeAcknowledgement(false), false);
 });

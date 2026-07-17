@@ -14,7 +14,7 @@ export async function GET() {
   const admin = createRecommendationAdminClient(env);
   const { data, error } = await admin
     .from("recommendation_moderation_notices")
-    .select("id,deck_id")
+    .select("id,deck_id,deck_chars,deck_score")
     .eq("user_id", userId)
     .is("acknowledged_at", null)
     .order("created_at", { ascending: true })
@@ -32,8 +32,16 @@ export async function GET() {
     notice: {
       id: data.id,
       message: RECOMMENDATION_MODERATION_NOTICE,
-      deckChars: Array.isArray(deck?.chars) ? deck.chars : [],
-      deckScore: deck ? Number(deck.score) : null,
+      deckChars: Array.isArray(data.deck_chars)
+        ? data.deck_chars
+        : Array.isArray(deck?.chars)
+          ? deck.chars
+          : [],
+      deckScore: data.deck_score !== null
+        ? Number(data.deck_score)
+        : deck
+          ? Number(deck.score)
+          : null,
     },
   });
 }
