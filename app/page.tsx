@@ -16,6 +16,7 @@ import LicenseContent from "./components/LicenseContent";
 import NoticeContent, { type NoticePost } from "./components/NoticeContent";
 import PrivacyContent from "./components/PrivacyContent";
 import TermsContent from "./components/TermsContent";
+import RecommendationModerationNotice from "./components/recommend/RecommendationModerationNotice";
 import type { ImageBlock, TextBlock, UsageBlock, UsageEditorBlock, UsagePost } from "./components/tabs/usage/types";
 import { supabase, migrateAuthCookies } from "../lib/supabase";
 import {
@@ -1516,6 +1517,7 @@ export default function Page() {
   const [recommendedVideoUrl, setRecommendedVideoUrl] = useState<string>("");
   const [recommendedNikkeNames, setRecommendedNikkeNames] = useState<string[]>([]);
   const [communityRaidDecks, setCommunityRaidDecks] = useState<Deck[]>([]);
+  const [recommendationModerationRefreshTick, setRecommendationModerationRefreshTick] = useState(0);
   const [loadingCommunityRaidDecks, setLoadingCommunityRaidDecks] = useState(false);
   const [recommendedDeckSnapshots, setRecommendedDeckSnapshots] = useState<Record<string, RecommendedDeckSnapshot>>({});
   const [loadingRecommendedDeckSnapshots, setLoadingRecommendedDeckSnapshots] = useState(false);
@@ -1634,15 +1636,14 @@ export default function Page() {
     const cachedDecks = options.forceRefresh ? null : readCachedCommunityRaidDecks(raidKey, isAuthenticated);
     if (cachedDecks) return cachedDecks;
 
-    const { data, error } = await supabase
-      .from("decks")
-      .select("id,user_id,raid_key,deck_key,chars,score,created_at")
-      .eq("raid_key", raidKey)
-      .not("user_id", "is", null)
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-    const rows = ((data ?? []) as Array<Omit<DeckRow, "note">>).map((row) => ({ ...row, note: null }));
+    const response = await fetch(`/api/recommendations/decks?raidKey=${encodeURIComponent(raidKey)}`, {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`recommendation decks failed: ${response.status}`);
+    const payload = (await response.json()) as { decks?: Array<Omit<DeckRow, "note">> };
+    const rows = (payload.decks ?? []).map((row) => ({ ...row, note: null }));
 
     const decks = rows.map(mapDeckRow).filter((d): d is Deck => d !== null);
     writeCachedCommunityRaidDecks(raidKey, decks, isAuthenticated);
@@ -2986,7 +2987,7 @@ export default function Page() {
 	      cancelled = true;
         window.clearInterval(intervalId);
 	    };
-		  }, [authResolved, fetchCommunityRaidDecks, isPageVisible, recommendDeckLoadRaidKey, tab, userId]);
+		  }, [authResolved, fetchCommunityRaidDecks, isPageVisible, recommendDeckLoadRaidKey, recommendationModerationRefreshTick, tab, userId]);
 	  const recommendedDecks = useMemo(() => {
 	    return aggregateRecommendedDecks(communityRaidDecks);
 	  }, [communityRaidDecks]);
@@ -5410,7 +5411,7 @@ export default function Page() {
             <NoticeContent
               posts={noticePosts}
               loading={loadingNoticePosts}
-              isMaster={isMaster}
+	              isMaster={isMaster}
               saving={savingNoticePost}
               deletingId={deletingNoticePostId}
               onSubmit={submitNoticePost}
@@ -5535,6 +5536,7 @@ export default function Page() {
               loadingTips={loadingSoloRaidTips}
               currentUserId={userId}
               isMaster={isMaster}
+              localModerationPreview={process.env.NODE_ENV !== "production"}
               canWriteTips={Boolean(userId) || process.env.NODE_ENV !== "production"}
               editorUserId={userId ?? (process.env.NODE_ENV !== "production" ? DEV_LOCAL_TIP_USER_ID : null)}
               onSubmitTip={submitSoloRaidTip}
@@ -5542,6 +5544,10 @@ export default function Page() {
               onDeleteTip={deleteSoloRaidTip}
               onCopyDeckToBuilder={copyRecommendedDeckToBuilder}
               onCopyDecksToBuilder={copyRecommendedDecksToBuilder}
+              onRecommendationModerationChanged={() => {
+                removeCachedCommunityRaidDecks([selectedRecommendRaidKey]);
+                setRecommendationModerationRefreshTick((value) => value + 1);
+              }}
               nikkeMap={nikkeMap}
               getPublicUrl={getPublicUrl}
               fmt={fmt}
@@ -5620,6 +5626,7 @@ export default function Page() {
           <MyPageTab
             deckTabs={deckTabs}
             isMaster={isMaster}
+            localModerationPreview={process.env.NODE_ENV !== "production"}
             showBossManagement={canManageBosses}
             recommendationHistory={recommendationHistory}
             onlineUserCount={onlineUserCount}
@@ -5690,6 +5697,7 @@ export default function Page() {
           </nav>
         </div>
       </footer>
+      <RecommendationModerationNotice userId={userId} localPreview={process.env.NODE_ENV !== "production"} />
     </div>
   );
 }

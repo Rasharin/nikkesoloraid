@@ -10,6 +10,7 @@ import {
   type SoloRaidScheduleStatus,
 } from "../../../lib/solo-raid-schedule";
 import type { ScoreDisplayMode } from "../../../lib/score-format";
+import BlockedUsersSection from "../../components/mypage/BlockedUsersSection";
 
 type RecommendationDeck = {
   chars: string[];
@@ -68,12 +69,13 @@ type NikkeRow = {
 
 type NikkeElementValue = "iron" | "fire" | "wind" | "water" | "electric" | null;
 type NikkeRoleValue = "attacker" | "supporter" | "defender" | null;
-type AdminSectionKey = "nikkes" | "recommended" | "bosses" | "video";
+type AdminSectionKey = "nikkes" | "recommended" | "bosses" | "video" | "blocked-users";
 type ThemeMode = "dark" | "light";
 
 type MyPageTabProps = {
   deckTabs: readonly DeckTabItem[];
   isMaster: boolean;
+  localModerationPreview?: boolean;
   showBossManagement: boolean;
   recommendationHistory: Record<string, RecommendationRecord>;
   onlineUserCount: number;
@@ -177,6 +179,7 @@ function formatScheduleDateTime(value: string) {
 export default function MyPageTab({
   deckTabs,
   isMaster,
+  localModerationPreview = false,
   showBossManagement,
   recommendationHistory,
   onlineUserCount,
@@ -765,6 +768,11 @@ export default function MyPageTab({
             <button type="button" onClick={() => setAdminSection("video")} className={adminTabClass(adminSection === "video")}>
               추천 영상
             </button>
+            {isMaster || localModerationPreview ? (
+              <button type="button" onClick={() => setAdminSection("blocked-users")} className={adminTabClass(adminSection === "blocked-users")}>
+                차단 유저
+              </button>
+            ) : null}
           </div>
 
           {adminSection === "nikkes" ? (
@@ -1574,6 +1582,10 @@ export default function MyPageTab({
                 </div>
               </div>
             </div>
+          ) : null}
+
+          {adminSection === "blocked-users" && (isMaster || localModerationPreview) ? (
+            <BlockedUsersSection localPreview={localModerationPreview} />
           ) : null}
         </section>
       ) : null}

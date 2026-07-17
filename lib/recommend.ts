@@ -34,6 +34,16 @@ export type RecommendationRankRow = {
   total: number;
 };
 
+export function isDeckHiddenAfterModeration(
+  deckUpdatedAt: string | null | undefined,
+  hiddenDeckUpdatedAt: string | null | undefined
+): boolean {
+  const deckTime = Date.parse(deckUpdatedAt ?? "");
+  const hiddenVersionTime = Date.parse(hiddenDeckUpdatedAt ?? "");
+  if (!Number.isFinite(deckTime) || !Number.isFinite(hiddenVersionTime)) return true;
+  return deckTime <= hiddenVersionTime;
+}
+
 export function shouldLoadRecommendationRank({
   soloRaidInProgress,
   raidKey,

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import { isDeckHiddenAfterModeration } from "@/lib/recommend";
 
 function getServerEnv() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -27,26 +26,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "raidKey is required." }, { status: 400 });
   }
 
-  const cookieStore = await cookies();
-  const supabase = createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          cookieStore.set(name, value, options ?? {});
-        });
-      },
-    },
-  });
-
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  const userId = userData.user?.id ?? null;
-  if (userError || !userId) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
-
   const admin = createClient(env.supabaseUrl, env.serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
@@ -56,7 +35,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await admin
     .from("decks")
-    .select("id,user_id,raid_key,deck_key,chars,score,created_at")
+    .select("id,user_id,raid_key,deck_key,chars,score,created_at,updated_at")
     .eq("raid_key", raidKey)
     .order("created_at", { ascending: false });
 
@@ -65,10 +44,38 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Failed to load recommendation decks." }, { status: 500 });
   }
 
-  const decks = (data ?? []).map((deck) => ({
-    ...deck,
-    note: null,
-  }));
+  const userIds = [...new Set((data ?? []).map((deck) => deck.user_id))];
+  const deckIds = (data ?? []).map((deck) => deck.id);
+  const [{ data: blockedRows }, { data: moderationRows }] = await Promise.all([
+    userIds.length
+      ? admin.from("recommendation_blocked_users").select("user_id").in("user_id", userIds)
+      : Promise.resolve({ data: [] }),
+    deckIds.length
+      ? admin
+          .from("recommendation_deck_moderations")
+          .select("deck_id,hidden_deck_updated_at")
+          .in("deck_id", deckIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const blocked = new Set((blockedRows ?? []).map((row) => row.user_id));
+  const moderationByDeck = new Map((moderationRows ?? []).map((row) => [row.deck_id, row.hidden_deck_updated_at]));
+
+  const decks = (data ?? [])
+    .filter((deck) => !blocked.has(deck.user_id))
+    .filter((deck) => {
+      const hiddenVersion = moderationByDeck.get(deck.id);
+      return !hiddenVersion || !isDeckHiddenAfterModeration(deck.updated_at, hiddenVersion);
+    })
+    .map((deck) => ({
+      id: deck.id,
+      user_id: "",
+      raid_key: deck.raid_key,
+      deck_key: deck.deck_key,
+      chars: deck.chars,
+      score: deck.score,
+      created_at: deck.created_at,
+      note: null,
+    }));
 
   return NextResponse.json({ decks });
 }

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { formatRecommendationRankLabel } from "../../../lib/recommend";
 import GiseonDeckSection from "../recommend/GiseonDeckSection";
+import RecommendationRecordPanel from "../recommend/RecommendationRecordPanel";
 
 type NikkeRow = {
   id: string;
@@ -80,6 +81,7 @@ type RecommendTabProps = {
   loadingTips: boolean;
   currentUserId: string | null;
   isMaster: boolean;
+  localModerationPreview?: boolean;
   canWriteTips: boolean;
   editorUserId: string | null;
   onSubmitTip: (payload: { content: string }) => Promise<boolean>;
@@ -87,6 +89,7 @@ type RecommendTabProps = {
   onDeleteTip: (id: string) => Promise<boolean>;
   onCopyDeckToBuilder: (deck: RecommendedDeck) => void;
   onCopyDecksToBuilder: (decks: RecommendedDeck[]) => void;
+  onRecommendationModerationChanged: () => void;
   nikkeMap: Map<string, NikkeRow>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   fmt: (value: number) => string;
@@ -111,6 +114,7 @@ export default function RecommendTab({
   loadingTips,
   currentUserId,
   isMaster,
+  localModerationPreview = false,
   canWriteTips,
   editorUserId,
   onSubmitTip,
@@ -118,6 +122,7 @@ export default function RecommendTab({
   onDeleteTip,
   onCopyDeckToBuilder,
   onCopyDecksToBuilder,
+  onRecommendationModerationChanged,
   nikkeMap,
   getPublicUrl,
   fmt,
@@ -134,6 +139,7 @@ export default function RecommendTab({
   const [q, setQ] = useState("");
   const [sortMode, setSortMode] = useState<RecommendedDeckSortMode>(() => readStoredRecommendedDeckSortMode());
   const [visibleRecommendedDeckCount, setVisibleRecommendedDeckCount] = useState(RECOMMENDED_DECK_PAGE_SIZE);
+  const [openedRecommendationRecordKey, setOpenedRecommendationRecordKey] = useState<string | null>(null);
 
   const tipDateFormatter = useMemo(
     () =>
@@ -370,7 +376,8 @@ export default function RecommendTab({
           ) : (
             <>
             {visibleRecommendedDecks.map((deck) => (
-              <article key={deck.deckKey} className="flex flex-col gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div key={deck.deckKey} className="space-y-2">
+              <article className="flex flex-col gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="grid w-full grid-cols-5 gap-2 sm:max-w-[66%] sm:flex-1">
                   {deck.chars.map((name) => {
                     const nikke = nikkeMap.get(name);
@@ -407,9 +414,28 @@ export default function RecommendTab({
                     >
                       복사
                     </button>
+                    {isMaster || localModerationPreview ? (
+                      <button
+                        type="button"
+                        onClick={() => setOpenedRecommendationRecordKey((current) => current === deck.deckKey ? null : deck.deckKey)}
+                        className="rounded-xl border border-sky-500/40 bg-sky-500/10 px-3.5 py-2 text-base font-medium leading-5 text-sky-100 transition hover:border-sky-300/70"
+                      >
+                        기록
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </article>
+              {(isMaster || localModerationPreview) && openedRecommendationRecordKey === deck.deckKey ? (
+                <RecommendationRecordPanel
+                  raidKey={raidKey}
+                  deckKey={deck.deckKey}
+                  fmt={fmt}
+                  onChanged={localModerationPreview ? () => {} : onRecommendationModerationChanged}
+                  localPreview={localModerationPreview}
+                />
+              ) : null}
+              </div>
             ))}
 
             {hasMoreRecommendedDecks ? (
