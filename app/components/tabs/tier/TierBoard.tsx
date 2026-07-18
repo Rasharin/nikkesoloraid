@@ -1,0 +1,390 @@
+"use client";
+
+import Image from "next/image";
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  rectSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { useMemo, useState, type CSSProperties } from "react";
+import {
+  getContrastingTextColor,
+  moveNikke,
+  type TierBoardData,
+  type TierRow,
+} from "../../../../lib/nikke-tier";
+import { formatNikkeDisplayName } from "../../../../lib/nikke-display";
+import TierNikkeCatalog, {
+  type TierFilterOption,
+  type TierNikkeRow,
+} from "./TierNikkeCatalog";
+import TierSettingsPanel from "./TierSettingsPanel";
+
+type DragData = {
+  source?: "catalog" | "tier";
+  nikkeName?: string;
+  rowId?: string;
+  index?: number;
+};
+
+type TierBoardProps = {
+  board: TierBoardData;
+  nikkes: TierNikkeRow[];
+  canEdit: boolean;
+  saving: boolean;
+  onChange: (board: TierBoardData) => void;
+  getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
+  bursts: readonly { readonly n: number; readonly label: string }[];
+  elements: readonly TierFilterOption[];
+  roles: readonly TierFilterOption[];
+};
+
+function EditableLabel({
+  value,
+  canEdit,
+  onChange,
+  className = "",
+}: {
+  value: string;
+  canEdit: boolean;
+  onChange: (value: string) => void;
+  className?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  function finish() {
+    const nextValue = draft.trim();
+    if (nextValue) onChange(nextValue);
+    else setDraft(value);
+    setEditing(false);
+  }
+
+  if (editing && canEdit) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={finish}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") finish();
+          if (event.key === "Escape") {
+            setDraft(value);
+            setEditing(false);
+          }
+        }}
+        className={`min-w-0 rounded-lg border border-white/50 bg-black/20 px-2 py-1 text-inherit outline-none ${className}`}
+      />
+    );
+  }
+
+  return (
+    <span
+      onDoubleClick={() => {
+        if (!canEdit) return;
+        setDraft(value);
+        setEditing(true);
+      }}
+      title={canEdit ? "더블클릭하여 수정" : undefined}
+      className={`${canEdit ? "cursor-text" : ""} ${className}`}
+    >
+      {value}
+    </span>
+  );
+}
+
+function TierNikkeCard({
+  nikke,
+  rowId,
+  index,
+  canEdit,
+  getPublicUrl,
+}: {
+  nikke: TierNikkeRow;
+  rowId: string;
+  index: number;
+  canEdit: boolean;
+  getPublicUrl: TierBoardProps["getPublicUrl"];
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `tier-card-${rowId}-${nikke.name}`,
+    disabled: !canEdit,
+    data: { source: "tier", nikkeName: nikke.name, rowId, index } satisfies DragData,
+  });
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.25 : 1,
+  };
+  const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      disabled={!canEdit}
+      style={style}
+      {...(canEdit ? attributes : {})}
+      {...(canEdit ? listeners : {})}
+      className={`w-16 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-black/25 sm:w-20 ${
+        canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-default"
+      }`}
+    >
+      <div className="relative aspect-square w-full">
+        {imageUrl ? (
+          <Image
+            fill
+            src={imageUrl}
+            alt={formatNikkeDisplayName(nikke.name)}
+            className="object-cover"
+            sizes="80px"
+          />
+        ) : (
+          <div className="grid h-full place-items-center text-[9px] text-white/60">no image</div>
+        )}
+      </div>
+      <div className="truncate px-1 py-1 text-[10px] text-white">
+        {formatNikkeDisplayName(nikke.name)}
+      </div>
+    </button>
+  );
+}
+
+function TierRowView({
+  row,
+  nikkesByName,
+  canEdit,
+  onNameChange,
+  getPublicUrl,
+}: {
+  row: TierRow;
+  nikkesByName: ReadonlyMap<string, TierNikkeRow>;
+  canEdit: boolean;
+  onNameChange: (name: string) => void;
+  getPublicUrl: TierBoardProps["getPublicUrl"];
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `tier-row-${row.id}`,
+    disabled: !canEdit,
+    data: { rowId: row.id },
+  });
+
+  return (
+    <div
+      className="grid min-h-24 grid-cols-[minmax(0,1fr)_4.5rem] overflow-hidden rounded-2xl border sm:grid-cols-[minmax(0,1fr)_6rem]"
+      style={{
+        borderColor: `${row.color}99`,
+        backgroundColor: `${row.color}18`,
+        boxShadow: isOver ? `0 0 0 2px ${row.color}` : undefined,
+      }}
+    >
+      <div ref={setNodeRef} className="min-w-0 p-2.5">
+        <SortableContext
+          items={row.nikkeNames.map((name) => `tier-card-${row.id}-${name}`)}
+          strategy={rectSortingStrategy}
+        >
+          <div className="flex min-h-20 flex-wrap content-start gap-2">
+            {row.nikkeNames.map((name, index) => {
+              const nikke = nikkesByName.get(name);
+              return nikke ? (
+                <TierNikkeCard
+                  key={name}
+                  nikke={nikke}
+                  rowId={row.id}
+                  index={index}
+                  canEdit={canEdit}
+                  getPublicUrl={getPublicUrl}
+                />
+              ) : null;
+            })}
+            {row.nikkeNames.length === 0 ? (
+              <div className="grid min-h-20 flex-1 place-items-center rounded-xl border border-dashed border-white/15 text-xs text-[var(--muted)]">
+                {canEdit ? "니케를 여기에 놓으세요" : "배치된 니케가 없습니다"}
+              </div>
+            ) : null}
+          </div>
+        </SortableContext>
+      </div>
+
+      <div
+        className="grid place-items-center p-2 text-center text-lg font-black sm:text-xl"
+        style={{ backgroundColor: row.color, color: getContrastingTextColor(row.color) }}
+      >
+        <EditableLabel value={row.name} canEdit={canEdit} onChange={onNameChange} />
+      </div>
+    </div>
+  );
+}
+
+export default function TierBoard({
+  board,
+  nikkes,
+  canEdit,
+  saving,
+  onChange,
+  getPublicUrl,
+  bursts,
+  elements,
+  roles,
+}: TierBoardProps) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activeNikkeName, setActiveNikkeName] = useState<string | null>(null);
+  const nikkesByName = useMemo(
+    () => new Map(nikkes.map((nikke) => [nikke.name, nikke])),
+    [nikkes]
+  );
+  const assignedTiers = useMemo(() => {
+    const map = new Map<string, string>();
+    board.rows.forEach((row) => row.nikkeNames.forEach((name) => map.set(name, row.name)));
+    return map;
+  }, [board.rows]);
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  function updateRows(rows: TierRow[]) {
+    onChange({ ...board, rows });
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    const data = (event.active.data.current ?? {}) as DragData;
+    setActiveNikkeName(data.nikkeName ?? null);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveNikkeName(null);
+    if (!canEdit || !event.over) return;
+    const activeData = (event.active.data.current ?? {}) as DragData;
+    const overData = (event.over.data.current ?? {}) as DragData & { rowId?: string };
+    const nikkeName = activeData.nikkeName;
+    const targetRowId =
+      overData.rowId ??
+      (typeof event.over.id === "string" && event.over.id.startsWith("tier-row-")
+        ? event.over.id.slice("tier-row-".length)
+        : undefined);
+    if (!nikkeName || !targetRowId) return;
+    onChange(
+      moveNikke(board, {
+        nikkeName,
+        targetRowId,
+        targetIndex: typeof overData.index === "number" ? overData.index : undefined,
+      })
+    );
+  }
+
+  const activeNikke = activeNikkeName ? nikkesByName.get(activeNikkeName) : null;
+  const activeImageUrl = activeNikke?.image_path
+    ? getPublicUrl("nikke-images", activeNikke.image_path)
+    : "";
+
+  return (
+    <DndContext
+      id="nikke-tier-dnd"
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragCancel={() => setActiveNikkeName(null)}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="grid gap-5">
+        <section className="rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)] lg:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold text-[var(--text)]">
+                <EditableLabel
+                  value={board.sectionName}
+                  canEdit={canEdit}
+                  onChange={(sectionName) => onChange({ ...board, sectionName })}
+                />
+              </h2>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                {canEdit ? "이름은 더블클릭하여 수정할 수 있습니다." : "공용 니케 티어표입니다."}
+                {saving ? " 저장 중…" : ""}
+              </p>
+            </div>
+
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => setSettingsOpen((open) => !open)}
+                aria-label="티어 설정"
+                title="설정"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[var(--border)] bg-[var(--card)] text-xl text-[var(--theme-text-soft)] transition hover:rotate-45 hover:border-cyan-400"
+              >
+                ⚙
+              </button>
+            ) : null}
+          </div>
+
+          {canEdit && settingsOpen ? (
+            <TierSettingsPanel
+              rows={board.rows}
+              onChange={updateRows}
+              onClose={() => setSettingsOpen(false)}
+            />
+          ) : null}
+
+          <div className="mt-4 grid gap-2.5">
+            {board.rows.map((row) => (
+              <TierRowView
+                key={row.id}
+                row={row}
+                nikkesByName={nikkesByName}
+                canEdit={canEdit}
+                onNameChange={(name) =>
+                  updateRows(
+                    board.rows.map((item) => (item.id === row.id ? { ...item, name } : item))
+                  )
+                }
+                getPublicUrl={getPublicUrl}
+              />
+            ))}
+          </div>
+        </section>
+
+        <TierNikkeCatalog
+          nikkes={nikkes}
+          assignedTiers={assignedTiers}
+          canEdit={canEdit}
+          getPublicUrl={getPublicUrl}
+          bursts={bursts}
+          elements={elements}
+          roles={roles}
+        />
+      </div>
+
+      <DragOverlay zIndex={80} dropAnimation={null}>
+        {activeNikke ? (
+          <div className="w-20 overflow-hidden rounded-xl border border-white/30 bg-neutral-950 shadow-2xl">
+            <div className="relative aspect-square">
+              {activeImageUrl ? (
+                <Image fill src={activeImageUrl} alt={activeNikke.name} className="object-cover" sizes="80px" />
+              ) : null}
+            </div>
+            <div className="truncate px-1 py-1 text-center text-[10px] text-white">
+              {formatNikkeDisplayName(activeNikke.name)}
+            </div>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+}
