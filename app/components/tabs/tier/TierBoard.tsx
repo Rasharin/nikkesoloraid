@@ -4,6 +4,7 @@ import Image from "next/image";
 import {
   closestCenter,
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   MouseSensor,
   pointerWithin,
@@ -169,6 +170,46 @@ function EditableLabel({
   );
 }
 
+function TierNikkeCardVisual({
+  nikke,
+  getPublicUrl,
+  overlay = false,
+}: {
+  nikke: TierNikkeRow;
+  getPublicUrl: TierBoardProps["getPublicUrl"];
+  overlay?: boolean;
+}) {
+  const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+
+  return (
+    <div
+      className={`w-16 overflow-hidden rounded-xl border border-black/10 bg-white/80 sm:w-20 dark:border-white/15 dark:bg-black/25 ${
+        overlay ? "scale-[1.03] shadow-2xl" : ""
+      }`}
+    >
+      <div className="relative aspect-square w-full">
+        {imageUrl ? (
+          <Image
+            fill
+            src={imageUrl}
+            alt={formatNikkeDisplayName(nikke.name)}
+            draggable={false}
+            className="pointer-events-none object-cover"
+            sizes="80px"
+          />
+        ) : (
+          <div className="grid h-full place-items-center text-[9px] text-white/60">
+            no image
+          </div>
+        )}
+      </div>
+      <div className="truncate px-1 py-1 text-[13px] text-neutral-900 dark:text-white">
+        {formatNikkeDisplayName(nikke.name)}
+      </div>
+    </div>
+  );
+}
+
 function TierNikkeCard({
   nikke,
   rowId,
@@ -201,8 +242,8 @@ function TierNikkeCard({
     transition: isDragging ? "none" : transition,
     zIndex: isDragging ? 20 : undefined,
     position: isDragging ? "relative" : undefined,
+    visibility: isDragging ? "hidden" : undefined,
   };
-  const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
 
   return (
     <button
@@ -214,27 +255,11 @@ function TierNikkeCard({
       style={style}
       {...(canEdit ? attributes : {})}
       {...(canEdit ? listeners : {})}
-      className={`w-16 shrink-0 overflow-hidden rounded-xl border border-black/10 bg-white/80 sm:w-20 dark:border-white/15 dark:bg-black/25 ${
+      className={`w-16 shrink-0 rounded-xl text-left sm:w-20 ${
         canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-default"
       }`}
     >
-      <div className="relative aspect-square w-full">
-        {imageUrl ? (
-          <Image
-            fill
-            src={imageUrl}
-            alt={formatNikkeDisplayName(nikke.name)}
-            draggable={false}
-            className="pointer-events-none object-cover"
-            sizes="80px"
-          />
-        ) : (
-          <div className="grid h-full place-items-center text-[9px] text-white/60">no image</div>
-        )}
-      </div>
-      <div className="truncate px-1 py-1 text-[13px] text-neutral-900 dark:text-white">
-        {formatNikkeDisplayName(nikke.name)}
-      </div>
+      <TierNikkeCardVisual nikke={nikke} getPublicUrl={getPublicUrl} />
     </button>
   );
 }
@@ -351,12 +376,16 @@ export default function TierBoard({
 }: TierBoardProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [catalogPreview, setCatalogPreview] = useState<CatalogDropPreview | null>(null);
+  const [activeTierNikkeName, setActiveTierNikkeName] = useState<string | null>(null);
   const catalogPreviewRef = useRef<CatalogDropPreview | null>(null);
   const draggedNikkeRef = useRef<string | null>(null);
   const nikkesByName = useMemo(
     () => new Map(nikkes.map((nikke) => [nikke.name, nikke])),
     [nikkes]
   );
+  const activeTierNikke = activeTierNikkeName
+    ? nikkesByName.get(activeTierNikkeName) ?? null
+    : null;
   const assignedTiers = useMemo(() => {
     const map = new Map<string, string>();
     board.rows.forEach((row) => row.nikkeNames.forEach((name) => map.set(name, row.name)));
@@ -375,6 +404,9 @@ export default function TierBoard({
   function handleDragStart(event: DragStartEvent) {
     const activeData = (event.active.data.current ?? {}) as DragData;
     draggedNikkeRef.current = activeData.nikkeName ?? null;
+    setActiveTierNikkeName(
+      activeData.source === "tier" && activeData.nikkeName ? activeData.nikkeName : null
+    );
   }
 
   function updateCatalogPreview(nextPreview: CatalogDropPreview | null) {
@@ -422,6 +454,7 @@ export default function TierBoard({
 
   function clearDraggedNikkeSoon() {
     updateCatalogPreview(null);
+    setActiveTierNikkeName(null);
     window.setTimeout(() => {
       draggedNikkeRef.current = null;
     }, 0);
@@ -537,6 +570,22 @@ export default function TierBoard({
         />
       </div>
 
+      <DragOverlay
+        dropAnimation={{
+          duration: 180,
+          easing: "cubic-bezier(0.2, 0, 0, 1)",
+        }}
+      >
+        {activeTierNikke ? (
+          <div className="pointer-events-none">
+            <TierNikkeCardVisual
+              nikke={activeTierNikke}
+              getPublicUrl={getPublicUrl}
+              overlay
+            />
+          </div>
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
