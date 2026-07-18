@@ -44,6 +44,14 @@ test("tier dragging has no follower overlay or empty-row instruction text", () =
   assert.match(source, /moveNikke/);
 });
 
+test("dragged tier cards stay opaque and move without transition lag", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.doesNotMatch(source, /opacity:\s*isDragging/);
+  assert.doesNotMatch(source, /transform,\s*transition,\s*isDragging/);
+  assert.match(source, /transform:\s*CSS\.Transform\.toString\(transform\)/);
+});
+
 test("tier board restricts editing affordances with canEdit", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
