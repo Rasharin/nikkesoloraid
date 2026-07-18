@@ -33,6 +33,17 @@ test("clicking an editable tier nikke removes it from the tier", () => {
   assert.match(source, /removeNikkeFromTier\(board, name\)/);
 });
 
+test("tier dragging has no follower overlay or empty-row instruction text", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.doesNotMatch(source, /DragOverlay/);
+  assert.doesNotMatch(source, /activeNikkeName|activeImageUrl/);
+  assert.doesNotMatch(source, /니케를 여기에 놓으세요|배치된 니케가 없습니다/);
+  assert.match(source, /DndContext/);
+  assert.match(source, /useDroppable/);
+  assert.match(source, /moveNikke/);
+});
+
 test("tier board restricts editing affordances with canEdit", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 

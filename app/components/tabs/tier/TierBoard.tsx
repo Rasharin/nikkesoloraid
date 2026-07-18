@@ -4,7 +4,6 @@ import Image from "next/image";
 import {
   closestCenter,
   DndContext,
-  DragOverlay,
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
@@ -12,7 +11,6 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   rectSortingStrategy,
@@ -237,7 +235,6 @@ function TierRowView({
             })}
             {row.nikkeNames.length === 0 ? (
               <div className="grid min-h-20 flex-1 place-items-center rounded-xl border border-dashed border-white/15 text-xs text-[var(--muted)]">
-                {canEdit ? "니케를 여기에 놓으세요" : "배치된 니케가 없습니다"}
               </div>
             ) : null}
           </div>
@@ -260,7 +257,6 @@ export default function TierBoard({
   roles,
 }: TierBoardProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [activeNikkeName, setActiveNikkeName] = useState<string | null>(null);
   const nikkesByName = useMemo(
     () => new Map(nikkes.map((nikke) => [nikke.name, nikke])),
     [nikkes]
@@ -280,13 +276,7 @@ export default function TierBoard({
     onChange({ ...board, rows });
   }
 
-  function handleDragStart(event: DragStartEvent) {
-    const data = (event.active.data.current ?? {}) as DragData;
-    setActiveNikkeName(data.nikkeName ?? null);
-  }
-
   function handleDragEnd(event: DragEndEvent) {
-    setActiveNikkeName(null);
     if (!canEdit || !event.over) return;
     const activeData = (event.active.data.current ?? {}) as DragData;
     const overData = (event.over.data.current ?? {}) as DragData & { rowId?: string };
@@ -306,18 +296,11 @@ export default function TierBoard({
     );
   }
 
-  const activeNikke = activeNikkeName ? nikkesByName.get(activeNikkeName) : null;
-  const activeImageUrl = activeNikke?.image_path
-    ? getPublicUrl("nikke-images", activeNikke.image_path)
-    : "";
-
   return (
     <DndContext
       id="nikke-tier-dnd"
       sensors={sensors}
       collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragCancel={() => setActiveNikkeName(null)}
       onDragEnd={handleDragEnd}
     >
       <div className="grid gap-5">
@@ -387,20 +370,6 @@ export default function TierBoard({
         />
       </div>
 
-      <DragOverlay zIndex={80} dropAnimation={null}>
-        {activeNikke ? (
-          <div className="w-20 overflow-hidden rounded-xl border border-white/30 bg-neutral-950 shadow-2xl">
-            <div className="relative aspect-square">
-              {activeImageUrl ? (
-                <Image fill src={activeImageUrl} alt={activeNikke.name} className="object-cover" sizes="80px" />
-              ) : null}
-            </div>
-            <div className="truncate px-1 py-1 text-center text-[10px] text-white">
-              {formatNikkeDisplayName(activeNikke.name)}
-            </div>
-          </div>
-        ) : null}
-      </DragOverlay>
     </DndContext>
   );
 }
