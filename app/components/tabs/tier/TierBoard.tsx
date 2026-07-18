@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import {
+  closestCenter,
   DndContext,
   KeyboardSensor,
   MouseSensor,
@@ -11,7 +12,9 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
+  type CollisionDetection,
 } from "@dnd-kit/core";
 import {
   rectSortingStrategy,
@@ -43,6 +46,61 @@ type DragData = {
   rowId?: string;
   index?: number;
 };
+
+type CatalogDropPreview = {
+  activeId: string;
+  nikkeName: string;
+  rowId: string;
+  index: number;
+};
+
+const tierCollisionDetection: CollisionDetection = (args) => {
+  const pointerCollisions = pointerWithin(args);
+  const cardCollision = pointerCollisions.find(({ id }) =>
+    String(id).startsWith("tier-card-")
+  );
+  if (cardCollision) return [cardCollision];
+
+  const rowCollision = pointerCollisions.find(({ id }) =>
+    String(id).startsWith("tier-row-")
+  );
+  if (!rowCollision) return pointerCollisions;
+
+  const rowId = String(rowCollision.id).slice("tier-row-".length);
+  const rowCards = args.droppableContainers.filter(
+    (container) =>
+      container.data.current?.rowId === rowId &&
+      String(container.id).startsWith("tier-card-")
+  );
+  if (rowCards.length === 0) return [rowCollision];
+
+  const nearestCard = closestCenter({ ...args, droppableContainers: rowCards });
+  return nearestCard.length > 0 ? nearestCard : [rowCollision];
+};
+
+function getCatalogInsertionIndex(
+  rowId: string,
+  activeRect: { left: number; top: number; width: number; height: number } | null,
+  fallbackIndex: number
+) {
+  if (!activeRect) return fallbackIndex;
+  const rowElement = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-tier-row-id]")
+  ).find((element) => element.dataset.tierRowId === rowId);
+  if (!rowElement) return fallbackIndex;
+
+  const activeCenterX = activeRect.left + activeRect.width / 2;
+  const activeCenterY = activeRect.top + activeRect.height / 2;
+  const cards = Array.from(rowElement.querySelectorAll<HTMLElement>("[data-tier-card]"));
+  const insertionIndex = cards.findIndex((card) => {
+    const rect = card.getBoundingClientRect();
+    const cardCenterX = rect.left + rect.width / 2;
+    const cardCenterY = rect.top + rect.height / 2;
+    const sameVisualLine = Math.abs(activeCenterY - cardCenterY) < rect.height / 2;
+    return sameVisualLine ? activeCenterX < cardCenterX : activeCenterY < cardCenterY;
+  });
+  return insertionIndex >= 0 ? insertionIndex : cards.length;
+}
 
 type TierBoardProps = {
   board: TierBoardData;
@@ -150,6 +208,7 @@ function TierNikkeCard({
     <button
       ref={setNodeRef}
       type="button"
+      data-tier-card
       disabled={!canEdit}
       onClick={onRemove}
       style={style}
@@ -187,6 +246,7 @@ function TierRowView({
   onNameChange,
   onRemoveNikke,
   getPublicUrl,
+  catalogPreview,
 }: {
   row: TierRow;
   nikkesByName: ReadonlyMap<string, TierNikkeRow>;
@@ -194,18 +254,27 @@ function TierRowView({
   onNameChange: (name: string) => void;
   onRemoveNikke: (name: string) => void;
   getPublicUrl: TierBoardProps["getPublicUrl"];
+  catalogPreview: CatalogDropPreview | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `tier-row-${row.id}`,
     disabled: !canEdit,
     data: { rowId: row.id },
   });
+  const activePreview = catalogPreview?.rowId === row.id ? catalogPreview : null;
+  const previewIndex = activePreview
+    ? Math.max(0, Math.min(activePreview.index, row.nikkeNames.length))
+    : -1;
+  const sortableItems = row.nikkeNames.map((name) => `tier-card-${row.id}-${name}`);
+  if (activePreview) sortableItems.splice(previewIndex, 0, activePreview.activeId);
+  const visualItemCount = row.nikkeNames.length + (activePreview ? 1 : 0);
 
   return (
     <div
       ref={setNodeRef}
       data-tier-row
-      className="grid min-h-24 grid-cols-[4.5rem_minmax(0,1fr)] overflow-hidden rounded-2xl border sm:grid-cols-[6rem_minmax(0,1fr)]"
+      data-tier-row-id={row.id}
+      className="grid min-h-24 grid-cols-[4.5rem_minmax(0,1fr)] overflow-visible rounded-2xl border sm:grid-cols-[6rem_minmax(0,1fr)]"
       style={{
         borderColor: `${row.color}99`,
         backgroundColor: `${row.color}18`,
@@ -214,7 +283,7 @@ function TierRowView({
     >
       <div
         data-tier-row-label
-        className="grid min-w-0 place-items-center overflow-hidden border-r border-black/10 p-2 text-center text-lg font-black sm:text-xl"
+        className="grid min-w-0 place-items-center overflow-hidden rounded-l-2xl border-r border-black/10 p-2 text-center text-lg font-black sm:text-xl"
         style={{ backgroundColor: row.color, color: getContrastingTextColor(row.color) }}
       >
         <EditableLabel
@@ -227,13 +296,25 @@ function TierRowView({
 
       <div data-tier-row-content className="min-w-0 p-2.5">
         <SortableContext
-          items={row.nikkeNames.map((name) => `tier-card-${row.id}-${name}`)}
+          items={sortableItems}
           strategy={rectSortingStrategy}
         >
           <div className="flex min-h-20 flex-wrap content-start gap-2">
-            {row.nikkeNames.map((name, index) => {
-              const nikke = nikkesByName.get(name);
-              return nikke ? (
+            {Array.from({ length: visualItemCount }, (_, visualIndex) => {
+              if (activePreview && visualIndex === previewIndex) {
+                return (
+                  <div
+                    key={activePreview.activeId}
+                    data-tier-insertion-placeholder
+                    className="h-[94px] w-16 shrink-0 rounded-xl border-2 border-dashed border-cyan-400/70 bg-cyan-400/10 transition-all duration-150 sm:h-[110px] sm:w-20"
+                  />
+                );
+              }
+              const index =
+                activePreview && visualIndex > previewIndex ? visualIndex - 1 : visualIndex;
+              const name = row.nikkeNames[index];
+              const nikke = name ? nikkesByName.get(name) : null;
+              return nikke && name ? (
                 <TierNikkeCard
                   key={name}
                   nikke={nikke}
@@ -245,7 +326,7 @@ function TierRowView({
                 />
               ) : null;
             })}
-            {row.nikkeNames.length === 0 ? (
+            {row.nikkeNames.length === 0 && !activePreview ? (
               <div className="grid min-h-20 flex-1 place-items-center rounded-xl border border-dashed border-white/15 text-xs text-[var(--muted)]">
               </div>
             ) : null}
@@ -269,6 +350,8 @@ export default function TierBoard({
   roles,
 }: TierBoardProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [catalogPreview, setCatalogPreview] = useState<CatalogDropPreview | null>(null);
+  const catalogPreviewRef = useRef<CatalogDropPreview | null>(null);
   const draggedNikkeRef = useRef<string | null>(null);
   const nikkesByName = useMemo(
     () => new Map(nikkes.map((nikke) => [nikke.name, nikke])),
@@ -294,29 +377,81 @@ export default function TierBoard({
     draggedNikkeRef.current = activeData.nikkeName ?? null;
   }
 
+  function updateCatalogPreview(nextPreview: CatalogDropPreview | null) {
+    catalogPreviewRef.current = nextPreview;
+    setCatalogPreview((current) =>
+      current?.activeId === nextPreview?.activeId &&
+      current?.rowId === nextPreview?.rowId &&
+      current?.index === nextPreview?.index
+        ? current
+        : nextPreview
+    );
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const activeData = (event.active.data.current ?? {}) as DragData;
+    if (activeData.source !== "catalog" || !activeData.nikkeName || !event.over) {
+      updateCatalogPreview(null);
+      return;
+    }
+
+    const overData = (event.over.data.current ?? {}) as DragData;
+    const rowId = overData.rowId;
+    const targetRow = rowId ? board.rows.find((row) => row.id === rowId) : null;
+    if (!rowId || !targetRow) {
+      updateCatalogPreview(null);
+      return;
+    }
+
+    const activeRect = event.active.rect.current.translated;
+    let index = getCatalogInsertionIndex(
+      rowId,
+      activeRect,
+      typeof overData.index === "number" ? overData.index : targetRow.nikkeNames.length
+    );
+    index = Math.max(0, Math.min(index, targetRow.nikkeNames.length));
+
+    const nextPreview: CatalogDropPreview = {
+      activeId: String(event.active.id),
+      nikkeName: activeData.nikkeName,
+      rowId,
+      index,
+    };
+    updateCatalogPreview(nextPreview);
+  }
+
   function clearDraggedNikkeSoon() {
+    updateCatalogPreview(null);
     window.setTimeout(() => {
       draggedNikkeRef.current = null;
     }, 0);
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    const previewTarget = catalogPreviewRef.current;
     clearDraggedNikkeSoon();
     if (!canEdit || !event.over) return;
     const activeData = (event.active.data.current ?? {}) as DragData;
     const overData = (event.over.data.current ?? {}) as DragData & { rowId?: string };
     const nikkeName = activeData.nikkeName;
     const targetRowId =
+      (activeData.source === "catalog" ? previewTarget?.rowId : undefined) ??
       overData.rowId ??
       (typeof event.over.id === "string" && event.over.id.startsWith("tier-row-")
         ? event.over.id.slice("tier-row-".length)
         : undefined);
     if (!nikkeName || !targetRowId) return;
+    const targetIndex =
+      activeData.source === "catalog"
+        ? previewTarget?.index
+        : typeof overData.index === "number"
+          ? overData.index
+          : undefined;
     onChange(
       moveNikke(board, {
         nikkeName,
         targetRowId,
-        targetIndex: typeof overData.index === "number" ? overData.index : undefined,
+        targetIndex,
       })
     );
   }
@@ -325,8 +460,9 @@ export default function TierBoard({
     <DndContext
       id="nikke-tier-dnd"
       sensors={sensors}
-      collisionDetection={pointerWithin}
+      collisionDetection={tierCollisionDetection}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragCancel={clearDraggedNikkeSoon}
       onDragEnd={handleDragEnd}
     >
@@ -384,6 +520,7 @@ export default function TierBoard({
                   )
                 }
                 getPublicUrl={getPublicUrl}
+                catalogPreview={catalogPreview}
               />
             ))}
           </div>

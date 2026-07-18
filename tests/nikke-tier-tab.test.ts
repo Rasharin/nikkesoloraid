@@ -56,7 +56,36 @@ test("tier rows accept vertical drops anywhere across the full row", () => {
 
   assert.match(source, /pointerWithin/);
   assert.match(source, /<div[\s\S]*?ref=\{setNodeRef\}[\s\S]*?data-tier-row/);
-  assert.match(source, /collisionDetection=\{pointerWithin\}/);
+  assert.match(source, /collisionDetection=\{tierCollisionDetection\}/);
+});
+
+test("dragged tier cards remain visible outside their source row", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(source, /data-tier-row[\s\S]{0,100}?className="[^"]*overflow-visible/);
+  assert.match(source, /data-tier-row-label[\s\S]*?rounded-l-2xl/);
+});
+
+test("catalog dragging opens and commits a sortable insertion gap", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(source, /type CatalogDropPreview/);
+  assert.match(source, /const \[catalogPreview, setCatalogPreview\]/);
+  assert.match(source, /catalogPreviewRef/);
+  assert.match(source, /function updateCatalogPreview/);
+  assert.match(source, /function handleDragOver\(event: DragOverEvent\)/);
+  assert.match(source, /const tierCollisionDetection: CollisionDetection/);
+  assert.match(source, /closestCenter/);
+  assert.match(source, /onDragOver=\{handleDragOver\}/);
+  assert.match(source, /data-tier-insertion-placeholder/);
+  assert.match(source, /data-tier-card/);
+  assert.match(source, /data-tier-row-id/);
+  assert.match(source, /function getCatalogInsertionIndex/);
+  assert.match(source, /sortableItems/);
+  assert.match(source, /const previewTarget = catalogPreviewRef\.current/);
+  assert.match(source, /const targetIndex[\s\S]*?previewTarget\?\.index/);
+  assert.match(source, /moveNikke\(board,[\s\S]*?targetIndex,/);
+  assert.match(source, /sameVisualLine\s*\?\s*activeCenterX < cardCenterX\s*:\s*activeCenterY < cardCenterY/);
 });
 
 test("tier dragging has no follower overlay or empty-row instruction text", () => {
@@ -127,12 +156,16 @@ test("catalog nikke names use 13px text with tighter vertical padding", () => {
   assert.doesNotMatch(source, /text-\[11px\] text-\[var\(--theme-text-soft\)\]/);
 });
 
-test("catalog nikkes drag at full opacity", () => {
+test("catalog cards follow the pointer without transition lag at full opacity", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
 
   assert.doesNotMatch(source, /opacity:\s*isDragging/);
-  assert.doesNotMatch(source, /transform,\s*isDragging/);
+  assert.match(source, /setNodeRef,\s*transform,\s*isDragging/);
   assert.match(source, /transform:\s*CSS\.Translate\.toString\(transform\)/);
+  assert.match(source, /transition:\s*isDragging\s*\?\s*"none"\s*:\s*undefined/);
+  assert.match(source, /zIndex:\s*isDragging\s*\?\s*30\s*:\s*undefined/);
+  assert.match(source, /position:\s*isDragging\s*\?\s*"relative"\s*:\s*undefined/);
+  assert.doesNotMatch(source, /text-left transition/);
 });
 
 test("tier tab is routed between deck building and usage", () => {

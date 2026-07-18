@@ -49,13 +49,16 @@ function CatalogCard({
   canEdit: boolean;
   getPublicUrl: TierNikkeCatalogProps["getPublicUrl"];
 }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `tier-catalog-${nikke.id}`,
     disabled: !canEdit,
     data: { source: "catalog", nikkeName: nikke.name },
   });
   const style: CSSProperties = {
     transform: CSS.Translate.toString(transform),
+    transition: isDragging ? "none" : undefined,
+    zIndex: isDragging ? 30 : undefined,
+    position: isDragging ? "relative" : undefined,
   };
   const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
 
@@ -67,7 +70,7 @@ function CatalogCard({
       disabled={!canEdit}
       {...(canEdit ? attributes : {})}
       {...(canEdit ? listeners : {})}
-      className={`group relative min-w-0 overflow-hidden rounded-xl border bg-[var(--card)] text-left transition ${
+      className={`group relative min-w-0 overflow-hidden rounded-xl border bg-[var(--card)] text-left ${
         canEdit ? "cursor-grab border-[var(--border)] active:cursor-grabbing" : "cursor-default border-[var(--border)]"
       }`}
     >
