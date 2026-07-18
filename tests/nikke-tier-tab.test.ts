@@ -51,6 +51,14 @@ test("tier card images cannot intercept sortable dragging", () => {
   );
 });
 
+test("tier rows accept vertical drops anywhere across the full row", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(source, /pointerWithin/);
+  assert.match(source, /<div[\s\S]*?ref=\{setNodeRef\}[\s\S]*?data-tier-row/);
+  assert.match(source, /collisionDetection=\{pointerWithin\}/);
+});
+
 test("tier dragging has no follower overlay or empty-row instruction text", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 

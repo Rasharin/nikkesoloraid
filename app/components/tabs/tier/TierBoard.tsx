@@ -2,10 +2,10 @@
 
 import Image from "next/image";
 import {
-  closestCenter,
   DndContext,
   KeyboardSensor,
   MouseSensor,
+  pointerWithin,
   TouchSensor,
   useDroppable,
   useSensor,
@@ -193,6 +193,8 @@ function TierRowView({
 
   return (
     <div
+      ref={setNodeRef}
+      data-tier-row
       className="grid min-h-24 grid-cols-[4.5rem_minmax(0,1fr)] overflow-hidden rounded-2xl border sm:grid-cols-[6rem_minmax(0,1fr)]"
       style={{
         borderColor: `${row.color}99`,
@@ -213,7 +215,7 @@ function TierRowView({
         />
       </div>
 
-      <div ref={setNodeRef} data-tier-row-content className="min-w-0 p-2.5">
+      <div data-tier-row-content className="min-w-0 p-2.5">
         <SortableContext
           items={row.nikkeNames.map((name) => `tier-card-${row.id}-${name}`)}
           strategy={rectSortingStrategy}
@@ -313,7 +315,7 @@ export default function TierBoard({
     <DndContext
       id="nikke-tier-dnd"
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragCancel={clearDraggedNikkeSoon}
       onDragEnd={handleDragEnd}
