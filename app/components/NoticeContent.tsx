@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 export type NoticePost = {
   id: string;
@@ -26,14 +26,19 @@ const emptyDraft = { title: "", content: "" };
 export default function NoticeContent({ posts, loading, isMaster, saving, deletingId, onSubmit, onDelete }: NoticeContentProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState(emptyDraft);
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
-  const effectiveOpenIds = useMemo(() => {
-    const postIds = new Set(posts.map((post) => post.id));
-    const next = new Set([...openIds].filter((id) => postIds.has(id)));
-    if (next.size === 0 && posts[0]) next.add(posts[0].id);
-    return next;
-  }, [openIds, posts]);
+  const [openIds, setOpenIds] = useState<Set<string>>(
+    () => new Set(posts[0] ? [posts[0].id] : [])
+  );
+  const [previousPosts, setPreviousPosts] = useState(posts);
   const editingPost = editingId && editingId !== "new" ? posts.find((post) => post.id === editingId) ?? null : null;
+
+  if (posts !== previousPosts) {
+    const postIds = new Set(posts.map((post) => post.id));
+    const nextOpenIds = new Set([...openIds].filter((id) => postIds.has(id)));
+    if (nextOpenIds.size === 0 && posts[0]) nextOpenIds.add(posts[0].id);
+    setPreviousPosts(posts);
+    setOpenIds(nextOpenIds);
+  }
 
   const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
     year: "numeric",
@@ -149,7 +154,7 @@ export default function NoticeContent({ posts, loading, isMaster, saving, deleti
       ) : (
         <div className="space-y-3">
           {posts.map((post) => {
-            const isOpen = effectiveOpenIds.has(post.id);
+            const isOpen = openIds.has(post.id);
             return (
               <article key={post.id} className="rounded-2xl border border-neutral-800 bg-neutral-900/80">
                 <button
