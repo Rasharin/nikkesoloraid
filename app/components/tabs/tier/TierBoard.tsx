@@ -155,7 +155,8 @@ function TierNikkeCard({
             fill
             src={imageUrl}
             alt={formatNikkeDisplayName(nikke.name)}
-            className="object-cover"
+            draggable={false}
+            className="pointer-events-none object-cover"
             sizes="80px"
           />
         ) : (

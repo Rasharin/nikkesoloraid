@@ -42,6 +42,15 @@ test("tier drag completion does not trigger click removal", () => {
   assert.match(source, /setTimeout/);
 });
 
+test("tier card images cannot intercept sortable dragging", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(
+    source,
+    /<Image[\s\S]*?draggable=\{false\}[\s\S]*?className="pointer-events-none object-cover"/,
+  );
+});
+
 test("tier dragging has no follower overlay or empty-row instruction text", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
