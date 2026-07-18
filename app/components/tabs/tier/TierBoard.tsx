@@ -196,10 +196,15 @@ function TierRowView({
     >
       <div
         data-tier-row-label
-        className="grid place-items-center border-r border-black/10 p-2 text-center text-lg font-black sm:text-xl"
+        className="grid min-w-0 place-items-center overflow-hidden border-r border-black/10 p-2 text-center text-lg font-black sm:text-xl"
         style={{ backgroundColor: row.color, color: getContrastingTextColor(row.color) }}
       >
-        <EditableLabel value={row.name} canEdit={canEdit} onChange={onNameChange} />
+        <EditableLabel
+          value={row.name}
+          canEdit={canEdit}
+          onChange={onNameChange}
+          className="w-full max-w-full text-center"
+        />
       </div>
 
       <div ref={setNodeRef} data-tier-row-content className="min-w-0 p-2.5">

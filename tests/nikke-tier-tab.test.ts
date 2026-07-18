@@ -65,6 +65,16 @@ test("tier row renders its label before the nikke content", () => {
   assert.match(source, /grid-cols-\[4\.5rem_minmax\(0,1fr\)\]/);
 });
 
+test("tier row name editor stays inside the narrow label column", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(source, /data-tier-row-label[\s\S]*?overflow-hidden/);
+  assert.match(
+    source,
+    /<EditableLabel[\s\S]*?value=\{row\.name\}[\s\S]*?className="w-full max-w-full text-center"/,
+  );
+});
+
 test("tier filters share one left-aligned scrolling row without group titles", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
 
