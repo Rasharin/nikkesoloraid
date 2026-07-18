@@ -88,24 +88,27 @@ test("catalog dragging opens and commits a sortable insertion gap", () => {
   assert.match(source, /sameVisualLine\s*\?\s*activeCenterX < cardCenterX\s*:\s*activeCenterY < cardCenterY/);
 });
 
-test("tier dragging has no follower overlay or empty-row instruction text", () => {
+test("tier cards use a fully opaque overlay across row boundaries", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
-  assert.doesNotMatch(source, /DragOverlay/);
-  assert.doesNotMatch(source, /activeNikkeName|activeImageUrl/);
+  assert.match(source, /DragOverlay/);
+  assert.match(source, /function TierNikkeCardVisual/);
+  assert.match(source, /const \[activeTierNikkeName, setActiveTierNikkeName\]/);
+  assert.match(source, /activeData\.source === "tier"/);
+  assert.match(source, /visibility:\s*isDragging\s*\?\s*"hidden"\s*:\s*undefined/);
+  assert.match(source, /<DragOverlay[\s\S]*?<TierNikkeCardVisual/);
+  assert.doesNotMatch(source, /opacity:\s*isDragging/);
   assert.doesNotMatch(source, /니케를 여기에 놓으세요|배치된 니케가 없습니다/);
-  assert.match(source, /DndContext/);
-  assert.match(source, /useDroppable/);
-  assert.match(source, /moveNikke/);
 });
 
-test("the actual opaque tier card follows the pointer and settles after drop", () => {
+test("the sortable tier card preserves its layout slot while the overlay follows the pointer", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
   assert.match(source, /transform,\s*transition,\s*isDragging/);
   assert.match(source, /transition:\s*isDragging\s*\?\s*"none"\s*:\s*transition/);
   assert.match(source, /zIndex:\s*isDragging\s*\?\s*20\s*:\s*undefined/);
   assert.match(source, /position:\s*isDragging\s*\?\s*"relative"\s*:\s*undefined/);
+  assert.match(source, /visibility:\s*isDragging\s*\?\s*"hidden"\s*:\s*undefined/);
   assert.doesNotMatch(source, /opacity:\s*isDragging/);
   assert.match(source, /transform:\s*CSS\.Transform\.toString\(transform\)/);
 });
