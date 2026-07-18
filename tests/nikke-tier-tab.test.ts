@@ -83,6 +83,13 @@ test("tier filters share one left-aligned scrolling row without group titles", (
   assert.doesNotMatch(source, />버스트<|>코드<|>클래스</);
 });
 
+test("selected tier filters use a high-contrast mint style", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.match(source, /border-emerald-300 bg-emerald-300 text-emerald-950/);
+  assert.doesNotMatch(source, /border-white bg-white text-black/);
+});
+
 test("tier sections do not render descriptive copy", () => {
   const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
   const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
