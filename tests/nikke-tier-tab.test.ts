@@ -72,6 +72,22 @@ test("tier catalog includes name search and all three filter groups", () => {
   assert.match(source, /useDraggable/);
 });
 
+test("assigned catalog nikkes use a gray image treatment without tier badges", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.match(source, /grayscale/);
+  assert.match(source, /bg-neutral-500\/35/);
+  assert.doesNotMatch(source, /\{tierName\}\s*<\/span>/);
+});
+
+test("catalog nikkes drag at full opacity", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.doesNotMatch(source, /opacity:\s*isDragging/);
+  assert.doesNotMatch(source, /transform,\s*isDragging/);
+  assert.match(source, /transform:\s*CSS\.Translate\.toString\(transform\)/);
+});
+
 test("tier tab is routed between deck building and usage", () => {
   const page = fs.readFileSync("app/page.tsx", "utf8");
   const header = fs.readFileSync("app/components/Header.tsx", "utf8");

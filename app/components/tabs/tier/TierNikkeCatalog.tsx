@@ -40,23 +40,22 @@ function toggleValue<T>(set: Set<T>, value: T) {
 
 function CatalogCard({
   nikke,
-  tierName,
+  assigned,
   canEdit,
   getPublicUrl,
 }: {
   nikke: TierNikkeRow;
-  tierName?: string;
+  assigned: boolean;
   canEdit: boolean;
   getPublicUrl: TierNikkeCatalogProps["getPublicUrl"];
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `tier-catalog-${nikke.id}`,
     disabled: !canEdit,
     data: { source: "catalog", nikkeName: nikke.name },
   });
   const style: CSSProperties = {
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.35 : 1,
   };
   const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
 
@@ -78,16 +77,15 @@ function CatalogCard({
             fill
             src={imageUrl}
             alt={formatNikkeDisplayName(nikke.name)}
-            className="object-cover"
+            draggable={false}
+            className={`pointer-events-none object-cover ${assigned ? "grayscale" : ""}`}
             sizes="(max-width: 640px) 25vw, 110px"
           />
         ) : (
           <div className="grid h-full place-items-center text-[10px] text-[var(--muted)]">no image</div>
         )}
-        {tierName ? (
-          <span className="absolute right-1 top-1 rounded-md bg-black/75 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-            {tierName}
-          </span>
+        {assigned ? (
+          <span className="pointer-events-none absolute inset-0 bg-neutral-500/35" aria-hidden="true" />
         ) : null}
       </div>
       <div className="truncate px-1.5 py-1.5 text-center text-[11px] text-[var(--theme-text-soft)]">
@@ -197,7 +195,7 @@ export default function TierNikkeCatalog({
             <CatalogCard
               key={nikke.id}
               nikke={nikke}
-              tierName={assignedTiers.get(nikke.name)}
+              assigned={assignedTiers.has(nikke.name)}
               canEdit={canEdit}
               getPublicUrl={getPublicUrl}
             />
