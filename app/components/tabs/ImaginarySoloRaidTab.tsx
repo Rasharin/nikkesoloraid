@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { buildCopiedRecommendedDeckDrafts, copyDeckDraftAfterIndex } from "../../../lib/deck-building-copy";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { formatPlainScoreText, formatScore, parseScoreInput, type ScoreDisplayMode } from "../../../lib/score-format";
+import { useHydrated } from "../../hooks/useHydrated";
 import DeckBuilderSection, {
   getDroppedDeckSlotTarget,
   getHoveredDeckSlotTarget,
@@ -515,6 +516,53 @@ function SpareSlot({ index, name, nikke, imageUrl, activeDrag, hovered, canDrop,
   );
 }
 
+function readSavedDeckBuilderState(): { pages: DeckBuilderPageState[]; activePageId: number } {
+  const fallbackPages = [createEmptyDeckBuilderPage(1)];
+  try {
+    const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!rawDraft) return { pages: fallbackPages, activePageId: 1 };
+    const parsed = JSON.parse(rawDraft) as {
+      pages?: unknown;
+      activePageId?: unknown;
+      deckDrafts?: unknown;
+      spareSlots?: unknown;
+    };
+    const pages = normalizeSavedDeckBuilderPages(parsed.pages, parsed.deckDrafts, parsed.spareSlots);
+    const activePageId =
+      typeof parsed.activePageId === "number" && pages.some((page) => page.id === parsed.activePageId)
+        ? parsed.activePageId
+        : pages[0]?.id ?? 1;
+    return { pages, activePageId };
+  } catch {
+    return { pages: fallbackPages, activePageId: 1 };
+  }
+}
+
+function readWideDeckLayout(): boolean {
+  try {
+    return localStorage.getItem(LAYOUT_STORAGE_KEY) !== "stacked";
+  } catch {
+    return true;
+  }
+}
+
+function readRecommendedOpen(fallback: boolean): boolean {
+  try {
+    const saved = localStorage.getItem(RECOMMENDED_OPEN_STORAGE_KEY);
+    if (saved === "open") return true;
+    if (saved === "closed") return false;
+  } catch {}
+  return fallback;
+}
+
+function readDeckBuildingMemo(): string {
+  try {
+    return localStorage.getItem(DECK_BUILDING_MEMO_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 type RecommendedDeckSlotProps = {
   deckId: string;
   slotIndex: number;
@@ -623,6 +671,7 @@ export default function ImaginarySoloRaidTab({
   const [layoutStorageReady, setLayoutStorageReady] = useState(false);
   const [recommendedOpenStorageReady, setRecommendedOpenStorageReady] = useState(false);
   const [draftStorageReady, setDraftStorageReady] = useState(false);
+  const [storageRestored, setStorageRestored] = useState(false);
   const [showNikkePickerOverlay, setShowNikkePickerOverlay] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
   const [pendingNikkeNames, setPendingNikkeNames] = useState<Set<string>>(new Set());
@@ -653,6 +702,20 @@ export default function ImaginarySoloRaidTab({
   const selectedTrashRef = useRef<HTMLDivElement | null>(null);
   const memoTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const previousScoreDisplayModeRef = useRef<ScoreDisplayMode>(scoreDisplayMode);
+  const hydrated = useHydrated();
+
+  if (hydrated && !storageRestored) {
+    const stored = readSavedDeckBuilderState();
+    setDeckPages(stored.pages);
+    setActiveDeckPageId(stored.activePageId);
+    setWideDeckLayout(readWideDeckLayout());
+    setRecommendedOpen(readRecommendedOpen(canRecommend));
+    setMemoText(readDeckBuildingMemo());
+    setLayoutStorageReady(true);
+    setRecommendedOpenStorageReady(true);
+    setDraftStorageReady(true);
+    setStorageRestored(true);
+  }
   const { setNodeRef: setSelectedTrashNodeRef, isOver: selectedTrashOver } = useDroppable({
     id: SELECTED_TRASH_DROP_ID,
   });
@@ -663,6 +726,10 @@ export default function ImaginarySoloRaidTab({
   const activeDeckPage = deckPages.find((page) => page.id === activeDeckPageId) ?? deckPages[0] ?? createEmptyDeckBuilderPage(1);
   const deckDrafts = activeDeckPage.deckDrafts;
   const spareSlots = activeDeckPage.spareSlots;
+  const effectiveSelectedDeckDraftIds = useMemo(() => {
+    const activeDeckIds = new Set(deckDrafts.map((deck) => deck.id));
+    return new Set([...selectedDeckDraftIds].filter((id) => activeDeckIds.has(id)));
+  }, [deckDrafts, selectedDeckDraftIds]);
   const displayScore = (value: number) => formatScore(value, scoreDisplayMode);
 
   const sensors = useSensors(
@@ -681,66 +748,6 @@ export default function ImaginarySoloRaidTab({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
-
-  useEffect(() => {
-    try {
-      const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (rawDraft) {
-        const parsed = JSON.parse(rawDraft) as {
-          pages?: unknown;
-          activePageId?: unknown;
-          deckDrafts?: unknown;
-          spareSlots?: unknown;
-        };
-        const pages = normalizeSavedDeckBuilderPages(parsed.pages, parsed.deckDrafts, parsed.spareSlots);
-        const savedActivePageId =
-          typeof parsed.activePageId === "number" && pages.some((page) => page.id === parsed.activePageId)
-            ? parsed.activePageId
-            : pages[0]?.id ?? 1;
-        setDeckPages(pages);
-        setActiveDeckPageId(savedActivePageId);
-      }
-    } catch {}
-
-    setDraftStorageReady(true);
-  }, []);
-
-  useEffect(() => {
-    try {
-      const savedLayout = localStorage.getItem(LAYOUT_STORAGE_KEY);
-      if (savedLayout === "wide") {
-        setWideDeckLayout(true);
-      }
-      if (savedLayout === "stacked") {
-        setWideDeckLayout(false);
-      }
-    } catch {}
-
-    setLayoutStorageReady(true);
-  }, []);
-
-  useEffect(() => {
-    try {
-      const savedOpen = localStorage.getItem(RECOMMENDED_OPEN_STORAGE_KEY);
-      if (savedOpen === "open") {
-        setRecommendedOpen(true);
-      }
-      if (savedOpen === "closed") {
-        setRecommendedOpen(false);
-      }
-    } catch {}
-
-    setRecommendedOpenStorageReady(true);
-  }, []);
-
-  useEffect(() => {
-    try {
-      const rawMemo = localStorage.getItem(DECK_BUILDING_MEMO_STORAGE_KEY);
-      if (typeof rawMemo === "string") {
-        setMemoText(rawMemo);
-      }
-    } catch {}
-  }, []);
 
   useEffect(() => {
     const textarea = memoTextareaRef.current;
@@ -773,7 +780,6 @@ export default function ImaginarySoloRaidTab({
 
   useEffect(() => {
     if (!wideDeckLayout || !deckSectionRef.current) {
-      setDeckSectionHeight(null);
       return;
     }
 
@@ -843,14 +849,6 @@ export default function ImaginarySoloRaidTab({
   useEffect(() => {
     scoreRefs.current = [];
   }, [activeDeckPageId]);
-
-  useEffect(() => {
-    const activeDeckIds = new Set(deckDrafts.map((deck) => deck.id));
-    setSelectedDeckDraftIds((prev) => {
-      const next = new Set(Array.from(prev).filter((id) => activeDeckIds.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [deckDrafts]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -1030,11 +1028,11 @@ export default function ImaginarySoloRaidTab({
   const selectedDeckScoreTotal = useMemo(
     () =>
       deckDrafts.reduce((total, deck) => {
-        if (!selectedDeckDraftIds.has(deck.id)) return total;
+        if (!effectiveSelectedDeckDraftIds.has(deck.id)) return total;
         const score = parseScoreInput(deck.score);
         return score !== null && Number.isFinite(score) ? total + score : total;
       }, 0),
-    [deckDrafts, selectedDeckDraftIds]
+    [deckDrafts, effectiveSelectedDeckDraftIds]
   );
 
   function updateActiveDeckPage(updater: (page: DeckBuilderPageState) => DeckBuilderPageState) {
@@ -1633,7 +1631,9 @@ export default function ImaginarySoloRaidTab({
 
   async function handleSaveAllDecks() {
     const targetDecks =
-      selectedDeckDraftIds.size > 0 ? deckDrafts.filter((deck) => selectedDeckDraftIds.has(deck.id)) : deckDrafts;
+      effectiveSelectedDeckDraftIds.size > 0
+        ? deckDrafts.filter((deck) => effectiveSelectedDeckDraftIds.has(deck.id))
+        : deckDrafts;
 
     for (const deck of targetDecks) {
       const completeDraft = deck.draft.filter((value): value is string => value !== null);
@@ -1959,7 +1959,7 @@ export default function ImaginarySoloRaidTab({
               </button>
               {deckOpen ? (
                 <>
-                  {selectedDeckDraftIds.size > 0 ? (
+                  {effectiveSelectedDeckDraftIds.size > 0 ? (
                     <div className="rounded-2xl border border-yellow-400/40 bg-yellow-400/10 px-4 py-2 text-sm font-semibold text-[var(--text)]">
                       선택 합계 {displayScore(selectedDeckScoreTotal)}
                     </div>
@@ -2220,7 +2220,7 @@ export default function ImaginarySoloRaidTab({
                       onCopyDeck={() => copyDeckDraft(deckIndex)}
                       onClearDraft={() => clearDraft(deckIndex)}
                       onDeleteDeck={() => removeDeckDraft(deckIndex)}
-                      selected={selectedDeckDraftIds.has(deck.id)}
+                      selected={effectiveSelectedDeckDraftIds.has(deck.id)}
                       onToggleSelected={() => toggleDeckDraftSelected(deck.id)}
                       note={deck.note}
                       onNoteChange={(value) => updateDeckNote(deckIndex, value)}
