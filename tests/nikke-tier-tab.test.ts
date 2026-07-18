@@ -89,6 +89,13 @@ test("assigned catalog nikkes use a gray image treatment without tier badges", (
   assert.doesNotMatch(source, /\{tierName\}\s*<\/span>/);
 });
 
+test("catalog nikke names render at one-and-a-half times their previous size", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.match(source, /text-\[16\.5px\]/);
+  assert.doesNotMatch(source, /text-\[11px\] text-\[var\(--theme-text-soft\)\]/);
+});
+
 test("catalog nikkes drag at full opacity", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
 
