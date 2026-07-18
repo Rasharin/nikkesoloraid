@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { toPng } from "html-to-image";
 import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
 import { formatPlainScoreText } from "../../../lib/score-format";
+import { useHydrated } from "../../hooks/useHydrated";
 import {
   isHomeAnnouncementDismissed,
   type HomeAnnouncement,
@@ -174,6 +175,51 @@ const HOME_DRAFT_STORAGE_KEY = "soloraid_home_draft_v1";
 const HOME_MEMO_STORAGE_KEY = "soloraid_home_memo_v1";
 const HOME_ANNOUNCEMENT_DISMISSED_VERSION_KEY = "soloraid_home_announcement_dismissed_version_v1";
 
+type StoredHomeDraftState = {
+  draft: DraftSlot[];
+  score: string;
+  editingId: string | null;
+};
+
+function normalizeStoredHomeDraft(value: unknown): DraftSlot[] {
+  const restoredDraft = createEmptyDraft();
+  if (!Array.isArray(value)) return restoredDraft;
+  value.slice(0, restoredDraft.length).forEach((slot, index) => {
+    restoredDraft[index] = typeof slot === "string" ? slot : null;
+  });
+  return restoredDraft;
+}
+
+function readHomeDraftState(): StoredHomeDraftState {
+  const fallback = { draft: createEmptyDraft(), score: "", editingId: null };
+  try {
+    const raw = sessionStorage.getItem(HOME_DRAFT_STORAGE_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as {
+      deckDrafts?: Array<{ draft?: unknown; score?: unknown; editingId?: unknown }>;
+      draft?: unknown;
+      score?: unknown;
+      editingId?: unknown;
+    };
+    const saved = Array.isArray(parsed.deckDrafts) ? parsed.deckDrafts[0] : parsed;
+    return {
+      draft: normalizeStoredHomeDraft(saved?.draft),
+      score: typeof saved?.score === "string" ? formatPlainScoreText(saved.score) : "",
+      editingId: typeof saved?.editingId === "string" ? saved.editingId : null,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function readHomeMemo(): string {
+  try {
+    return localStorage.getItem(HOME_MEMO_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 function swapDraftSlots(draft: DraftSlot[], fromIndex: number, toIndex: number): DraftSlot[] {
   const next = [...draft];
   const fromValue = next[fromIndex] ?? null;
@@ -234,10 +280,32 @@ export default function HomeTab({
   const [isAnnouncementEditing, setIsAnnouncementEditing] = useState(false);
   const [announcementDraft, setAnnouncementDraft] = useState("");
   const [draftStorageReady, setDraftStorageReady] = useState(false);
+  const [storageRestored, setStorageRestored] = useState(false);
+  const [appliedEditRequestId, setAppliedEditRequestId] = useState<string | null>(null);
   const [isDesktopDnd, setIsDesktopDnd] = useState(false);
   const scoreRef = useRef<HTMLInputElement | null>(null);
   const deckSectionRef = useRef<HTMLElement | null>(null);
   const memoTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const hydrated = useHydrated();
+
+  if (hydrated && !storageRestored) {
+    const stored = readHomeDraftState();
+    setDraft(stored.draft);
+    setScore(stored.score);
+    setEditingId(stored.editingId);
+    setMemoText(readHomeMemo());
+    setDraftStorageReady(true);
+    setStorageRestored(true);
+  }
+
+  if (editRequest && editRequest.id !== appliedEditRequestId) {
+    setDraft(buildDraftFromChars(editRequest.chars));
+    setScore(fmt(editRequest.score));
+    setEditingId(editRequest.id);
+    setAppliedEditRequestId(editRequest.id);
+  } else if (!editRequest && appliedEditRequestId) {
+    setAppliedEditRequestId(null);
+  }
   const captureRefMobile = useRef<HTMLDivElement | null>(null);
   const captureRefDesktop = useRef<HTMLDivElement | null>(null);
 
@@ -268,59 +336,6 @@ export default function HomeTab({
   }, []);
 
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(HOME_DRAFT_STORAGE_KEY);
-      if (!raw) {
-        setDraftStorageReady(true);
-        return;
-      }
-
-      const parsed = JSON.parse(raw) as {
-        deckDrafts?: Array<{
-          draft?: DraftSlot[];
-          score?: string;
-          editingId?: string | null;
-        }>;
-        draft?: DraftSlot[];
-        score?: string;
-        editingId?: string | null;
-      };
-
-      if (Array.isArray(parsed.deckDrafts)) {
-        const saved = parsed.deckDrafts[0];
-        const restoredDraft = createEmptyDraft();
-        if (Array.isArray(saved?.draft)) {
-          saved.draft.slice(0, restoredDraft.length).forEach((value, slotIndex) => {
-            restoredDraft[slotIndex] = typeof value === "string" ? value : null;
-          });
-        }
-        setDraft(restoredDraft);
-        setScore(typeof saved?.score === "string" ? formatPlainScoreText(saved.score) : "");
-        setEditingId(typeof saved?.editingId === "string" ? saved.editingId : null);
-      } else if (Array.isArray(parsed.draft)) {
-        const restoredDraft = createEmptyDraft();
-        parsed.draft.slice(0, restoredDraft.length).forEach((value, index) => {
-          restoredDraft[index] = typeof value === "string" ? value : null;
-        });
-        setDraft(restoredDraft);
-        setScore(typeof parsed.score === "string" ? formatPlainScoreText(parsed.score) : "");
-        setEditingId(typeof parsed.editingId === "string" ? parsed.editingId : null);
-      }
-    } catch { }
-
-    setDraftStorageReady(true);
-  }, []);
-
-  useEffect(() => {
-    try {
-      const rawMemo = localStorage.getItem(HOME_MEMO_STORAGE_KEY);
-      if (typeof rawMemo === "string") {
-        setMemoText(rawMemo);
-      }
-    } catch { }
-  }, []);
-
-  useEffect(() => {
     const textarea = memoTextareaRef.current;
     if (!textarea) return;
     textarea.style.height = "0px";
@@ -335,10 +350,6 @@ export default function HomeTab({
 
   useEffect(() => {
     if (!editRequest) return;
-
-    setDraft(buildDraftFromChars(editRequest.chars));
-    setScore(fmt(editRequest.score));
-    setEditingId(editRequest.id);
     requestAnimationFrame(() => scoreRef.current?.focus());
     onShowToast("수정 모드: 니케 변경 후 점수 저장");
     onEditRequestConsumed();
