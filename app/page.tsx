@@ -11,6 +11,7 @@ import SettingsTab from "./components/tabs/SettingsTab";
 import ContactTab from "./components/tabs/ContactTab";
 import UsageTab from "./components/tabs/UsageTab";
 import ImaginarySoloRaidTab from "./components/tabs/ImaginarySoloRaidTab";
+import TierTab from "./components/tabs/TierTab";
 import LicenseContent from "./components/LicenseContent";
 import NoticeContent, { type NoticePost } from "./components/NoticeContent";
 import PrivacyContent from "./components/PrivacyContent";
@@ -295,13 +296,14 @@ const roles = [
   { v: "defender", label: "방어형" },
 ] as const;
 
-type TabKey = "home" | "saved" | "recommend" | "imaginary" | "usage" | "settings" | "contact" | "mypage";
+type TabKey = "home" | "saved" | "recommend" | "imaginary" | "tier" | "usage" | "settings" | "contact" | "mypage";
 type UsageBoardCategoryKey = "home" | "saved" | "recommend" | "deck-building" | "settings";
 const TAB_ROUTE_MAP: Record<Exclude<TabKey, "mypage">, string> = {
   home: "/",
   saved: "/saved-deck",
   recommend: "/deck-recommend",
   imaginary: "/deck-building",
+  tier: "/tier",
   usage: "/usage",
   settings: "/deck-setting",
   contact: "/faq",
@@ -311,6 +313,7 @@ const PATH_TAB_MAP: Record<string, Exclude<TabKey, "mypage">> = {
   "/saved-deck": "saved",
   "/deck-recommend": "recommend",
   "/deck-building": "imaginary",
+  "/tier": "tier",
   "/usage": "usage",
   "/deck-setting": "settings",
   "/faq": "contact",
@@ -5740,6 +5743,22 @@ export default function Page() {
 	              onShowToast={showToast}
               onSubmitDeck={submitDeckFromHome}
               onUpdateDeckScore={updateDeckScore}
+            />
+          </div>
+        )}
+
+        {tab === "tier" && (
+          <div className="mx-auto w-full lg:max-w-6xl">
+            <TierTab
+              nikkes={nikkes}
+              getPublicUrl={getPublicUrl}
+              bursts={[
+                { n: 1, label: "I" },
+                { n: 2, label: "II" },
+                { n: 3, label: "III" },
+              ]}
+              elements={elements}
+              roles={roles}
             />
           </div>
         )}

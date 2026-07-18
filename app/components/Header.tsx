@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import LoginButton from "./LoginButton";
 
-type TabKey = "home" | "saved" | "recommend" | "imaginary" | "usage" | "settings" | "contact" | "mypage";
+type TabKey = "home" | "saved" | "recommend" | "imaginary" | "tier" | "usage" | "settings" | "contact" | "mypage";
 
 type HeaderProps = {
   tab: TabKey;
@@ -32,10 +32,10 @@ function HeaderContent({ tab, onTabChange, onProfileClick }: HeaderProps) {
           <p className="sr-only">덱 조합, 추천, 기록, 솔로레이드 시즌별 기록, 솔레 팁</p>
         </div>
 
-        <div className="grid grid-cols-7 gap-1.5 px-1 lg:mx-auto lg:w-full lg:max-w-4xl">
+        <div className="grid grid-cols-4 gap-1.5 px-1 sm:grid-cols-8 lg:mx-auto lg:w-full lg:max-w-5xl">
           <button
             onClick={() => onTabChange("home")}
-            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-[11px] font-medium transition active:scale-[0.99] lg:text-xs ${
+            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-xs font-medium transition active:scale-[0.99] lg:text-sm ${
               tab === "home" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
           >
@@ -44,7 +44,7 @@ function HeaderContent({ tab, onTabChange, onProfileClick }: HeaderProps) {
 
           <button
             onClick={() => onTabChange("saved")}
-            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-[11px] font-medium transition active:scale-[0.99] lg:text-xs ${
+            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-xs font-medium transition active:scale-[0.99] lg:text-sm ${
               tab === "saved" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
           >
@@ -53,7 +53,7 @@ function HeaderContent({ tab, onTabChange, onProfileClick }: HeaderProps) {
 
           <button
             onClick={() => onTabChange("recommend")}
-            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-[11px] font-medium transition active:scale-[0.99] lg:text-xs ${
+            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-xs font-medium transition active:scale-[0.99] lg:text-sm ${
               tab === "recommend" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
           >
@@ -62,7 +62,7 @@ function HeaderContent({ tab, onTabChange, onProfileClick }: HeaderProps) {
 
           <button
             onClick={() => onTabChange("imaginary")}
-            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-[11px] font-medium transition active:scale-[0.99] lg:text-xs ${
+            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-xs font-medium transition active:scale-[0.99] lg:text-sm ${
               tab === "imaginary" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
           >
@@ -70,8 +70,17 @@ function HeaderContent({ tab, onTabChange, onProfileClick }: HeaderProps) {
           </button>
 
           <button
+            onClick={() => onTabChange("tier")}
+            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-xs font-medium transition active:scale-[0.99] lg:text-sm ${
+              tab === "tier" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
+            }`}
+          >
+            <div>티어</div>
+          </button>
+
+          <button
             onClick={() => onTabChange("usage")}
-            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-[11px] font-medium transition active:scale-[0.99] lg:text-xs ${
+            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-xs font-medium transition active:scale-[0.99] lg:text-sm ${
               tab === "usage" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
           >
@@ -80,7 +89,7 @@ function HeaderContent({ tab, onTabChange, onProfileClick }: HeaderProps) {
 
           <button
             onClick={() => onTabChange("settings")}
-            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-[11px] font-medium transition active:scale-[0.99] lg:text-xs ${
+            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-xs font-medium transition active:scale-[0.99] lg:text-sm ${
               tab === "settings" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
           >
@@ -89,7 +98,7 @@ function HeaderContent({ tab, onTabChange, onProfileClick }: HeaderProps) {
 
           <button
             onClick={() => onTabChange("contact")}
-            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-[11px] font-medium transition active:scale-[0.99] lg:text-xs ${
+            className={`flex min-w-0 items-center justify-center rounded-xl px-1 py-2.5 text-xs font-medium transition active:scale-[0.99] lg:text-sm ${
               tab === "contact" ? "bg-[var(--card)] text-[var(--text)]" : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--theme-text-soft)]"
             }`}
           >

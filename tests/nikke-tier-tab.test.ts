@@ -31,3 +31,29 @@ test("tier catalog includes name search and all three filter groups", () => {
   assert.match(source, /클래스/);
   assert.match(source, /useDraggable/);
 });
+
+test("tier tab is routed between deck building and usage", () => {
+  const page = fs.readFileSync("app/page.tsx", "utf8");
+  const header = fs.readFileSync("app/components/Header.tsx", "utf8");
+
+  assert.match(page, /tier:\s*"\/tier"/);
+  assert.ok(header.indexOf('onTabChange("imaginary")') < header.indexOf('onTabChange("tier")'));
+  assert.ok(header.indexOf('onTabChange("tier")') < header.indexOf('onTabChange("usage")'));
+});
+
+test("tier has a direct App Router entry point", () => {
+  const route = fs.readFileSync("app/tier/page.tsx", "utf8");
+
+  assert.match(route, /canonicalUrl\("\/tier"\)/);
+  assert.match(route, /export \{ default \} from "\.\.\/page"/);
+});
+
+test("tier tab loads and saves through the server API", () => {
+  const source = fs.readFileSync("app/components/tabs/TierTab.tsx", "utf8");
+
+  assert.match(source, /fetch\("\/api\/tier-board"/);
+  assert.match(source, /method:\s*"PATCH"/);
+  assert.match(source, /expectedUpdatedAt/);
+  assert.match(source, /response\.status === 409/);
+  assert.doesNotMatch(source, /normalizeTierBoard\(payload\.board,\s*validNames\)/);
+});

@@ -11,6 +11,7 @@ export const publicRoutes = [
   "",
   "/deck-recommend",
   "/deck-setting",
+  "/tier",
   "/usage",
   "/saved-deck",
   "/faq",
