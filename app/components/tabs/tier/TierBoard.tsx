@@ -161,7 +161,7 @@ function TierNikkeCard({
           <div className="grid h-full place-items-center text-[9px] text-white/60">no image</div>
         )}
       </div>
-      <div className="truncate px-1 py-1 text-[11px] text-neutral-900 dark:text-white">
+      <div className="truncate px-1 py-1 text-[13px] text-neutral-900 dark:text-white">
         {formatNikkeDisplayName(nikke.name)}
       </div>
     </button>

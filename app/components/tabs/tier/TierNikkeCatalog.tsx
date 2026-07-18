@@ -88,7 +88,7 @@ function CatalogCard({
           <span className="pointer-events-none absolute inset-0 bg-neutral-500/35" aria-hidden="true" />
         ) : null}
       </div>
-      <div className="truncate px-1.5 py-1.5 text-center text-[16.5px] text-[var(--theme-text-soft)]">
+      <div className="truncate px-1.5 py-[5px] text-center text-[13px] text-[var(--theme-text-soft)]">
         {formatNikkeDisplayName(nikke.name)}
       </div>
     </button>

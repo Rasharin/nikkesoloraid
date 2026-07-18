@@ -52,12 +52,12 @@ test("dragged tier cards stay opaque and move without transition lag", () => {
   assert.match(source, /transform:\s*CSS\.Transform\.toString\(transform\)/);
 });
 
-test("placed tier cards use larger names and a light-mode white background", () => {
+test("placed tier cards use 13px names and a light-mode white background", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
   assert.match(source, /bg-white\/80/);
   assert.match(source, /dark:bg-black\/25/);
-  assert.match(source, /text-\[11px\]/);
+  assert.match(source, /text-\[13px\]/);
   assert.doesNotMatch(source, /text-\[10px\] text-white/);
 });
 
@@ -89,10 +89,12 @@ test("assigned catalog nikkes use a gray image treatment without tier badges", (
   assert.doesNotMatch(source, /\{tierName\}\s*<\/span>/);
 });
 
-test("catalog nikke names render at one-and-a-half times their previous size", () => {
+test("catalog nikke names use 13px text with tighter vertical padding", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
 
-  assert.match(source, /text-\[16\.5px\]/);
+  assert.match(source, /py-\[5px\]/);
+  assert.match(source, /text-\[13px\]/);
+  assert.doesNotMatch(source, /text-\[16\.5px\]/);
   assert.doesNotMatch(source, /text-\[11px\] text-\[var\(--theme-text-soft\)\]/);
 });
 
