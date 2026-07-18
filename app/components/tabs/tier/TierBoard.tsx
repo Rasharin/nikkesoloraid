@@ -144,7 +144,7 @@ function TierNikkeCard({
       style={style}
       {...(canEdit ? attributes : {})}
       {...(canEdit ? listeners : {})}
-      className={`w-16 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-black/25 sm:w-20 ${
+      className={`w-16 shrink-0 overflow-hidden rounded-xl border border-black/10 bg-white/80 sm:w-20 dark:border-white/15 dark:bg-black/25 ${
         canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-default"
       }`}
     >
@@ -161,7 +161,7 @@ function TierNikkeCard({
           <div className="grid h-full place-items-center text-[9px] text-white/60">no image</div>
         )}
       </div>
-      <div className="truncate px-1 py-1 text-[10px] text-white">
+      <div className="truncate px-1 py-1 text-[11px] text-neutral-900 dark:text-white">
         {formatNikkeDisplayName(nikke.name)}
       </div>
     </button>

@@ -52,6 +52,15 @@ test("dragged tier cards stay opaque and move without transition lag", () => {
   assert.match(source, /transform:\s*CSS\.Transform\.toString\(transform\)/);
 });
 
+test("placed tier cards use larger names and a light-mode white background", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(source, /bg-white\/80/);
+  assert.match(source, /dark:bg-black\/25/);
+  assert.match(source, /text-\[11px\]/);
+  assert.doesNotMatch(source, /text-\[10px\] text-white/);
+});
+
 test("tier board restricts editing affordances with canEdit", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
