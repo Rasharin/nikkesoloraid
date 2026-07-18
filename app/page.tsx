@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Header from "./components/Header";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import HomeTab from "./components/tabs/HomeTab";
 import MyPageTab from "./components/tabs/MyPageTab";
 import RecommendTab from "./components/tabs/RecommendTab";
@@ -10,7 +10,6 @@ import SavedTab from "./components/tabs/SavedTab";
 import SettingsTab from "./components/tabs/SettingsTab";
 import ContactTab from "./components/tabs/ContactTab";
 import UsageTab from "./components/tabs/UsageTab";
-import CalculatorTab from "./components/tabs/CalculatorTab";
 import ImaginarySoloRaidTab from "./components/tabs/ImaginarySoloRaidTab";
 import LicenseContent from "./components/LicenseContent";
 import NoticeContent, { type NoticePost } from "./components/NoticeContent";
@@ -296,14 +295,13 @@ const roles = [
   { v: "defender", label: "방어형" },
 ] as const;
 
-type TabKey = "home" | "saved" | "recommend" | "imaginary" | "calculator" | "usage" | "settings" | "contact" | "mypage";
+type TabKey = "home" | "saved" | "recommend" | "imaginary" | "usage" | "settings" | "contact" | "mypage";
 type UsageBoardCategoryKey = "home" | "saved" | "recommend" | "deck-building" | "settings";
 const TAB_ROUTE_MAP: Record<Exclude<TabKey, "mypage">, string> = {
   home: "/",
   saved: "/saved-deck",
   recommend: "/deck-recommend",
   imaginary: "/deck-building",
-  calculator: "/calculator",
   usage: "/usage",
   settings: "/deck-setting",
   contact: "/faq",
@@ -313,7 +311,6 @@ const PATH_TAB_MAP: Record<string, Exclude<TabKey, "mypage">> = {
   "/saved-deck": "saved",
   "/deck-recommend": "recommend",
   "/deck-building": "imaginary",
-  "/calculator": "calculator",
   "/usage": "usage",
   "/deck-setting": "settings",
   "/faq": "contact",
@@ -1475,7 +1472,6 @@ function normalizeRecommendedNikkeNames(value: unknown): string[] {
 // -------------------- Page --------------------
 export default function Page() {
   const pathname = usePathname();
-  const router = useRouter();
   const pathnameRef = useRef(pathname);
   const [currentPath, setCurrentPath] = useState(pathname);
   pathnameRef.current = currentPath;
@@ -1575,8 +1571,6 @@ export default function Page() {
   const isTermsPage = currentPath === "/terms";
   const isLegalPage = isLicensePage || isNoticePage || isPrivacyPage || isTermsPage;
   const showInitialDataLoading = !isLegalPage && loadingData && nikkes.length === 0 && bosses.length === 0;
-  const canAccessCalculator = process.env.NODE_ENV !== "production";
-  const calculatorAccessResolved = true;
   const activeRaidTabLabel = useMemo(
     () => deckTabs.find((deckTab) => deckTab.key === activeRaidKey)?.label ?? null,
     [activeRaidKey, deckTabs]
@@ -1590,11 +1584,9 @@ export default function Page() {
   );
 
   useEffect(() => {
-    if (!calculatorAccessResolved) return;
     const pathTab = PATH_TAB_MAP[currentPath] ?? "home";
-    const nextTab = pathTab === "calculator" && !canAccessCalculator ? "home" : pathTab;
-    setTab((current) => (current === nextTab ? current : nextTab));
-  }, [calculatorAccessResolved, canAccessCalculator, currentPath]);
+    setTab((current) => (current === pathTab ? current : pathTab));
+  }, [currentPath]);
 
   useEffect(() => {
     setCurrentPath(pathname);
@@ -1621,13 +1613,6 @@ export default function Page() {
     setBoss(cached.bosses[0] ?? null);
     setLoadingData(false);
   }, []);
-
-  useEffect(() => {
-    if (!calculatorAccessResolved) return;
-    if (currentPath !== "/calculator") return;
-    if (canAccessCalculator) return;
-    router.replace("/");
-  }, [calculatorAccessResolved, canAccessCalculator, currentPath, router]);
 
   async function fetchUserDecks(currentUserId: string) {
     const { data, error } = await supabase
@@ -3189,7 +3174,6 @@ export default function Page() {
     [deckTabs]
   );
   const isMaster = isMasterUser;
-  const shouldShowCalculator = canAccessCalculator;
   const canManageBosses = isMaster || process.env.NODE_ENV !== "production";
 
   useEffect(() => {
@@ -5550,7 +5534,6 @@ export default function Page() {
         {/* Header */}
         <Header
           tab={tab}
-          shouldShowCalculator={shouldShowCalculator}
           onTabChange={navigateToTab}
           onProfileClick={handleProfileClick}
         />
@@ -5776,12 +5759,6 @@ export default function Page() {
               onDeletePost={deleteUsagePost}
               getPublicUrl={getPublicUrl}
             />
-          </div>
-        )}
-
-        {tab === "calculator" && shouldShowCalculator && (
-          <div className="mx-auto w-full lg:max-w-6xl">
-            <CalculatorTab />
           </div>
         )}
 
