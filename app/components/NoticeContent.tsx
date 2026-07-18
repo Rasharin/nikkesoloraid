@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 
 export type NoticePost = {
   id: string;
@@ -27,6 +27,12 @@ export default function NoticeContent({ posts, loading, isMaster, saving, deleti
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState(emptyDraft);
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const effectiveOpenIds = useMemo(() => {
+    const postIds = new Set(posts.map((post) => post.id));
+    const next = new Set([...openIds].filter((id) => postIds.has(id)));
+    if (next.size === 0 && posts[0]) next.add(posts[0].id);
+    return next;
+  }, [openIds, posts]);
   const editingPost = editingId && editingId !== "new" ? posts.find((post) => post.id === editingId) ?? null : null;
 
   const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
@@ -36,17 +42,6 @@ export default function NoticeContent({ posts, loading, isMaster, saving, deleti
     hour: "2-digit",
     minute: "2-digit",
   });
-
-  useEffect(() => {
-    setOpenIds((current) => {
-      const postIds = new Set(posts.map((post) => post.id));
-      const next = new Set([...current].filter((id) => postIds.has(id)));
-      if (next.size === 0 && posts[0]) {
-        next.add(posts[0].id);
-      }
-      return next;
-    });
-  }, [posts]);
 
   function startCreate() {
     setEditingId("new");
@@ -154,7 +149,7 @@ export default function NoticeContent({ posts, loading, isMaster, saving, deleti
       ) : (
         <div className="space-y-3">
           {posts.map((post) => {
-            const isOpen = openIds.has(post.id);
+            const isOpen = effectiveOpenIds.has(post.id);
             return (
               <article key={post.id} className="rounded-2xl border border-neutral-800 bg-neutral-900/80">
                 <button

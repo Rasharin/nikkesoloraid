@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const termsText = `이용약관
 
@@ -85,11 +85,10 @@ export default function TermsContent({ content = "", canEdit = false, saving = f
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(displayText);
 
-  useEffect(() => {
-    if (!editing) {
-      setDraft(displayText);
-    }
-  }, [displayText, editing]);
+  function startEditing() {
+    setDraft(displayText);
+    setEditing(true);
+  }
 
   async function handleSave() {
     if (!onSave) return;
@@ -130,7 +129,7 @@ export default function TermsContent({ content = "", canEdit = false, saving = f
             ) : (
               <button
                 type="button"
-                onClick={() => setEditing(true)}
+                onClick={startEditing}
                 className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm text-neutral-200"
               >
                 수정

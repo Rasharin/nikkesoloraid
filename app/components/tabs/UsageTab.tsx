@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import UsagePostEditor from "./usage/UsagePostEditor";
 import UsagePostViewer from "./usage/UsagePostViewer";
 import type { UsageEditorBlock, UsagePost, UsagePostSubmitPayload } from "./usage/types";
@@ -120,15 +120,6 @@ export default function UsageTab({
   const activeLabel = tabs.find((tab) => tab.key === activeTab)?.label ?? activeTab;
   const currentPost = posts[0] ?? null;
 
-  useEffect(() => {
-    setShowWriteForm(false);
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (!showWriteForm) return;
-    setBlocks(toEditorBlocks(currentPost, getPublicUrl));
-  }, [currentPost, getPublicUrl, showWriteForm]);
-
   const hasContent = useMemo(
     () =>
       blocks.some((block) =>
@@ -158,6 +149,11 @@ export default function UsageTab({
     setShowWriteForm(true);
   }
 
+  function changeTab(key: string) {
+    setShowWriteForm(false);
+    onTabChange(key);
+  }
+
   return (
     <div className="space-y-3">
       <section className="rounded-2xl border border-neutral-800 bg-neutral-800/60 p-4">
@@ -169,13 +165,7 @@ export default function UsageTab({
           {isMaster ? (
             <button
               type="button"
-              onClick={() => {
-                const nextOpen = !showWriteForm;
-                setShowWriteForm(nextOpen);
-                if (nextOpen) {
-                  setBlocks(toEditorBlocks(currentPost, getPublicUrl));
-                }
-              }}
+              onClick={showWriteForm ? () => setShowWriteForm(false) : openEditor}
               className="rounded-2xl border border-neutral-700 px-4 py-2 text-sm text-neutral-100 active:scale-[0.99]"
             >
               {showWriteForm ? "닫기" : currentPost ? "사용법 수정" : "사용법 작성"}
@@ -188,7 +178,7 @@ export default function UsageTab({
             <button
               key={tab.key}
               type="button"
-              onClick={() => onTabChange(tab.key)}
+              onClick={() => changeTab(tab.key)}
               className={`flex min-h-16 items-center gap-2.5 rounded-xl border px-3 py-3 text-left text-base font-semibold transition ${
                 activeTab === tab.key
                   ? "border-white bg-white text-black"
