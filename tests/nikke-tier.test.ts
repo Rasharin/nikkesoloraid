@@ -1,13 +1,43 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  clearTierAssignments,
   createDefaultTierBoard,
   getContrastingTextColor,
   moveNikke,
   normalizeTierBoard,
+  removeNikkeFromTier,
   removeTierRow,
   type TierBoardData,
 } from "../lib/nikke-tier.ts";
+
+test("removes one nikke while preserving tier settings and other assignments", () => {
+  const board = createDefaultTierBoard();
+  board.sectionName = "커스텀";
+  board.rows[0].nikkeNames = ["라피", "아니스"];
+  board.rows[1].nikkeNames = ["네온"];
+
+  const next = removeNikkeFromTier(board, "라피");
+
+  assert.equal(next.sectionName, "커스텀");
+  assert.deepEqual(next.rows[0].nikkeNames, ["아니스"]);
+  assert.deepEqual(next.rows[1].nikkeNames, ["네온"]);
+  assert.deepEqual(board.rows[0].nikkeNames, ["라피", "아니스"]);
+});
+
+test("clears every assignment while preserving tier row settings", () => {
+  const board = createDefaultTierBoard();
+  board.rows[0] = { ...board.rows[0], name: "최고", color: "#123456", nikkeNames: ["라피"] };
+  board.rows[1].nikkeNames = ["아니스"];
+
+  const next = clearTierAssignments(board);
+
+  assert.equal(next.rows.length, board.rows.length);
+  assert.equal(next.rows[0].name, "최고");
+  assert.equal(next.rows[0].color, "#123456");
+  assert.ok(next.rows.every((row) => row.nikkeNames.length === 0));
+  assert.deepEqual(board.rows[0].nikkeNames, ["라피"]);
+});
 
 test("creates the five default tier rows", () => {
   const board = createDefaultTierBoard();

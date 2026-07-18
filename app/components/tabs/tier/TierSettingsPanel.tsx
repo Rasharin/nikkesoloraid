@@ -11,6 +11,8 @@ import {
 type TierSettingsPanelProps = {
   rows: TierRow[];
   onChange: (rows: TierRow[]) => void;
+  onClearAssignments: () => void;
+  onResetAll: () => void;
   onClose: () => void;
 };
 
@@ -29,6 +31,8 @@ function createTierRow(index: number): TierRow {
 export default function TierSettingsPanel({
   rows,
   onChange,
+  onClearAssignments,
+  onResetAll,
   onClose,
 }: TierSettingsPanelProps) {
   function updateRow(index: number, patch: Partial<TierRow>) {
@@ -47,7 +51,7 @@ export default function TierSettingsPanel({
     <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-[var(--text)]">티어 설정</h3>
+          <h3 className="font-semibold text-[var(--text)]">설정</h3>
           <p className="mt-1 text-xs text-[var(--muted)]">줄 이름, 순서와 색상을 변경할 수 있습니다.</p>
         </div>
         <button
@@ -126,6 +130,27 @@ export default function TierSettingsPanel({
       >
         줄 추가 ({rows.length}/{TIER_ROW_MAX})
       </button>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.confirm("배치된 니케 목록을 모두 초기화할까요?")) onClearAssignments();
+          }}
+          className="rounded-xl border border-amber-500/40 px-3 py-2 text-sm text-amber-600 transition hover:bg-amber-500/10 dark:text-amber-300"
+        >
+          목록 초기화
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (window.confirm("티어 설정과 니케 목록을 모두 기본값으로 초기화할까요?")) onResetAll();
+          }}
+          className="rounded-xl border border-red-500/40 px-3 py-2 text-sm text-red-600 transition hover:bg-red-500/10 dark:text-red-300"
+        >
+          전부 초기화
+        </button>
+      </div>
 
       <div className="sr-only">{DEFAULT_TIER_COLORS.join(",")}</div>
     </div>

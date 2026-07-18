@@ -131,6 +131,23 @@ export function moveNikke(board: TierBoardData, move: TierMove): TierBoardData {
   return { ...board, rows };
 }
 
+export function removeNikkeFromTier(board: TierBoardData, nikkeName: string): TierBoardData {
+  return {
+    ...board,
+    rows: board.rows.map((row) => ({
+      ...row,
+      nikkeNames: row.nikkeNames.filter((name) => name !== nikkeName),
+    })),
+  };
+}
+
+export function clearTierAssignments(board: TierBoardData): TierBoardData {
+  return {
+    ...board,
+    rows: board.rows.map((row) => ({ ...row, nikkeNames: [] })),
+  };
+}
+
 export function removeTierRow(board: TierBoardData, rowId: string): TierBoardData {
   if (board.rows.length <= TIER_ROW_MIN || !board.rows.some((row) => row.id === rowId)) {
     return board;

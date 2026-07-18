@@ -23,8 +23,11 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useMemo, useState, type CSSProperties } from "react";
 import {
+  clearTierAssignments,
+  createDefaultTierBoard,
   getContrastingTextColor,
   moveNikke,
+  removeNikkeFromTier,
   type TierBoardData,
   type TierRow,
 } from "../../../../lib/nikke-tier";
@@ -114,12 +117,14 @@ function TierNikkeCard({
   rowId,
   index,
   canEdit,
+  onRemove,
   getPublicUrl,
 }: {
   nikke: TierNikkeRow;
   rowId: string;
   index: number;
   canEdit: boolean;
+  onRemove: () => void;
   getPublicUrl: TierBoardProps["getPublicUrl"];
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -139,6 +144,7 @@ function TierNikkeCard({
       ref={setNodeRef}
       type="button"
       disabled={!canEdit}
+      onClick={onRemove}
       style={style}
       {...(canEdit ? attributes : {})}
       {...(canEdit ? listeners : {})}
@@ -171,12 +177,14 @@ function TierRowView({
   nikkesByName,
   canEdit,
   onNameChange,
+  onRemoveNikke,
   getPublicUrl,
 }: {
   row: TierRow;
   nikkesByName: ReadonlyMap<string, TierNikkeRow>;
   canEdit: boolean;
   onNameChange: (name: string) => void;
+  onRemoveNikke: (name: string) => void;
   getPublicUrl: TierBoardProps["getPublicUrl"];
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -222,6 +230,7 @@ function TierRowView({
                   rowId={row.id}
                   index={index}
                   canEdit={canEdit}
+                  onRemove={() => onRemoveNikke(name)}
                   getPublicUrl={getPublicUrl}
                 />
               ) : null;
@@ -342,6 +351,8 @@ export default function TierBoard({
             <TierSettingsPanel
               rows={board.rows}
               onChange={updateRows}
+              onClearAssignments={() => onChange(clearTierAssignments(board))}
+              onResetAll={() => onChange(createDefaultTierBoard())}
               onClose={() => setSettingsOpen(false)}
             />
           ) : null}
@@ -353,6 +364,7 @@ export default function TierBoard({
                 row={row}
                 nikkesByName={nikkesByName}
                 canEdit={canEdit}
+                onRemoveNikke={(name) => onChange(removeNikkeFromTier(board, name))}
                 onNameChange={(name) =>
                   updateRows(
                     board.rows.map((item) => (item.id === row.id ? { ...item, name } : item))

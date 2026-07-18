@@ -138,7 +138,7 @@ export default function TierNikkeCatalog({
   const filterButtonClass = (active: boolean) =>
     `shrink-0 rounded-lg border px-2.5 py-1 text-xs transition ${
       active
-        ? "border-emerald-300 bg-emerald-300 text-emerald-950"
+        ? "border-cyan-500/40 bg-cyan-500/10 text-[var(--text)]"
         : "border-[var(--border)] text-[var(--theme-text-soft)] hover:border-neutral-400"
     }`;
 
