@@ -23,6 +23,8 @@ type TierBoardResponse = {
   error?: unknown;
 };
 
+const LOCAL_TIER_PREVIEW_KEY = "soloraid_nikke_tier_preview_v1";
+
 function TierTabContent({
   nikkes,
   getPublicUrl,
@@ -30,6 +32,7 @@ function TierTabContent({
   elements,
   roles,
 }: TierTabProps) {
+  const localPreview = process.env.NODE_ENV !== "production";
   const [board, setBoard] = useState<TierBoardData>(() => createDefaultTierBoard());
   const [canEdit, setCanEdit] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -57,13 +60,30 @@ function TierTabContent({
         if (!response.ok) {
           throw new Error(typeof payload.error === "string" ? payload.error : "티어 정보를 불러오지 못했습니다.");
         }
-        const nextBoard = normalizeTierBoard(payload.board);
-        lastServerBoardRef.current = nextBoard;
+        const serverBoard = normalizeTierBoard(payload.board);
+        lastServerBoardRef.current = serverBoard;
+        let nextBoard = serverBoard;
+        if (localPreview) {
+          try {
+            const storedBoard = window.localStorage.getItem(LOCAL_TIER_PREVIEW_KEY);
+            if (storedBoard) nextBoard = normalizeTierBoard(JSON.parse(storedBoard));
+          } catch { }
+        }
         setBoard(nextBoard);
-        setCanEdit(payload.canEdit === true);
+        setCanEdit(localPreview || payload.canEdit === true);
       } catch (loadError) {
         if (controller.signal.aborted) return;
-        setError(loadError instanceof Error ? loadError.message : "티어 정보를 불러오지 못했습니다.");
+        if (localPreview) {
+          let localBoard = createDefaultTierBoard();
+          try {
+            const storedBoard = window.localStorage.getItem(LOCAL_TIER_PREVIEW_KEY);
+            if (storedBoard) localBoard = normalizeTierBoard(JSON.parse(storedBoard));
+          } catch { }
+          setBoard(localBoard);
+          setCanEdit(true);
+        } else {
+          setError(loadError instanceof Error ? loadError.message : "티어 정보를 불러오지 못했습니다.");
+        }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -75,7 +95,7 @@ function TierTabContent({
       controller.abort();
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [nikkes]);
+  }, [nikkes, localPreview]);
 
   function queueSave(nextBoard: TierBoardData) {
     pendingBoardRef.current = nextBoard;
@@ -131,6 +151,12 @@ function TierTabContent({
   function handleChange(nextBoard: TierBoardData) {
     if (!canEdit) return;
     setBoard(nextBoard);
+    if (localPreview) {
+      try {
+        localStorage.setItem(LOCAL_TIER_PREVIEW_KEY, JSON.stringify(nextBoard));
+      } catch { }
+      return;
+    }
     queueSave(nextBoard);
   }
 

@@ -187,14 +187,22 @@ function TierRowView({
 
   return (
     <div
-      className="grid min-h-24 grid-cols-[minmax(0,1fr)_4.5rem] overflow-hidden rounded-2xl border sm:grid-cols-[minmax(0,1fr)_6rem]"
+      className="grid min-h-24 grid-cols-[4.5rem_minmax(0,1fr)] overflow-hidden rounded-2xl border sm:grid-cols-[6rem_minmax(0,1fr)]"
       style={{
         borderColor: `${row.color}99`,
         backgroundColor: `${row.color}18`,
         boxShadow: isOver ? `0 0 0 2px ${row.color}` : undefined,
       }}
     >
-      <div ref={setNodeRef} className="min-w-0 p-2.5">
+      <div
+        data-tier-row-label
+        className="grid place-items-center border-r border-black/10 p-2 text-center text-lg font-black sm:text-xl"
+        style={{ backgroundColor: row.color, color: getContrastingTextColor(row.color) }}
+      >
+        <EditableLabel value={row.name} canEdit={canEdit} onChange={onNameChange} />
+      </div>
+
+      <div ref={setNodeRef} data-tier-row-content className="min-w-0 p-2.5">
         <SortableContext
           items={row.nikkeNames.map((name) => `tier-card-${row.id}-${name}`)}
           strategy={rectSortingStrategy}
@@ -222,12 +230,6 @@ function TierRowView({
         </SortableContext>
       </div>
 
-      <div
-        className="grid place-items-center p-2 text-center text-lg font-black sm:text-xl"
-        style={{ backgroundColor: row.color, color: getContrastingTextColor(row.color) }}
-      >
-        <EditableLabel value={row.name} canEdit={canEdit} onChange={onNameChange} />
-      </div>
     </div>
   );
 }
@@ -307,7 +309,7 @@ export default function TierBoard({
       <div className="grid gap-5">
         <section className="rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)] lg:p-5">
           <div className="flex items-center justify-between gap-3">
-            <div>
+            <div className="flex items-center gap-2">
               <h2 className="text-xl font-semibold text-[var(--text)]">
                 <EditableLabel
                   value={board.sectionName}
@@ -315,10 +317,7 @@ export default function TierBoard({
                   onChange={(sectionName) => onChange({ ...board, sectionName })}
                 />
               </h2>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                {canEdit ? "이름은 더블클릭하여 수정할 수 있습니다." : "공용 니케 티어표입니다."}
-                {saving ? " 저장 중…" : ""}
-              </p>
+              {saving ? <span className="text-xs text-[var(--muted)]">저장 중…</span> : null}
             </div>
 
             {canEdit ? (

@@ -136,7 +136,7 @@ export default function TierNikkeCatalog({
   }, [nikkes, search, selectedBursts, selectedElements, selectedRoles]);
 
   const filterButtonClass = (active: boolean) =>
-    `rounded-lg border px-2.5 py-1 text-xs transition ${
+    `shrink-0 rounded-lg border px-2.5 py-1 text-xs transition ${
       active
         ? "border-white bg-white text-black"
         : "border-[var(--border)] text-[var(--theme-text-soft)] hover:border-neutral-400"
@@ -144,12 +144,9 @@ export default function TierNikkeCatalog({
 
   return (
     <section className="rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)] lg:p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-[var(--text)]">전체 니케 목록</h2>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            {canEdit ? "니케를 위 티어 줄로 드래그하세요." : "현재 공용 티어 배치를 확인할 수 있습니다."}
-          </p>
         </div>
         <div className="w-full lg:max-w-md">
           <input
@@ -158,9 +155,10 @@ export default function TierNikkeCatalog({
             placeholder="니케 이름 검색"
             className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-cyan-400"
           />
-          <div className="mt-2 grid gap-2">
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="mr-1 text-xs text-[var(--muted)]">버스트</span>
+        </div>
+      </div>
+
+      <div data-tier-filter-bar className="mt-3 flex w-full items-center justify-start gap-1 overflow-x-auto pb-1">
               {bursts.map((burst) => (
                 <button
                   key={burst.n}
@@ -171,9 +169,6 @@ export default function TierNikkeCatalog({
                   {burst.label}
                 </button>
               ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="mr-1 text-xs text-[var(--muted)]">코드</span>
               {elements.map((element) => (
                 <button
                   key={element.v}
@@ -184,9 +179,6 @@ export default function TierNikkeCatalog({
                   {element.label}
                 </button>
               ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-1">
-              <span className="mr-1 text-xs text-[var(--muted)]">클래스</span>
               {roles.map((role) => (
                 <button
                   key={role.v}
@@ -197,9 +189,6 @@ export default function TierNikkeCatalog({
                   {role.label}
                 </button>
               ))}
-            </div>
-          </div>
-        </div>
       </div>
 
       {filteredNikkes.length > 0 ? (

@@ -26,9 +26,9 @@ test("tier catalog includes name search and all three filter groups", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
 
   assert.match(source, /니케 이름 검색/);
-  assert.match(source, /버스트/);
-  assert.match(source, /코드/);
-  assert.match(source, /클래스/);
+  assert.match(source, /bursts\.map/);
+  assert.match(source, /elements\.map/);
+  assert.match(source, /roles\.map/);
   assert.match(source, /useDraggable/);
 });
 
@@ -56,4 +56,36 @@ test("tier tab loads and saves through the server API", () => {
   assert.match(source, /expectedUpdatedAt/);
   assert.match(source, /response\.status === 409/);
   assert.doesNotMatch(source, /normalizeTierBoard\(payload\.board,\s*validNames\)/);
+});
+
+test("tier row renders its label before the nikke content", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.ok(source.indexOf("data-tier-row-label") < source.indexOf("data-tier-row-content"));
+  assert.match(source, /grid-cols-\[4\.5rem_minmax\(0,1fr\)\]/);
+});
+
+test("tier filters share one left-aligned scrolling row without group titles", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.match(source, /data-tier-filter-bar/);
+  assert.match(source, /overflow-x-auto/);
+  assert.doesNotMatch(source, />버스트<|>코드<|>클래스</);
+});
+
+test("tier sections do not render descriptive copy", () => {
+  const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+  const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.doesNotMatch(board, /이름은 더블클릭|공용 니케 티어표/);
+  assert.doesNotMatch(catalog, /니케를 위 티어 줄|현재 공용 티어 배치/);
+});
+
+test("development tier editing persists locally without PATCH requests", () => {
+  const source = fs.readFileSync("app/components/tabs/TierTab.tsx", "utf8");
+
+  assert.match(source, /process\.env\.NODE_ENV !== "production"/);
+  assert.match(source, /soloraid_nikke_tier_preview_v1/);
+  assert.match(source, /localStorage\.setItem/);
+  assert.match(source, /if \(localPreview\)/);
 });
