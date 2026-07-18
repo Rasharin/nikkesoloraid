@@ -70,11 +70,14 @@ test("tier dragging has no follower overlay or empty-row instruction text", () =
   assert.match(source, /moveNikke/);
 });
 
-test("dragged tier cards stay opaque and move without transition lag", () => {
+test("the actual opaque tier card follows the pointer and settles after drop", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
+  assert.match(source, /transform,\s*transition,\s*isDragging/);
+  assert.match(source, /transition:\s*isDragging\s*\?\s*"none"\s*:\s*transition/);
+  assert.match(source, /zIndex:\s*isDragging\s*\?\s*20\s*:\s*undefined/);
+  assert.match(source, /position:\s*isDragging\s*\?\s*"relative"\s*:\s*undefined/);
   assert.doesNotMatch(source, /opacity:\s*isDragging/);
-  assert.doesNotMatch(source, /transform,\s*transition,\s*isDragging/);
   assert.match(source, /transform:\s*CSS\.Transform\.toString\(transform\)/);
 });
 

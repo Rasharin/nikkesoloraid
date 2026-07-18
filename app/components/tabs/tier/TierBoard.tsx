@@ -126,13 +126,23 @@ function TierNikkeCard({
   onRemove: () => void;
   getPublicUrl: TierBoardProps["getPublicUrl"];
 }) {
-  const { attributes, listeners, setNodeRef, transform } = useSortable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: `tier-card-${rowId}-${nikke.name}`,
     disabled: !canEdit,
     data: { source: "tier", nikkeName: nikke.name, rowId, index } satisfies DragData,
   });
   const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
+    transition: isDragging ? "none" : transition,
+    zIndex: isDragging ? 20 : undefined,
+    position: isDragging ? "relative" : undefined,
   };
   const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
 
