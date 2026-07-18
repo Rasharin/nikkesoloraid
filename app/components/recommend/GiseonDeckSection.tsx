@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { getSubmasterDecks, MAX_RECOMMENDED_DECK_COUNT, pickBest5, type RecommendationSourceDeck } from "../../../lib/recommend";
+import { SUBMASTER_USER_ID } from "../../../lib/submaster";
 
 type NikkeRow = {
   id: string;
@@ -31,9 +32,6 @@ type GiseonDeckSectionProps = {
   onCopyDeckToBuilder: (deck: RecommendedDeck) => void;
   onCopyDecksToBuilder: (decks: RecommendedDeck[]) => void;
 };
-
-const DEFAULT_SUBMASTER_USER_ID = "2d455703-52fd-4239-82f8-79c5e1856f30";
-const SUBMASTER_USER_ID = process.env.NEXT_PUBLIC_SUBMASTER_USER_ID?.trim() || DEFAULT_SUBMASTER_USER_ID;
 
 function toRecommendedDeck(deck: RecommendationSourceDeck): RecommendedDeck {
   return {
