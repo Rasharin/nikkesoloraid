@@ -11,6 +11,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   rectSortingStrategy,
@@ -19,7 +20,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   clearTierAssignments,
   createDefaultTierBoard,
@@ -255,6 +256,7 @@ export default function TierBoard({
   roles,
 }: TierBoardProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const draggedNikkeRef = useRef<string | null>(null);
   const nikkesByName = useMemo(
     () => new Map(nikkes.map((nikke) => [nikke.name, nikke])),
     [nikkes]
@@ -274,7 +276,19 @@ export default function TierBoard({
     onChange({ ...board, rows });
   }
 
+  function handleDragStart(event: DragStartEvent) {
+    const activeData = (event.active.data.current ?? {}) as DragData;
+    draggedNikkeRef.current = activeData.nikkeName ?? null;
+  }
+
+  function clearDraggedNikkeSoon() {
+    window.setTimeout(() => {
+      draggedNikkeRef.current = null;
+    }, 0);
+  }
+
   function handleDragEnd(event: DragEndEvent) {
+    clearDraggedNikkeSoon();
     if (!canEdit || !event.over) return;
     const activeData = (event.active.data.current ?? {}) as DragData;
     const overData = (event.over.data.current ?? {}) as DragData & { rowId?: string };
@@ -299,6 +313,8 @@ export default function TierBoard({
       id="nikke-tier-dnd"
       sensors={sensors}
       collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragCancel={clearDraggedNikkeSoon}
       onDragEnd={handleDragEnd}
     >
       <div className="grid gap-5">
@@ -345,7 +361,10 @@ export default function TierBoard({
                 row={row}
                 nikkesByName={nikkesByName}
                 canEdit={canEdit}
-                onRemoveNikke={(name) => onChange(removeNikkeFromTier(board, name))}
+                onRemoveNikke={(name) => {
+                  if (draggedNikkeRef.current === name) return;
+                  onChange(removeNikkeFromTier(board, name));
+                }}
                 onNameChange={(name) =>
                   updateRows(
                     board.rows.map((item) => (item.id === row.id ? { ...item, name } : item))

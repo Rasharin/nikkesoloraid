@@ -33,6 +33,15 @@ test("clicking an editable tier nikke removes it from the tier", () => {
   assert.match(source, /removeNikkeFromTier\(board, name\)/);
 });
 
+test("tier drag completion does not trigger click removal", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(source, /draggedNikkeRef/);
+  assert.match(source, /onDragStart=\{handleDragStart\}/);
+  assert.match(source, /if \(draggedNikkeRef\.current === name\) return/);
+  assert.match(source, /setTimeout/);
+});
+
 test("tier dragging has no follower overlay or empty-row instruction text", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
