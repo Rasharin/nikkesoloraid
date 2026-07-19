@@ -3,6 +3,7 @@
 import Image from "next/image";
 import React, { useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
+import { matchesSelectedElements } from "../../../lib/nikke-elements";
 
 type NikkeRow = {
   id: string;
@@ -10,6 +11,7 @@ type NikkeRow = {
   image_path: string | null;
   burst: number | null;
   element: string | null;
+  element2: string | null;
   role: string | null;
   aliases: string[];
 };
@@ -220,7 +222,7 @@ export default function SettingsTab({
       }
 
       if (selectedElements.size > 0) {
-        if (!nikke.element || !selectedElements.has(nikke.element)) return false;
+        if (!matchesSelectedElements(nikke, selectedElements)) return false;
       }
 
       if (selectedRoles.size > 0) {

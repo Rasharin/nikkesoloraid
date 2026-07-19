@@ -21,6 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { buildCopiedRecommendedDeckDrafts, copyDeckDraftAfterIndex } from "../../../lib/deck-building-copy";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
+import { matchesSelectedElements } from "../../../lib/nikke-elements";
 import { formatPlainScoreText, formatScore, parseScoreInput, type ScoreDisplayMode } from "../../../lib/score-format";
 import { useHydrated } from "../../hooks/useHydrated";
 import DeckBuilderSection, {
@@ -927,7 +928,7 @@ export default function ImaginarySoloRaidTab({
         const matchesAlias = nikke.aliases?.some((alias) => alias.toLowerCase().includes(query)) ?? false;
         if (!matchesName && !matchesAlias) return false;
       }
-      if (selectedElementFilter.size > 0 && (!nikke.element || !selectedElementFilter.has(nikke.element))) return false;
+      if (!matchesSelectedElements(nikke, selectedElementFilter)) return false;
       if (selectedBurstFilter.size > 0) {
         const burst = nikke.burst ?? -1;
         if (!selectedBurstFilter.has(burst)) return false;
@@ -966,7 +967,7 @@ export default function ImaginarySoloRaidTab({
           const matchesAlias = nikke.aliases?.some((alias) => alias.toLowerCase().includes(query)) ?? false;
           if (!matchesName && !matchesAlias) return false;
         }
-        if (pickerElementFilter.size > 0 && (!nikke.element || !pickerElementFilter.has(nikke.element))) return false;
+        if (!matchesSelectedElements(nikke, pickerElementFilter)) return false;
         if (pickerBurstFilter.size > 0) {
           const burst = nikke.burst ?? -1;
           if (!pickerBurstFilter.has(burst)) return false;

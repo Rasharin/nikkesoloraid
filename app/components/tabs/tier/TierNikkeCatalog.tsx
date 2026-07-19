@@ -5,6 +5,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { useMemo, useState, type CSSProperties } from "react";
 import { CSS } from "@dnd-kit/utilities";
 import { formatNikkeDisplayName } from "../../../../lib/nikke-display";
+import { matchesSelectedElements } from "../../../../lib/nikke-elements";
 
 export type TierNikkeRow = {
   id: string;
@@ -12,6 +13,7 @@ export type TierNikkeRow = {
   image_path: string | null;
   burst: number | null;
   element: string | null;
+  element2: string | null;
   role: string | null;
   aliases: string[];
 };
@@ -137,7 +139,7 @@ export default function TierNikkeCatalog({
         const burst = nikke.burst ?? -1;
         if (!(burst === 0 || selectedBursts.has(burst))) return false;
       }
-      if (selectedElements.size > 0 && (!nikke.element || !selectedElements.has(nikke.element))) {
+      if (!matchesSelectedElements(nikke, selectedElements)) {
         return false;
       }
       if (selectedRoles.size > 0 && (!nikke.role || !selectedRoles.has(nikke.role))) {

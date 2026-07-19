@@ -72,3 +72,38 @@ test("Nikke consumer types accept a nullable secondary element", () => {
     assert.match(source, /element2\??:\s*string \| null;/, file);
   }
 });
+
+test("master Nikke registration and editing expose both element fields", () => {
+  const source = fs.readFileSync("app/components/tabs/MyPageTab.tsx", "utf8");
+
+  assert.match(source, /const \[nikkeElement2, setNikkeElement2\]/);
+  assert.match(source, /element2: nikkeElement2/);
+  assert.match(source, /setNikkeElement2\(null\)/);
+  assert.match(source, /element2: nikke\.element2 \?\? ""/);
+  assert.match(source, />속성 1</);
+  assert.match(source, />속성 2 \(선택\)</);
+  assert.match(source, /editingNikkeField === "element2"/);
+  assert.match(
+    source,
+    /normalizeSecondaryElement\(\s*editingNikkeValues\.element \|\| null,\s*editingNikkeValues\.element2 \|\| null\s*\)/
+  );
+});
+
+test("every existing Nikke element filter matches primary or secondary element", () => {
+  const expectedCalls = new Map([
+    ["app/components/tabs/MyPageTab.tsx", 3],
+    ["app/components/tabs/SettingsTab.tsx", 1],
+    ["app/components/tabs/ImaginarySoloRaidTab.tsx", 2],
+    ["app/components/tabs/tier/TierNikkeCatalog.tsx", 1],
+  ]);
+
+  for (const [file, count] of expectedCalls) {
+    const source = fs.readFileSync(file, "utf8");
+    assert.match(source, /import \{[^}]*matchesSelectedElements[^}]*\}/, file);
+    assert.equal(
+      source.match(/matchesSelectedElements\(nikke,/g)?.length,
+      count,
+      file
+    );
+  }
+});

@@ -10,6 +10,7 @@ import {
   type SoloRaidScheduleStatus,
 } from "../../../lib/solo-raid-schedule";
 import type { ScoreDisplayMode } from "../../../lib/score-format";
+import { matchesSelectedElements, normalizeSecondaryElement } from "../../../lib/nikke-elements";
 import BlockedUsersSection from "../../components/mypage/BlockedUsersSection";
 
 type RecommendationDeck = {
@@ -257,6 +258,7 @@ export default function MyPageTab({
   const [nikkeName, setNikkeName] = useState("");
   const [nikkeBurst, setNikkeBurst] = useState<number | null>(null);
   const [nikkeElement, setNikkeElement] = useState<NikkeElementValue>(null);
+  const [nikkeElement2, setNikkeElement2] = useState<NikkeElementValue>(null);
   const [nikkeRole, setNikkeRole] = useState<NikkeRoleValue>(null);
   const [nikkeAliases, setNikkeAliases] = useState("");
   const [nikkeImageFileName, setNikkeImageFileName] = useState("");
@@ -268,6 +270,7 @@ export default function MyPageTab({
     burst: string;
     aliases: string;
     element: string;
+    element2: string;
     role: string;
   } | null>(null);
   const [editingNikkeField, setEditingNikkeField] = useState<string | null>(null);
@@ -284,7 +287,7 @@ export default function MyPageTab({
         if (!recFilterBursts.has(burst)) return false;
       }
       if (recFilterElements.size > 0) {
-        if (!nikke.element || !recFilterElements.has(nikke.element)) return false;
+        if (!matchesSelectedElements(nikke, recFilterElements)) return false;
       }
       return true;
     });
@@ -296,7 +299,7 @@ export default function MyPageTab({
         if (!recListFilterBursts.has(burst)) return false;
       }
       if (recListFilterElements.size > 0) {
-        if (!nikke.element || !recListFilterElements.has(nikke.element)) return false;
+        if (!matchesSelectedElements(nikke, recListFilterElements)) return false;
       }
       return true;
     });
@@ -315,7 +318,7 @@ export default function MyPageTab({
         if (!adminNikkeFilterBursts.has(burst)) return false;
       }
       if (adminNikkeFilterElements.size > 0) {
-        if (!nikke.element || !adminNikkeFilterElements.has(nikke.element)) return false;
+        if (!matchesSelectedElements(nikke, adminNikkeFilterElements)) return false;
       }
       return true;
     });
@@ -478,7 +481,7 @@ export default function MyPageTab({
         name: nikkeName,
         burst: nikkeBurst,
         element: nikkeElement,
-        element2: null,
+        element2: nikkeElement2,
         role: nikkeRole,
         aliases: nikkeAliases
           .split(",")
@@ -490,6 +493,7 @@ export default function MyPageTab({
       setNikkeName("");
       setNikkeBurst(null);
       setNikkeElement(null);
+      setNikkeElement2(null);
       setNikkeRole(null);
       setNikkeAliases("");
       setNikkeImageFileName("");
@@ -508,6 +512,10 @@ export default function MyPageTab({
         .split(",")
         .map((a) => a.trim())
         .filter(Boolean);
+      const element2 = normalizeSecondaryElement(
+        editingNikkeValues.element || null,
+        editingNikkeValues.element2 || null
+      ) as NikkeElementValue;
       const ok = await onUpdateNikke({
         id: selectedNikkeForEdit.id,
         name: editingNikkeValues.name.trim(),
@@ -515,7 +523,7 @@ export default function MyPageTab({
         burst: isNaN(burstNum) ? null : burstNum,
         aliases,
         element: (editingNikkeValues.element || null) as NikkeElementValue,
-        element2: null,
+        element2,
         role: (editingNikkeValues.role || null) as NikkeRoleValue,
       });
       if (ok) {
@@ -528,6 +536,7 @@ export default function MyPageTab({
                 burst: isNaN(burstNum) ? null : burstNum,
                 aliases,
                 element: (editingNikkeValues.element || null) as NikkeElementValue,
+                element2,
                 role: (editingNikkeValues.role || null) as NikkeRoleValue,
               }
             : null
@@ -818,7 +827,7 @@ export default function MyPageTab({
                     className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                   />
 
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                     <select
                       value={nikkeBurst ?? ""}
                       onChange={(event) => {
@@ -838,7 +847,20 @@ export default function MyPageTab({
                       onChange={(event) => setNikkeElement((event.target.value || null) as NikkeElementValue)}
                       className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                     >
-                      <option value="">속성</option>
+                      <option value="">속성 1</option>
+                      {elements.map((element) => (
+                        <option key={element.v} value={element.v}>
+                          {element.label}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={nikkeElement2 ?? ""}
+                      onChange={(event) => setNikkeElement2((event.target.value || null) as NikkeElementValue)}
+                      className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                    >
+                      <option value="">속성 2 (선택)</option>
                       {elements.map((element) => (
                         <option key={element.v} value={element.v}>
                           {element.label}
@@ -966,6 +988,7 @@ export default function MyPageTab({
                                 burst: nikke.burst ? String(nikke.burst) : "",
                                 aliases: nikke.aliases.join(", "),
                                 element: nikke.element ?? "",
+                                element2: nikke.element2 ?? "",
                                 role: nikke.role ?? "",
                               });
                               setEditingNikkeField(null);
@@ -1052,7 +1075,7 @@ export default function MyPageTab({
                         </div>
 
                         <div>
-                          <div className="mb-1 text-xs text-neutral-400">속성</div>
+                          <div className="mb-1 text-xs text-neutral-400">속성 1</div>
                           {editingNikkeField === "element" ? (
                             <select
                               autoFocus
@@ -1073,6 +1096,32 @@ export default function MyPageTab({
                               title="더블클릭하여 수정"
                             >
                               {elements.find((el) => el.v === editingNikkeValues.element)?.label ?? <span className="text-neutral-500">-</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="mb-1 text-xs text-neutral-400">속성 2 (선택)</div>
+                          {editingNikkeField === "element2" ? (
+                            <select
+                              autoFocus
+                              value={editingNikkeValues.element2}
+                              onChange={(e) => setEditingNikkeValues((prev) => prev ? { ...prev, element2: e.target.value } : prev)}
+                              onBlur={() => setEditingNikkeField(null)}
+                              className="w-full rounded-lg border border-sky-500/50 bg-neutral-950/50 px-3 py-2 text-sm outline-none"
+                            >
+                              <option value="">-</option>
+                              {elements.map((el) => (
+                                <option key={el.v} value={el.v}>{el.label}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <div
+                              onDoubleClick={() => setEditingNikkeField("element2")}
+                              className="cursor-pointer rounded-lg border border-neutral-800 bg-neutral-950/40 px-3 py-2 text-sm text-neutral-100 hover:border-neutral-600"
+                              title="더블클릭하여 수정"
+                            >
+                              {elements.find((el) => el.v === editingNikkeValues.element2)?.label ?? <span className="text-neutral-500">-</span>}
                             </div>
                           )}
                         </div>
