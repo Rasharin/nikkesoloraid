@@ -24,7 +24,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import {
   clearTierAssignments,
   createDefaultTierBoard,
@@ -35,6 +35,14 @@ import {
   type TierRow,
 } from "../../../../lib/nikke-tier";
 import { formatNikkeDisplayName } from "../../../../lib/nikke-display";
+import {
+  TIER_LOCAL_LAYOUT_KEY,
+  clampTierSectionSize,
+  getTierCardSizeClasses,
+  parseTierLocalLayout,
+  type TierCardSize,
+  type TierSectionSize,
+} from "../../../../lib/tier-local-layout";
 import TierNikkeCatalog, {
   type TierFilterOption,
   type TierNikkeRow,
@@ -173,17 +181,20 @@ function EditableLabel({
 function TierNikkeCardVisual({
   nikke,
   getPublicUrl,
+  cardSize,
   overlay = false,
 }: {
   nikke: TierNikkeRow;
   getPublicUrl: TierBoardProps["getPublicUrl"];
+  cardSize: TierCardSize;
   overlay?: boolean;
 }) {
   const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
+  const sizeClasses = getTierCardSizeClasses(cardSize);
 
   return (
     <div
-      className={`w-16 overflow-hidden rounded-xl border border-black/10 bg-white/80 sm:w-20 dark:border-white/15 dark:bg-black/25 ${
+      className={`${sizeClasses.card} overflow-hidden rounded-xl border border-black/10 bg-white/80 dark:border-white/15 dark:bg-black/25 ${
         overlay ? "scale-[1.03] shadow-2xl" : ""
       }`}
     >
@@ -195,7 +206,7 @@ function TierNikkeCardVisual({
             alt={formatNikkeDisplayName(nikke.name)}
             draggable={false}
             className="pointer-events-none object-cover"
-            sizes="80px"
+            sizes={sizeClasses.imageSizes}
           />
         ) : (
           <div className="grid h-full place-items-center text-[9px] text-white/60">
@@ -203,7 +214,7 @@ function TierNikkeCardVisual({
           </div>
         )}
       </div>
-      <div className="truncate px-1 py-1 text-[13px] text-neutral-900 dark:text-white">
+      <div className={`truncate px-1 py-1 text-neutral-900 dark:text-white ${sizeClasses.name}`}>
         {formatNikkeDisplayName(nikke.name)}
       </div>
     </div>
@@ -217,6 +228,7 @@ function TierNikkeCard({
   canEdit,
   onRemove,
   getPublicUrl,
+  cardSize,
 }: {
   nikke: TierNikkeRow;
   rowId: string;
@@ -224,6 +236,7 @@ function TierNikkeCard({
   canEdit: boolean;
   onRemove: () => void;
   getPublicUrl: TierBoardProps["getPublicUrl"];
+  cardSize: TierCardSize;
 }) {
   const {
     attributes,
@@ -255,11 +268,11 @@ function TierNikkeCard({
       style={style}
       {...(canEdit ? attributes : {})}
       {...(canEdit ? listeners : {})}
-      className={`w-16 shrink-0 rounded-xl text-left sm:w-20 ${
+      className={`${getTierCardSizeClasses(cardSize).card} shrink-0 rounded-xl text-left ${
         canEdit ? "cursor-grab active:cursor-grabbing" : "cursor-default"
       }`}
     >
-      <TierNikkeCardVisual nikke={nikke} getPublicUrl={getPublicUrl} />
+      <TierNikkeCardVisual nikke={nikke} getPublicUrl={getPublicUrl} cardSize={cardSize} />
     </button>
   );
 }
@@ -272,6 +285,7 @@ function TierRowView({
   onRemoveNikke,
   getPublicUrl,
   catalogPreview,
+  cardSize,
 }: {
   row: TierRow;
   nikkesByName: ReadonlyMap<string, TierNikkeRow>;
@@ -280,6 +294,7 @@ function TierRowView({
   onRemoveNikke: (name: string) => void;
   getPublicUrl: TierBoardProps["getPublicUrl"];
   catalogPreview: CatalogDropPreview | null;
+  cardSize: TierCardSize;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `tier-row-${row.id}`,
@@ -293,13 +308,14 @@ function TierRowView({
   const sortableItems = row.nikkeNames.map((name) => `tier-card-${row.id}-${name}`);
   if (activePreview) sortableItems.splice(previewIndex, 0, activePreview.activeId);
   const visualItemCount = row.nikkeNames.length + (activePreview ? 1 : 0);
+  const sizeClasses = getTierCardSizeClasses(cardSize);
 
   return (
     <div
       ref={setNodeRef}
       data-tier-row
       data-tier-row-id={row.id}
-      className="grid min-h-24 grid-cols-[4.5rem_minmax(0,1fr)] overflow-visible rounded-2xl border sm:grid-cols-[6rem_minmax(0,1fr)]"
+      className={`grid ${sizeClasses.rowMinHeight} grid-cols-[4.5rem_minmax(0,1fr)] overflow-visible rounded-2xl border transition-[min-height] sm:grid-cols-[6rem_minmax(0,1fr)]`}
       style={{
         borderColor: `${row.color}99`,
         backgroundColor: `${row.color}18`,
@@ -331,7 +347,7 @@ function TierRowView({
                   <div
                     key={activePreview.activeId}
                     data-tier-insertion-placeholder
-                    className="h-[94px] w-16 shrink-0 rounded-xl border-2 border-dashed border-cyan-400/70 bg-cyan-400/10 transition-all duration-150 sm:h-[110px] sm:w-20"
+                    className={`${sizeClasses.placeholder} shrink-0 rounded-xl border-2 border-dashed border-cyan-400/70 bg-cyan-400/10 transition-all duration-150`}
                   />
                 );
               }
@@ -348,11 +364,12 @@ function TierRowView({
                   canEdit={canEdit}
                   onRemove={() => onRemoveNikke(name)}
                   getPublicUrl={getPublicUrl}
+                  cardSize={cardSize}
                 />
               ) : null;
             })}
             {row.nikkeNames.length === 0 && !activePreview ? (
-              <div className="grid min-h-20 flex-1 place-items-center rounded-xl border border-dashed border-white/15 text-xs text-[var(--muted)]">
+              <div className="grid min-h-20 flex-1 place-items-center rounded-xl text-xs text-[var(--muted)]">
               </div>
             ) : null}
           </div>
@@ -375,8 +392,13 @@ export default function TierBoard({
   roles,
 }: TierBoardProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sectionSize, setSectionSize] = useState<TierSectionSize | null>(null);
+  const [cardSize, setCardSize] = useState<TierCardSize>("default");
+  const [resizing, setResizing] = useState(false);
   const [catalogPreview, setCatalogPreview] = useState<CatalogDropPreview | null>(null);
   const [activeTierNikkeName, setActiveTierNikkeName] = useState<string | null>(null);
+  const minimumSectionSizeRef = useRef<TierSectionSize | null>(null);
+  const localLayoutLoadedRef = useRef(false);
   const catalogPreviewRef = useRef<CatalogDropPreview | null>(null);
   const draggedNikkeRef = useRef<string | null>(null);
   const nikkesByName = useMemo(
@@ -391,11 +413,90 @@ export default function TierBoard({
     board.rows.forEach((row) => row.nikkeNames.forEach((name) => map.set(name, row.name)));
     return map;
   }, [board.rows]);
+  const boardSizeClasses = getTierCardSizeClasses(cardSize);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+  const setSectionNode = useCallback((node: HTMLElement | null) => {
+    if (!node || !canEdit || localLayoutLoadedRef.current) return;
+    const rect = node.getBoundingClientRect();
+    const minimum = { width: Math.round(rect.width), height: Math.round(rect.height) };
+    minimumSectionSizeRef.current = minimum;
+    localLayoutLoadedRef.current = true;
+
+    let stored = null;
+    try {
+      stored = parseTierLocalLayout(window.localStorage.getItem(TIER_LOCAL_LAYOUT_KEY));
+    } catch { }
+    if (!stored) {
+      setSectionSize(minimum);
+      return;
+    }
+    setSectionSize(clampTierSectionSize(stored, minimum));
+    setCardSize(stored.cardSize);
+  }, [canEdit]);
+
+  function persistLocalLayout(size: TierSectionSize, nextCardSize: TierCardSize) {
+    try {
+      window.localStorage.setItem(
+        TIER_LOCAL_LAYOUT_KEY,
+        JSON.stringify({ ...size, cardSize: nextCardSize })
+      );
+    } catch { }
+  }
+
+  function handleResizeStart(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!canEdit) return;
+    event.preventDefault();
+    const minimum = minimumSectionSizeRef.current;
+    if (!minimum) return;
+    setResizing(true);
+    const measuredMinimum = minimum;
+    const initial = sectionSize ?? measuredMinimum;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let finalSize = initial;
+
+    function handlePointerMove(moveEvent: PointerEvent) {
+      finalSize = clampTierSectionSize(
+        {
+          width: initial.width + moveEvent.clientX - startX,
+          height: initial.height + moveEvent.clientY - startY,
+        },
+        measuredMinimum
+      );
+      setSectionSize(finalSize);
+    }
+
+    function handlePointerEnd() {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerEnd);
+      window.removeEventListener("pointercancel", handlePointerEnd);
+      setResizing(false);
+      persistLocalLayout(finalSize, cardSize);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerEnd, { once: true });
+    window.addEventListener("pointercancel", handlePointerEnd, { once: true });
+  }
+
+  function handleCardSizeChange(nextCardSize: TierCardSize) {
+    setCardSize(nextCardSize);
+    const size = sectionSize ?? minimumSectionSizeRef.current;
+    if (size) persistLocalLayout(size, nextCardSize);
+  }
+
+  function handleResetLocalLayout() {
+    const minimum = minimumSectionSizeRef.current;
+    if (minimum) setSectionSize(minimum);
+    setCardSize("default");
+    try {
+      window.localStorage.removeItem(TIER_LOCAL_LAYOUT_KEY);
+    } catch { }
+  }
 
   function updateRows(rows: TierRow[]) {
     onChange({ ...board, rows });
@@ -500,7 +601,19 @@ export default function TierBoard({
       onDragEnd={handleDragEnd}
     >
       <div className="grid gap-5">
-        <section className="rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)] lg:p-5">
+        <section
+          ref={setSectionNode}
+          className="relative flex flex-col rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)] lg:p-5"
+          style={
+            canEdit && sectionSize
+              ? {
+                  width: sectionSize.width,
+                  height: sectionSize.height,
+                  maxWidth: "calc(100vw - 2rem)",
+                }
+              : undefined
+          }
+        >
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-semibold text-[var(--text)]">
@@ -529,14 +642,17 @@ export default function TierBoard({
           {canEdit && settingsOpen ? (
             <TierSettingsPanel
               rows={board.rows}
+              cardSize={cardSize}
               onChange={updateRows}
+              onCardSizeChange={handleCardSizeChange}
               onClearAssignments={() => onChange(clearTierAssignments(board))}
               onResetAll={() => onChange(createDefaultTierBoard())}
+              onResetLocalLayout={handleResetLocalLayout}
               onClose={() => setSettingsOpen(false)}
             />
           ) : null}
 
-          <div className="mt-4 grid gap-2.5">
+          <div className={`mt-4 grid min-h-0 flex-1 content-start overflow-y-auto transition-[gap] ${boardSizeClasses.boardGap}`}>
             {board.rows.map((row) => (
               <TierRowView
                 key={row.id}
@@ -554,9 +670,28 @@ export default function TierBoard({
                 }
                 getPublicUrl={getPublicUrl}
                 catalogPreview={catalogPreview}
+                cardSize={cardSize}
               />
             ))}
           </div>
+          {canEdit ? (
+            <button
+              type="button"
+              onPointerDown={handleResizeStart}
+              data-resizing={resizing}
+              aria-label="티어 섹션 크기 조절"
+              title="드래그하여 티어 섹션 크기 조절"
+              className="tier-resize-handle absolute bottom-0 right-0 h-10 w-10 cursor-nwse-resize touch-none"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="tier-resize-handle-wedge"
+              >
+                <path d="M2 24 L24 2 A22 22 0 0 1 2 24 Z" />
+              </svg>
+            </button>
+          ) : null}
         </section>
 
         <TierNikkeCatalog
@@ -581,6 +716,7 @@ export default function TierBoard({
             <TierNikkeCardVisual
               nikke={activeTierNikke}
               getPublicUrl={getPublicUrl}
+              cardSize={cardSize}
               overlay
             />
           </div>

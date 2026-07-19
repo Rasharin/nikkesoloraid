@@ -16,6 +16,7 @@
   --theme-text-soft: #d4d4d4;
   --theme-muted: #a3a3a3;
   --theme-placeholder: #737373;
+  --tier-resize-handle: #ffffff;
   --bg: var(--theme-page);
   --text: var(--theme-text);
   --card: var(--theme-card);
@@ -36,6 +37,7 @@
   --theme-text-soft: #334155;
   --theme-muted: #64748b;
   --theme-placeholder: #94a3b8;
+  --tier-resize-handle: #00b8db;
 }
 
 html[data-theme="light"],
@@ -317,6 +319,36 @@ html[data-theme="light"] :where(input::placeholder, textarea::placeholder),
   background-color: #a3a3a3;
 }
 
+.tier-resize-handle {
+  border: 0;
+  background: transparent;
+}
+
+.tier-resize-handle-wedge {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  height: 24px;
+  color: var(--tier-resize-handle);
+  fill: currentColor;
+  opacity: 0.78;
+  pointer-events: none;
+  transform-origin: bottom right;
+  transition: opacity 150ms ease, filter 150ms ease, transform 150ms ease;
+}
+
+.tier-resize-handle:hover .tier-resize-handle-wedge {
+  opacity: 0.94;
+  transform: scale(1.03);
+}
+
+.tier-resize-handle[data-resizing="true"] .tier-resize-handle-wedge {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tier-resize-handle) 65%, transparent));
+  opacity: 1;
+  transform: scale(1.06);
+}
+
 html[data-theme="light"] :where(.deck-save-button) {
   border-color: #000000 !important;
 }
@@ -368,4 +400,3 @@ html[data-theme="light"] :where(.inactive-raid-tab:hover, .inactive-sort-tab:hov
   border-color: #85C1E9 !important;
   color: #0f172a !important;
 }
-
