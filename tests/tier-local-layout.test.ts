@@ -5,12 +5,13 @@ import {
   clampTierSectionSize,
   getTierCardSizeClasses,
   parseTierLocalLayout,
+  resizeTierSection,
 } from "../lib/tier-local-layout.ts";
 
 test("parses valid tier layout settings", () => {
   assert.deepEqual(
-    parseTierLocalLayout('{"width":900,"height":700,"cardSize":"large"}'),
-    { width: 900, height: 700, cardSize: "large" }
+    parseTierLocalLayout('{"width":900,"height":700,"cardSize":"large","offsetX":-120}'),
+    { width: 900, height: 700, cardSize: "large", offsetX: -120 }
   );
 });
 
@@ -29,6 +30,39 @@ test("clamps tier section size to its measured minimum", () => {
       { width: 760, height: 540 }
     ),
     { width: 760, height: 540 }
+  );
+});
+
+test("resizes from either bottom edge while preserving the left handle anchor", () => {
+  assert.deepEqual(
+    resizeTierSection(
+      { width: 800, height: 600 },
+      { x: 120, y: 40 },
+      "right",
+      { width: 760, height: 540 }
+    ),
+    { size: { width: 920, height: 640 }, offsetDeltaX: 0 }
+  );
+  assert.deepEqual(
+    resizeTierSection(
+      { width: 800, height: 600 },
+      { x: -120, y: 40 },
+      "left",
+      { width: 760, height: 540 }
+    ),
+    { size: { width: 920, height: 640 }, offsetDeltaX: -120 }
+  );
+});
+
+test("left resize clamps width and offsets only by the applied width change", () => {
+  assert.deepEqual(
+    resizeTierSection(
+      { width: 800, height: 600 },
+      { x: 200, y: -200 },
+      "left",
+      { width: 760, height: 540 }
+    ),
+    { size: { width: 760, height: 540 }, offsetDeltaX: 40 }
   );
 });
 

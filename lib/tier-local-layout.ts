@@ -9,7 +9,10 @@ export type TierSectionSize = {
 
 export type TierLocalLayout = TierSectionSize & {
   cardSize: TierCardSize;
+  offsetX?: number;
 };
+
+export type TierResizeEdge = "left" | "right";
 
 export type TierCardSizeClasses = {
   card: string;
@@ -68,6 +71,7 @@ export function parseTierLocalLayout(value: string | null): TierLocalLayout | nu
       width: Number(parsed.width),
       height: Number(parsed.height),
       cardSize: parsed.cardSize,
+      ...(Number.isFinite(parsed.offsetX) ? { offsetX: Number(parsed.offsetX) } : {}),
     };
   } catch {
     return null;
@@ -86,4 +90,25 @@ export function clampTierSectionSize(
 
 export function getTierCardSizeClasses(size: TierCardSize): TierCardSizeClasses {
   return CARD_SIZE_CLASSES[size];
+}
+
+export function resizeTierSection(
+  initial: TierSectionSize,
+  delta: { x: number; y: number },
+  edge: TierResizeEdge,
+  minimum: TierSectionSize
+): { size: TierSectionSize; offsetDeltaX: number } {
+  const requestedWidth = initial.width + (edge === "left" ? -delta.x : delta.x);
+  const size = clampTierSectionSize(
+    {
+      width: requestedWidth,
+      height: initial.height + delta.y,
+    },
+    minimum
+  );
+
+  return {
+    size,
+    offsetDeltaX: edge === "left" ? initial.width - size.width : 0,
+  };
 }

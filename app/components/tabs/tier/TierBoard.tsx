@@ -40,7 +40,9 @@ import {
   clampTierSectionSize,
   getTierCardSizeClasses,
   parseTierLocalLayout,
+  resizeTierSection,
   type TierCardSize,
+  type TierResizeEdge,
   type TierSectionSize,
 } from "../../../../lib/tier-local-layout";
 import TierNikkeCatalog, {
@@ -393,8 +395,9 @@ export default function TierBoard({
 }: TierBoardProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sectionSize, setSectionSize] = useState<TierSectionSize | null>(null);
+  const [sectionOffsetX, setSectionOffsetX] = useState(0);
   const [cardSize, setCardSize] = useState<TierCardSize>("default");
-  const [resizing, setResizing] = useState(false);
+  const [resizingEdge, setResizingEdge] = useState<TierResizeEdge | null>(null);
   const [catalogPreview, setCatalogPreview] = useState<CatalogDropPreview | null>(null);
   const [activeTierNikkeName, setActiveTierNikkeName] = useState<string | null>(null);
   const minimumSectionSizeRef = useRef<TierSectionSize | null>(null);
@@ -435,47 +438,62 @@ export default function TierBoard({
       return;
     }
     setSectionSize(clampTierSectionSize(stored, minimum));
+    setSectionOffsetX(stored.offsetX ?? 0);
     setCardSize(stored.cardSize);
   }, [canEdit]);
 
-  function persistLocalLayout(size: TierSectionSize, nextCardSize: TierCardSize) {
+  function persistLocalLayout(
+    size: TierSectionSize,
+    nextCardSize: TierCardSize,
+    offsetX: number
+  ) {
     try {
       window.localStorage.setItem(
         TIER_LOCAL_LAYOUT_KEY,
-        JSON.stringify({ ...size, cardSize: nextCardSize })
+        JSON.stringify({ ...size, cardSize: nextCardSize, offsetX })
       );
     } catch { }
   }
 
-  function handleResizeStart(event: ReactPointerEvent<HTMLButtonElement>) {
+  function handleResizeStart(
+    edge: TierResizeEdge,
+    event: ReactPointerEvent<HTMLButtonElement>
+  ) {
     if (!canEdit) return;
     event.preventDefault();
     const minimum = minimumSectionSizeRef.current;
     if (!minimum) return;
-    setResizing(true);
+    setResizingEdge(edge);
     const measuredMinimum = minimum;
     const initial = sectionSize ?? measuredMinimum;
+    const initialOffsetX = sectionOffsetX;
     const startX = event.clientX;
     const startY = event.clientY;
     let finalSize = initial;
+    let finalOffsetX = initialOffsetX;
 
     function handlePointerMove(moveEvent: PointerEvent) {
-      finalSize = clampTierSectionSize(
+      const result = resizeTierSection(
+        initial,
         {
-          width: initial.width + moveEvent.clientX - startX,
-          height: initial.height + moveEvent.clientY - startY,
+          x: moveEvent.clientX - startX,
+          y: moveEvent.clientY - startY,
         },
+        edge,
         measuredMinimum
       );
+      finalSize = result.size;
+      finalOffsetX = initialOffsetX + result.offsetDeltaX;
       setSectionSize(finalSize);
+      setSectionOffsetX(finalOffsetX);
     }
 
     function handlePointerEnd() {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerEnd);
       window.removeEventListener("pointercancel", handlePointerEnd);
-      setResizing(false);
-      persistLocalLayout(finalSize, cardSize);
+      setResizingEdge(null);
+      persistLocalLayout(finalSize, cardSize, finalOffsetX);
     }
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -486,12 +504,13 @@ export default function TierBoard({
   function handleCardSizeChange(nextCardSize: TierCardSize) {
     setCardSize(nextCardSize);
     const size = sectionSize ?? minimumSectionSizeRef.current;
-    if (size) persistLocalLayout(size, nextCardSize);
+    if (size) persistLocalLayout(size, nextCardSize, sectionOffsetX);
   }
 
   function handleResetLocalLayout() {
     const minimum = minimumSectionSizeRef.current;
     if (minimum) setSectionSize(minimum);
+    setSectionOffsetX(0);
     setCardSize("default");
     try {
       window.localStorage.removeItem(TIER_LOCAL_LAYOUT_KEY);
@@ -610,6 +629,7 @@ export default function TierBoard({
                   width: sectionSize.width,
                   height: sectionSize.height,
                   maxWidth: "calc(100vw - 2rem)",
+                  transform: `translateX(${sectionOffsetX}px)`,
                 }
               : undefined
           }
@@ -675,22 +695,42 @@ export default function TierBoard({
             ))}
           </div>
           {canEdit ? (
-            <button
-              type="button"
-              onPointerDown={handleResizeStart}
-              data-resizing={resizing}
-              aria-label="티어 섹션 크기 조절"
-              title="드래그하여 티어 섹션 크기 조절"
-              className="tier-resize-handle absolute bottom-0 right-0 h-10 w-10 cursor-nwse-resize touch-none"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="tier-resize-handle-wedge"
+            <>
+              <button
+                type="button"
+                data-resize-edge="left"
+                onPointerDown={(event) => handleResizeStart("left", event)}
+                data-resizing={resizingEdge === "left"}
+                aria-label="티어 섹션 왼쪽 크기 조절"
+                title="드래그하여 티어 섹션 왼쪽 크기 조절"
+                className="tier-resize-handle absolute bottom-0 left-0 h-10 w-10 cursor-nwse-resize touch-none"
               >
-                <path d="M2 24 L24 2 A22 22 0 0 1 2 24 Z" />
-              </svg>
-            </button>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  className="tier-resize-handle-wedge tier-resize-handle-wedge-left"
+                >
+                  <path d="M2 24 L24 2 A22 22 0 0 1 2 24 Z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                data-resize-edge="right"
+                onPointerDown={(event) => handleResizeStart("right", event)}
+                data-resizing={resizingEdge === "right"}
+                aria-label="티어 섹션 오른쪽 크기 조절"
+                title="드래그하여 티어 섹션 오른쪽 크기 조절"
+                className="tier-resize-handle absolute bottom-0 right-0 h-10 w-10 cursor-nwse-resize touch-none"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  className="tier-resize-handle-wedge"
+                >
+                  <path d="M2 24 L24 2 A22 22 0 0 1 2 24 Z" />
+                </svg>
+              </button>
+            </>
           ) : null}
         </section>
 

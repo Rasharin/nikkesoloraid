@@ -338,15 +338,30 @@ html[data-theme="light"] :where(input::placeholder, textarea::placeholder),
   transition: opacity 150ms ease, filter 150ms ease, transform 150ms ease;
 }
 
+.tier-resize-handle-wedge-left {
+  right: auto;
+  left: 0;
+  transform: scaleX(-1);
+  transform-origin: center;
+}
+
 .tier-resize-handle:hover .tier-resize-handle-wedge {
   opacity: 0.94;
   transform: scale(1.03);
+}
+
+.tier-resize-handle:hover .tier-resize-handle-wedge-left {
+  transform: scaleX(-1) scale(1.03);
 }
 
 .tier-resize-handle[data-resizing="true"] .tier-resize-handle-wedge {
   filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tier-resize-handle) 65%, transparent));
   opacity: 1;
   transform: scale(1.06);
+}
+
+.tier-resize-handle[data-resizing="true"] .tier-resize-handle-wedge-left {
+  transform: scaleX(-1) scale(1.06);
 }
 
 html[data-theme="light"] :where(.deck-save-button) {

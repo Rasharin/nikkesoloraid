@@ -140,8 +140,12 @@ test("tier editors can resize their local board above the measured minimum", () 
   assert.match(source, /TIER_LOCAL_LAYOUT_KEY/);
   assert.match(source, /parseTierLocalLayout/);
   assert.match(source, /clampTierSectionSize/);
-  assert.match(source, /onPointerDown=\{handleResizeStart\}/);
-  assert.match(source, /aria-label="티어 섹션 크기 조절"/);
+  assert.match(source, /handleResizeStart\("left"/);
+  assert.match(source, /handleResizeStart\("right"/);
+  assert.match(source, /data-resize-edge="left"/);
+  assert.match(source, /data-resize-edge="right"/);
+  assert.match(source, /aria-label="티어 섹션 왼쪽 크기 조절"/);
+  assert.match(source, /aria-label="티어 섹션 오른쪽 크기 조절"/);
   assert.match(source, /canEdit \? \(/);
   assert.match(source, /overflow-y-auto/);
   assert.match(source, /maxWidth:\s*"calc\(100vw - 2rem\)"/);
@@ -149,15 +153,30 @@ test("tier editors can resize their local board above the measured minimum", () 
   assert.match(styles, /:root\[data-theme="light"\][\s\S]*--tier-resize-handle:\s*#00b8db/);
   assert.match(source, /tier-resize-handle/);
   assert.match(source, /tier-resize-handle-wedge/);
-  assert.match(source, /data-resizing=\{resizing\}/);
+  assert.match(source, /data-resizing=\{resizingEdge === "left"\}/);
+  assert.match(source, /data-resizing=\{resizingEdge === "right"\}/);
   assert.match(source, /<svg[\s\S]*viewBox="0 0 24 24"/);
   assert.match(source, /<path d="M2 24 L24 2 A22 22 0 0 1 2 24 Z"/);
   assert.match(styles, /\.tier-resize-handle-wedge/);
+  assert.match(styles, /\.tier-resize-handle-wedge-left/);
+  assert.match(
+    styles,
+    /\.tier-resize-handle-wedge-left\s*\{[\s\S]*?transform-origin:\s*center/
+  );
   assert.match(styles, /width:\s*24px/);
   assert.match(styles, /height:\s*24px/);
   assert.match(styles, /color:\s*var\(--tier-resize-handle\)/);
   assert.match(styles, /\.tier-resize-handle:hover \.tier-resize-handle-wedge/);
   assert.match(styles, /\.tier-resize-handle\[data-resizing="true"\] \.tier-resize-handle-wedge/);
+});
+
+test("full Nikke catalog uses cards one visual step smaller than before", () => {
+  const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+  const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(catalog, /grid-cols-5 gap-2 sm:grid-cols-7 lg:grid-cols-12/);
+  assert.match(catalog, /sizes="\(max-width: 640px\) 20vw, 88px"/);
+  assert.match(board, /getTierCardSizeClasses\(cardSize\)/);
 });
 
 test("tier settings expose three local card sizes and a separate reset", () => {

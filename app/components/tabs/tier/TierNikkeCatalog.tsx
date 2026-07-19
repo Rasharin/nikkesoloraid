@@ -82,7 +82,7 @@ function CatalogCard({
             alt={formatNikkeDisplayName(nikke.name)}
             draggable={false}
             className={`pointer-events-none object-cover ${assigned ? "grayscale" : ""}`}
-            sizes="(max-width: 640px) 25vw, 110px"
+            sizes="(max-width: 640px) 20vw, 88px"
           />
         ) : (
           <div className="grid h-full place-items-center text-[10px] text-[var(--muted)]">no image</div>
@@ -221,7 +221,7 @@ export default function TierNikkeCatalog({
           </div>
 
           {filteredNikkes.length > 0 ? (
-            <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-10">
+            <div className="mt-4 grid grid-cols-5 gap-2 sm:grid-cols-7 lg:grid-cols-12">
               {filteredNikkes.map((nikke) => (
                 <CatalogCard
                   key={nikke.id}
