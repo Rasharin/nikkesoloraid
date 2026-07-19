@@ -13,6 +13,7 @@ type NikkeRow = {
   image_path: string | null;
   burst: number | null;
   element: string | null;
+  element2: string | null;
   role: string | null;
   aliases?: string[];
 };

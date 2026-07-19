@@ -52,6 +52,7 @@ import {
   type SoloRaidScheduleStatus,
 } from "../lib/solo-raid-schedule";
 import type { ContactPostDetail, ContactPostStatus, ContactPostSummary, ContactPostVisibility } from "../lib/contact-board";
+import { normalizeSecondaryElement } from "../lib/nikke-elements";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
    ${selected
@@ -236,6 +237,7 @@ type AddNikkePayload = {
   name: string;
   burst: number | null;
   element: NikkeElement;
+  element2: NikkeElement;
   role: NikkeRole;
   aliases: string[];
   imagePath: string;
@@ -255,6 +257,7 @@ type NikkeRow = {
   created_at: string;
   burst: number | null;
   element: NikkeElement;
+  element2: NikkeElement;
   role: NikkeRole;
   aliases: string[];
 };
@@ -531,6 +534,7 @@ function normalizeNikkeRows(value: unknown): NikkeRow[] {
     .filter((item): item is Omit<NikkeRow, "aliases"> & { aliases?: unknown } => Boolean(item) && typeof item === "object")
     .map((nikke) => ({
       ...nikke,
+      element2: nikke.element2 ?? null,
       aliases: normalizeAliases(nikke.aliases),
     }));
 }
@@ -2798,7 +2802,7 @@ export default function Page() {
       const [nikkeResult, bossResult] = await Promise.all([
         supabase
           .from("nikkes")
-          .select("id,name,image_path,created_at,burst,element,role,aliases")
+          .select("id,name,image_path,created_at,burst,element,element2,role,aliases")
           .order("name", { ascending: true }),
         supabase
           .from(bossSource)
@@ -4447,6 +4451,7 @@ export default function Page() {
     const trimmedName = payload.name.trim();
     const aliases = Array.from(new Set(payload.aliases.map((alias) => alias.trim()).filter(Boolean)));
     const imagePath = payload.imagePath.trim();
+    const element2 = normalizeSecondaryElement(payload.element, payload.element2) as NikkeElement;
 
     if (!isMaster) {
       showToast("마스터 계정만 가능");
@@ -4481,6 +4486,7 @@ export default function Page() {
           image_path: imagePath,
           burst: payload.burst,
           element: payload.element,
+          element2,
           role: payload.role,
           aliases,
         },
@@ -4507,6 +4513,7 @@ export default function Page() {
     burst: number | null;
     aliases: string[];
     element: NikkeElement | null;
+    element2: NikkeElement | null;
     role: NikkeRole;
   }) {
     if (!isMasterUser) {
@@ -4514,6 +4521,7 @@ export default function Page() {
       return false;
     }
     try {
+      const element2 = normalizeSecondaryElement(payload.element, payload.element2) as NikkeElement;
       const { error } = await supabase
         .from("nikkes")
         .update({
@@ -4522,6 +4530,7 @@ export default function Page() {
           burst: payload.burst,
           aliases: payload.aliases,
           element: payload.element,
+          element2,
           role: payload.role,
         })
         .eq("id", payload.id);

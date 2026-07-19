@@ -63,6 +63,7 @@ type NikkeRow = {
   image_path: string | null;
   burst: number | null;
   element: string | null;
+  element2: string | null;
   role: string | null;
   aliases: string[];
 };
@@ -89,6 +90,7 @@ type MyPageTabProps = {
     name: string;
     burst: number | null;
     element: NikkeElementValue;
+    element2: NikkeElementValue;
     role: NikkeRoleValue;
     aliases: string[];
     imagePath: string;
@@ -100,6 +102,7 @@ type MyPageTabProps = {
     burst: number | null;
     aliases: string[];
     element: NikkeElementValue;
+    element2: NikkeElementValue;
     role: NikkeRoleValue;
   }) => Promise<boolean>;
   nikkes: NikkeRow[];
@@ -475,6 +478,7 @@ export default function MyPageTab({
         name: nikkeName,
         burst: nikkeBurst,
         element: nikkeElement,
+        element2: null,
         role: nikkeRole,
         aliases: nikkeAliases
           .split(",")
@@ -511,6 +515,7 @@ export default function MyPageTab({
         burst: isNaN(burstNum) ? null : burstNum,
         aliases,
         element: (editingNikkeValues.element || null) as NikkeElementValue,
+        element2: null,
         role: (editingNikkeValues.role || null) as NikkeRoleValue,
       });
       if (ok) {

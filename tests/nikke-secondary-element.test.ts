@@ -41,3 +41,34 @@ test("secondary element migration adds a nullable enum column and index", () => 
   );
   assert.doesNotMatch(sql, /element2 public\.element_type\s+not null/i);
 });
+
+test("main Nikke data flow reads, normalizes, and writes the secondary element", () => {
+  const source = fs.readFileSync("app/page.tsx", "utf8");
+
+  assert.match(source, /type AddNikkePayload[\s\S]*?element2: NikkeElement;/);
+  assert.match(source, /type NikkeRow[\s\S]*?element2: NikkeElement;/);
+  assert.match(source, /element2:\s*nikke\.element2 \?\? null/);
+  assert.match(
+    source,
+    /\.select\("id,name,image_path,created_at,burst,element,element2,role,aliases"\)/
+  );
+  assert.match(
+    source,
+    /normalizeSecondaryElement\(payload\.element,\s*payload\.element2\)/
+  );
+  assert.match(source, /element2,/);
+});
+
+test("Nikke consumer types accept a nullable secondary element", () => {
+  const files = [
+    "app/components/home/deckBuilderTypes.ts",
+    "app/components/tabs/SavedTab.tsx",
+    "app/components/tabs/RecommendTab.tsx",
+    "app/components/recommend/GiseonDeckSection.tsx",
+  ];
+
+  for (const file of files) {
+    const source = fs.readFileSync(file, "utf8");
+    assert.match(source, /element2\??:\s*string \| null;/, file);
+  }
+});
