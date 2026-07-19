@@ -247,6 +247,15 @@ test("tier row renders its label before the nikke content", () => {
   assert.match(source, /grid-cols-\[4\.5rem_minmax\(0,1fr\)\]/);
 });
 
+test("empty tier rows do not show an inner dashed outline", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.doesNotMatch(
+    source,
+    /grid min-h-20 flex-1 place-items-center rounded-xl border border-dashed border-white\/15/
+  );
+});
+
 test("tier row name editor stays inside the narrow label column", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 

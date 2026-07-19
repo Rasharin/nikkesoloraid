@@ -369,7 +369,7 @@ function TierRowView({
               ) : null;
             })}
             {row.nikkeNames.length === 0 && !activePreview ? (
-              <div className="grid min-h-20 flex-1 place-items-center rounded-xl border border-dashed border-white/15 text-xs text-[var(--muted)]">
+              <div className="grid min-h-20 flex-1 place-items-center rounded-xl text-xs text-[var(--muted)]">
               </div>
             ) : null}
           </div>
