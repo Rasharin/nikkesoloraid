@@ -619,7 +619,7 @@ export default function TierBoard({
       onDragCancel={clearDraggedNikkeSoon}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid gap-5">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
         <section
           ref={setSectionNode}
           className="relative flex flex-col rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)] lg:p-5"

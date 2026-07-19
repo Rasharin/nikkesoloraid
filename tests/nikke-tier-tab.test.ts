@@ -179,6 +179,12 @@ test("full Nikke catalog uses cards one visual step smaller than before", () => 
   assert.match(board, /getTierCardSizeClasses\(cardSize\)/);
 });
 
+test("left tier resizing does not stretch the full Nikke catalog", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(source, /className="grid grid-cols-\[minmax\(0,1fr\)\] gap-5"/);
+});
+
 test("tier settings expose three local card sizes and a separate reset", () => {
   const settings = fs.readFileSync("app/components/tabs/tier/TierSettingsPanel.tsx", "utf8");
   const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
