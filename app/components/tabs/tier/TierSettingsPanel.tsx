@@ -7,12 +7,16 @@ import {
   getDefaultTierColor,
   type TierRow,
 } from "../../../../lib/nikke-tier";
+import type { TierCardSize } from "../../../../lib/tier-local-layout";
 
 type TierSettingsPanelProps = {
   rows: TierRow[];
+  cardSize: TierCardSize;
   onChange: (rows: TierRow[]) => void;
+  onCardSizeChange: (size: TierCardSize) => void;
   onClearAssignments: () => void;
   onResetAll: () => void;
+  onResetLocalLayout: () => void;
   onClose: () => void;
 };
 
@@ -30,9 +34,12 @@ function createTierRow(index: number): TierRow {
 
 export default function TierSettingsPanel({
   rows,
+  cardSize,
   onChange,
+  onCardSizeChange,
   onClearAssignments,
   onResetAll,
+  onResetLocalLayout,
   onClose,
 }: TierSettingsPanelProps) {
   function updateRow(index: number, patch: Partial<TierRow>) {
@@ -60,6 +67,40 @@ export default function TierSettingsPanel({
           className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--theme-text-soft)]"
         >
           닫기
+        </button>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--theme-panel)] p-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm font-medium text-[var(--text)]">니케 카드 크기</span>
+          <div role="group" aria-label="니케 카드 크기" className="flex gap-1">
+            {([
+              ["small", "작게"],
+              ["default", "기본"],
+              ["large", "크게"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onCardSizeChange(value)}
+                aria-pressed={cardSize === value}
+                className={`rounded-lg border px-3 py-1.5 text-xs transition ${
+                  cardSize === value
+                    ? "border-cyan-400 bg-cyan-500/15 text-cyan-200"
+                    : "border-[var(--border)] text-[var(--theme-text-soft)]"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onResetLocalLayout}
+          className="mt-3 w-full rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--theme-text-soft)] transition hover:border-cyan-400"
+        >
+          화면 크기 설정 초기화
         </button>
       </div>
 

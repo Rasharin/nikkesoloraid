@@ -115,10 +115,11 @@ test("the sortable tier card preserves its layout slot while the overlay follows
 
 test("placed tier cards use 13px names and a light-mode white background", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+  const layout = fs.readFileSync("lib/tier-local-layout.ts", "utf8");
 
   assert.match(source, /bg-white\/80/);
   assert.match(source, /dark:bg-black\/25/);
-  assert.match(source, /text-\[13px\]/);
+  assert.match(layout, /default:[\s\S]*?text-\[13px\]/);
   assert.doesNotMatch(source, /text-\[10px\] text-white/);
 });
 
@@ -130,6 +131,32 @@ test("tier board restricts editing affordances with canEdit", () => {
   assert.match(source, /설정/);
   assert.match(source, /DndContext/);
   assert.match(source, /SortableContext/);
+});
+
+test("tier editors can resize their local board above the measured minimum", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(source, /TIER_LOCAL_LAYOUT_KEY/);
+  assert.match(source, /parseTierLocalLayout/);
+  assert.match(source, /clampTierSectionSize/);
+  assert.match(source, /onPointerDown=\{handleResizeStart\}/);
+  assert.match(source, /aria-label="티어 섹션 크기 조절"/);
+  assert.match(source, /canEdit \? \(/);
+  assert.match(source, /overflow-y-auto/);
+  assert.match(source, /maxWidth:\s*"calc\(100vw - 2rem\)"/);
+});
+
+test("tier settings expose three local card sizes and a separate reset", () => {
+  const settings = fs.readFileSync("app/components/tabs/tier/TierSettingsPanel.tsx", "utf8");
+  const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(settings, /cardSize/);
+  assert.match(settings, /작게/);
+  assert.match(settings, /기본/);
+  assert.match(settings, /크게/);
+  assert.match(settings, /화면 크기 설정 초기화/);
+  assert.match(board, /getTierCardSizeClasses/);
+  assert.match(board, /onResetLocalLayout/);
 });
 
 test("tier catalog includes name search and all three filter groups", () => {
