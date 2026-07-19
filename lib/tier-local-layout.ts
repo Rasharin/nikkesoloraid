@@ -16,6 +16,8 @@ export type TierCardSizeClasses = {
   name: string;
   placeholder: string;
   imageSizes: string;
+  rowMinHeight: string;
+  boardGap: string;
 };
 
 const CARD_SIZE_CLASSES: Record<TierCardSize, TierCardSizeClasses> = {
@@ -24,18 +26,24 @@ const CARD_SIZE_CLASSES: Record<TierCardSize, TierCardSizeClasses> = {
     name: "text-[11px] sm:text-xs",
     placeholder: "h-[84px] w-14 sm:h-[94px] sm:w-16",
     imageSizes: "64px",
+    rowMinHeight: "min-h-[7rem]",
+    boardGap: "gap-2",
   },
   default: {
     card: "w-16 sm:w-20",
     name: "text-[13px]",
     placeholder: "h-[94px] w-16 sm:h-[110px] sm:w-20",
     imageSizes: "80px",
+    rowMinHeight: "min-h-[8.5rem]",
+    boardGap: "gap-2.5",
   },
   large: {
     card: "w-20 sm:w-24",
     name: "text-sm",
     placeholder: "h-[110px] w-20 sm:h-[126px] sm:w-24",
     imageSizes: "96px",
+    rowMinHeight: "min-h-[10rem]",
+    boardGap: "gap-4",
   },
 };
 

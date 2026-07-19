@@ -308,13 +308,14 @@ function TierRowView({
   const sortableItems = row.nikkeNames.map((name) => `tier-card-${row.id}-${name}`);
   if (activePreview) sortableItems.splice(previewIndex, 0, activePreview.activeId);
   const visualItemCount = row.nikkeNames.length + (activePreview ? 1 : 0);
+  const sizeClasses = getTierCardSizeClasses(cardSize);
 
   return (
     <div
       ref={setNodeRef}
       data-tier-row
       data-tier-row-id={row.id}
-      className="grid min-h-24 grid-cols-[4.5rem_minmax(0,1fr)] overflow-visible rounded-2xl border sm:grid-cols-[6rem_minmax(0,1fr)]"
+      className={`grid ${sizeClasses.rowMinHeight} grid-cols-[4.5rem_minmax(0,1fr)] overflow-visible rounded-2xl border transition-[min-height] sm:grid-cols-[6rem_minmax(0,1fr)]`}
       style={{
         borderColor: `${row.color}99`,
         backgroundColor: `${row.color}18`,
@@ -346,7 +347,7 @@ function TierRowView({
                   <div
                     key={activePreview.activeId}
                     data-tier-insertion-placeholder
-                    className={`${getTierCardSizeClasses(cardSize).placeholder} shrink-0 rounded-xl border-2 border-dashed border-cyan-400/70 bg-cyan-400/10 transition-all duration-150`}
+                    className={`${sizeClasses.placeholder} shrink-0 rounded-xl border-2 border-dashed border-cyan-400/70 bg-cyan-400/10 transition-all duration-150`}
                   />
                 );
               }
@@ -411,6 +412,7 @@ export default function TierBoard({
     board.rows.forEach((row) => row.nikkeNames.forEach((name) => map.set(name, row.name)));
     return map;
   }, [board.rows]);
+  const boardSizeClasses = getTierCardSizeClasses(cardSize);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
@@ -645,7 +647,7 @@ export default function TierBoard({
             />
           ) : null}
 
-          <div className="mt-4 grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto">
+          <div className={`mt-4 grid min-h-0 flex-1 content-start overflow-y-auto transition-[gap] ${boardSizeClasses.boardGap}`}>
             {board.rows.map((row) => (
               <TierRowView
                 key={row.id}
@@ -673,8 +675,16 @@ export default function TierBoard({
               onPointerDown={handleResizeStart}
               aria-label="티어 섹션 크기 조절"
               title="드래그하여 티어 섹션 크기 조절"
-              className="absolute bottom-1 right-1 h-7 w-7 cursor-nwse-resize touch-none rounded-br-2xl text-cyan-400/80 before:absolute before:bottom-1 before:right-1 before:h-3 before:w-3 before:border-b-2 before:border-r-2 before:border-current"
-            />
+              className="absolute bottom-0 right-0 h-8 w-8 cursor-nwse-resize touch-none overflow-hidden rounded-br-[1.4rem] text-[var(--tier-resize-handle)] transition-colors"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 32 32"
+                className="h-full w-full fill-current"
+              >
+                <path d="M32 0v16c0 8.84-7.16 16-16 16H0c13-4 21-12 24-24 1-4 4-7 8-8Z" />
+              </svg>
+            </button>
           ) : null}
         </section>
 

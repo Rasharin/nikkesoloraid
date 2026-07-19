@@ -16,6 +16,7 @@
   --theme-text-soft: #d4d4d4;
   --theme-muted: #a3a3a3;
   --theme-placeholder: #737373;
+  --tier-resize-handle: #ffffff;
   --bg: var(--theme-page);
   --text: var(--theme-text);
   --card: var(--theme-card);
@@ -36,6 +37,7 @@
   --theme-text-soft: #334155;
   --theme-muted: #64748b;
   --theme-placeholder: #94a3b8;
+  --tier-resize-handle: #5eead4;
 }
 
 html[data-theme="light"],
@@ -368,4 +370,3 @@ html[data-theme="light"] :where(.inactive-raid-tab:hover, .inactive-sort-tab:hov
   border-color: #85C1E9 !important;
   color: #0f172a !important;
 }
-

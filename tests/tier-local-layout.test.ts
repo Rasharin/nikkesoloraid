@@ -40,3 +40,18 @@ test("keeps the current tier card dimensions as the default size", () => {
   assert.match(classes.placeholder, /h-\[94px\]/);
   assert.match(classes.placeholder, /sm:h-\[110px\]/);
 });
+
+test("grows tier rows and spacing with the card size", () => {
+  const small = getTierCardSizeClasses("small");
+  const normal = getTierCardSizeClasses("default");
+  const large = getTierCardSizeClasses("large");
+
+  assert.deepEqual(
+    [small.rowMinHeight, normal.rowMinHeight, large.rowMinHeight],
+    ["min-h-[7rem]", "min-h-[8.5rem]", "min-h-[10rem]"]
+  );
+  assert.deepEqual(
+    [small.boardGap, normal.boardGap, large.boardGap],
+    ["gap-2", "gap-2.5", "gap-4"]
+  );
+});

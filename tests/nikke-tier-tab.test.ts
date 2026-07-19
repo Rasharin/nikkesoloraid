@@ -62,7 +62,7 @@ test("tier rows accept vertical drops anywhere across the full row", () => {
 test("dragged tier cards remain visible outside their source row", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
-  assert.match(source, /data-tier-row[\s\S]{0,100}?className="[^"]*overflow-visible/);
+  assert.match(source, /data-tier-row[\s\S]{0,180}?className=\{`[^`]*overflow-visible/);
   assert.match(source, /data-tier-row-label[\s\S]*?rounded-l-2xl/);
 });
 
@@ -135,6 +135,7 @@ test("tier board restricts editing affordances with canEdit", () => {
 
 test("tier editors can resize their local board above the measured minimum", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+  const styles = fs.readFileSync("app/globals.css", "utf8");
 
   assert.match(source, /TIER_LOCAL_LAYOUT_KEY/);
   assert.match(source, /parseTierLocalLayout/);
@@ -144,6 +145,10 @@ test("tier editors can resize their local board above the measured minimum", () 
   assert.match(source, /canEdit \? \(/);
   assert.match(source, /overflow-y-auto/);
   assert.match(source, /maxWidth:\s*"calc\(100vw - 2rem\)"/);
+  assert.match(source, /text-\[var\(--tier-resize-handle\)\]/);
+  assert.match(styles, /--tier-resize-handle:\s*#ffffff/);
+  assert.match(styles, /:root\[data-theme="light"\][\s\S]*--tier-resize-handle:\s*#5eead4/);
+  assert.match(source, /<svg[\s\S]*viewBox="0 0 32 32"/);
 });
 
 test("tier settings expose three local card sizes and a separate reset", () => {
@@ -157,6 +162,8 @@ test("tier settings expose three local card sizes and a separate reset", () => {
   assert.match(settings, /화면 크기 설정 초기화/);
   assert.match(board, /getTierCardSizeClasses/);
   assert.match(board, /onResetLocalLayout/);
+  assert.match(board, /sizeClasses\.rowMinHeight/);
+  assert.match(board, /boardSizeClasses\.boardGap/);
 });
 
 test("tier catalog includes name search and all three filter groups", () => {
