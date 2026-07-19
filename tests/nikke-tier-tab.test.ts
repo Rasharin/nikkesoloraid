@@ -78,6 +78,11 @@ test("catalog dragging opens and commits a sortable insertion gap", () => {
   assert.match(source, /closestCenter/);
   assert.match(source, /onDragOver=\{handleDragOver\}/);
   assert.match(source, /data-tier-insertion-placeholder/);
+  assert.match(source, /data-tier-catalog-drop-gap/);
+  assert.doesNotMatch(
+    source,
+    /sizeClasses\.placeholder[^\n]*border-2 border-dashed border-cyan-400\/70 bg-cyan-400\/10/,
+  );
   assert.match(source, /data-tier-card/);
   assert.match(source, /data-tier-row-id/);
   assert.match(source, /function getCatalogInsertionIndex/);
