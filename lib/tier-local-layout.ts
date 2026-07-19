@@ -96,16 +96,19 @@ export function resizeTierSection(
   initial: TierSectionSize,
   delta: { x: number; y: number },
   edge: TierResizeEdge,
-  minimum: TierSectionSize
+  minimum: TierSectionSize,
+  maximumWidth = Number.POSITIVE_INFINITY
 ): { size: TierSectionSize; offsetDeltaX: number } {
   const requestedWidth = initial.width + (edge === "left" ? -delta.x : delta.x);
-  const size = clampTierSectionSize(
-    {
-      width: requestedWidth,
-      height: initial.height + delta.y,
-    },
-    minimum
-  );
+  const effectiveMaximumWidth = Math.max(0, maximumWidth);
+  const effectiveMinimumWidth = Math.min(minimum.width, effectiveMaximumWidth);
+  const size = {
+    width: Math.min(
+      Math.max(requestedWidth, effectiveMinimumWidth),
+      effectiveMaximumWidth
+    ),
+    height: Math.max(initial.height + delta.y, minimum.height),
+  };
 
   return {
     size,

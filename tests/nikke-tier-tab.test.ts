@@ -149,6 +149,11 @@ test("tier editors can resize their local board above the measured minimum", () 
   assert.match(source, /canEdit \? \(/);
   assert.match(source, /overflow-y-auto/);
   assert.match(source, /maxWidth:\s*"calc\(100vw - 2rem\)"/);
+  assert.match(source, /const VIEWPORT_RESIZE_MARGIN = 16/);
+  assert.match(source, /getBoundingClientRect\(\)/);
+  assert.match(source, /width:\s*Math\.round\(sectionRect\.width\)/);
+  assert.match(source, /sectionRect\.right - VIEWPORT_RESIZE_MARGIN/);
+  assert.match(source, /window\.innerWidth - VIEWPORT_RESIZE_MARGIN - sectionRect\.left/);
   assert.match(styles, /--tier-resize-handle:\s*#ffffff/);
   assert.match(styles, /:root\[data-theme="light"\][\s\S]*--tier-resize-handle:\s*#00b8db/);
   assert.match(source, /tier-resize-handle/);
@@ -168,6 +173,17 @@ test("tier editors can resize their local board above the measured minimum", () 
   assert.match(styles, /color:\s*var\(--tier-resize-handle\)/);
   assert.match(styles, /\.tier-resize-handle:hover \.tier-resize-handle-wedge/);
   assert.match(styles, /\.tier-resize-handle\[data-resizing="true"\] \.tier-resize-handle-wedge/);
+});
+
+test("full tier reset also restores the local section and card size", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(source, /function handleResetAll\(\)/);
+  assert.match(
+    source,
+    /function handleResetAll\(\)\s*\{[\s\S]*onChange\(createDefaultTierBoard\(\)\)[\s\S]*handleResetLocalLayout\(\)/
+  );
+  assert.match(source, /onResetAll=\{handleResetAll\}/);
 });
 
 test("full Nikke catalog uses cards one visual step smaller than before", () => {

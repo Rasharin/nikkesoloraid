@@ -65,6 +65,8 @@ type CatalogDropPreview = {
   index: number;
 };
 
+const VIEWPORT_RESIZE_MARGIN = 16;
+
 const tierCollisionDetection: CollisionDetection = (args) => {
   const pointerCollisions = pointerWithin(args);
   const cardCollision = pointerCollisions.find(({ id }) =>
@@ -462,11 +464,20 @@ export default function TierBoard({
     if (!canEdit) return;
     event.preventDefault();
     const minimum = minimumSectionSizeRef.current;
-    if (!minimum) return;
+    const sectionElement = event.currentTarget.closest("section");
+    if (!minimum || !sectionElement) return;
+    const sectionRect = sectionElement.getBoundingClientRect();
     setResizingEdge(edge);
     const measuredMinimum = minimum;
-    const initial = sectionSize ?? measuredMinimum;
+    const initial = {
+      width: Math.round(sectionRect.width),
+      height: sectionSize?.height ?? measuredMinimum.height,
+    };
     const initialOffsetX = sectionOffsetX;
+    const maximumWidth =
+      edge === "left"
+        ? sectionRect.right - VIEWPORT_RESIZE_MARGIN
+        : window.innerWidth - VIEWPORT_RESIZE_MARGIN - sectionRect.left;
     const startX = event.clientX;
     const startY = event.clientY;
     let finalSize = initial;
@@ -480,7 +491,8 @@ export default function TierBoard({
           y: moveEvent.clientY - startY,
         },
         edge,
-        measuredMinimum
+        measuredMinimum,
+        maximumWidth
       );
       finalSize = result.size;
       finalOffsetX = initialOffsetX + result.offsetDeltaX;
@@ -609,6 +621,11 @@ export default function TierBoard({
     );
   }
 
+  function handleResetAll() {
+    onChange(createDefaultTierBoard());
+    handleResetLocalLayout();
+  }
+
   function handleCatalogImageClick(nikkeName: string) {
     if (!canEdit || draggedNikkeRef.current === nikkeName) return;
     const finalRow = board.rows.at(-1);
@@ -679,7 +696,7 @@ export default function TierBoard({
               onChange={updateRows}
               onCardSizeChange={handleCardSizeChange}
               onClearAssignments={() => onChange(clearTierAssignments(board))}
-              onResetAll={() => onChange(createDefaultTierBoard())}
+              onResetAll={handleResetAll}
               onResetLocalLayout={handleResetLocalLayout}
               onClose={() => setSettingsOpen(false)}
             />

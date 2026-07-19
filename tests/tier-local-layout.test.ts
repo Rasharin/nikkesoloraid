@@ -66,6 +66,42 @@ test("left resize clamps width and offsets only by the applied width change", ()
   );
 });
 
+test("caps horizontal resizing at the viewport maximum width", () => {
+  assert.deepEqual(
+    resizeTierSection(
+      { width: 800, height: 600 },
+      { x: 200, y: 20 },
+      "right",
+      { width: 760, height: 540 },
+      850
+    ),
+    { size: { width: 850, height: 620 }, offsetDeltaX: 0 }
+  );
+  assert.deepEqual(
+    resizeTierSection(
+      { width: 800, height: 600 },
+      { x: -200, y: 20 },
+      "left",
+      { width: 760, height: 540 },
+      850
+    ),
+    { size: { width: 850, height: 620 }, offsetDeltaX: -50 }
+  );
+});
+
+test("allows a viewport maximum narrower than the measured desktop minimum", () => {
+  assert.deepEqual(
+    resizeTierSection(
+      { width: 700, height: 600 },
+      { x: 100, y: 0 },
+      "right",
+      { width: 760, height: 540 },
+      700
+    ),
+    { size: { width: 700, height: 600 }, offsetDeltaX: 0 }
+  );
+});
+
 test("keeps the current tier card dimensions as the default size", () => {
   const classes = getTierCardSizeClasses("default");
 
