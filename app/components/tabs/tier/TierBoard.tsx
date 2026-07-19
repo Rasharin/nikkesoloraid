@@ -394,6 +394,7 @@ export default function TierBoard({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sectionSize, setSectionSize] = useState<TierSectionSize | null>(null);
   const [cardSize, setCardSize] = useState<TierCardSize>("default");
+  const [resizing, setResizing] = useState(false);
   const [catalogPreview, setCatalogPreview] = useState<CatalogDropPreview | null>(null);
   const [activeTierNikkeName, setActiveTierNikkeName] = useState<string | null>(null);
   const minimumSectionSizeRef = useRef<TierSectionSize | null>(null);
@@ -451,6 +452,7 @@ export default function TierBoard({
     event.preventDefault();
     const minimum = minimumSectionSizeRef.current;
     if (!minimum) return;
+    setResizing(true);
     const measuredMinimum = minimum;
     const initial = sectionSize ?? measuredMinimum;
     const startX = event.clientX;
@@ -468,14 +470,17 @@ export default function TierBoard({
       setSectionSize(finalSize);
     }
 
-    function handlePointerUp() {
+    function handlePointerEnd() {
       window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointerup", handlePointerEnd);
+      window.removeEventListener("pointercancel", handlePointerEnd);
+      setResizing(false);
       persistLocalLayout(finalSize, cardSize);
     }
 
     window.addEventListener("pointermove", handlePointerMove);
-    window.addEventListener("pointerup", handlePointerUp, { once: true });
+    window.addEventListener("pointerup", handlePointerEnd, { once: true });
+    window.addEventListener("pointercancel", handlePointerEnd, { once: true });
   }
 
   function handleCardSizeChange(nextCardSize: TierCardSize) {
@@ -673,16 +678,17 @@ export default function TierBoard({
             <button
               type="button"
               onPointerDown={handleResizeStart}
+              data-resizing={resizing}
               aria-label="티어 섹션 크기 조절"
               title="드래그하여 티어 섹션 크기 조절"
-              className="absolute bottom-0 right-0 h-8 w-8 cursor-nwse-resize touch-none overflow-hidden rounded-br-[1.4rem] text-[var(--tier-resize-handle)] transition-colors"
+              className="tier-resize-handle absolute bottom-0 right-0 h-10 w-10 cursor-nwse-resize touch-none"
             >
               <svg
                 aria-hidden="true"
-                viewBox="0 0 32 32"
-                className="h-full w-full fill-current"
+                viewBox="0 0 24 24"
+                className="tier-resize-handle-wedge"
               >
-                <path d="M10 32C22 29 29 22 32 10V32Z" />
+                <path d="M2 24 L24 2 A22 22 0 0 1 2 24 Z" />
               </svg>
             </button>
           ) : null}

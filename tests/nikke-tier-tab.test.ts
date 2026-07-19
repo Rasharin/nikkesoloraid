@@ -145,11 +145,19 @@ test("tier editors can resize their local board above the measured minimum", () 
   assert.match(source, /canEdit \? \(/);
   assert.match(source, /overflow-y-auto/);
   assert.match(source, /maxWidth:\s*"calc\(100vw - 2rem\)"/);
-  assert.match(source, /text-\[var\(--tier-resize-handle\)\]/);
   assert.match(styles, /--tier-resize-handle:\s*#ffffff/);
   assert.match(styles, /:root\[data-theme="light"\][\s\S]*--tier-resize-handle:\s*#00b8db/);
-  assert.match(source, /<svg[\s\S]*viewBox="0 0 32 32"/);
-  assert.match(source, /<path d="M10 32C22 29 29 22 32 10V32Z"/);
+  assert.match(source, /tier-resize-handle/);
+  assert.match(source, /tier-resize-handle-wedge/);
+  assert.match(source, /data-resizing=\{resizing\}/);
+  assert.match(source, /<svg[\s\S]*viewBox="0 0 24 24"/);
+  assert.match(source, /<path d="M2 24 L24 2 A22 22 0 0 1 2 24 Z"/);
+  assert.match(styles, /\.tier-resize-handle-wedge/);
+  assert.match(styles, /width:\s*24px/);
+  assert.match(styles, /height:\s*24px/);
+  assert.match(styles, /color:\s*var\(--tier-resize-handle\)/);
+  assert.match(styles, /\.tier-resize-handle:hover \.tier-resize-handle-wedge/);
+  assert.match(styles, /\.tier-resize-handle\[data-resizing="true"\] \.tier-resize-handle-wedge/);
 });
 
 test("tier settings expose three local card sizes and a separate reset", () => {
