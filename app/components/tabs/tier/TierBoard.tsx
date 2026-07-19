@@ -682,7 +682,7 @@ export default function TierBoard({
                 viewBox="0 0 32 32"
                 className="h-full w-full fill-current"
               >
-                <path d="M32 0v16c0 8.84-7.16 16-16 16H0c13-4 21-12 24-24 1-4 4-7 8-8Z" />
+                <path d="M10 32C22 29 29 22 32 10V32Z" />
               </svg>
             </button>
           ) : null}

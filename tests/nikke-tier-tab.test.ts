@@ -147,8 +147,9 @@ test("tier editors can resize their local board above the measured minimum", () 
   assert.match(source, /maxWidth:\s*"calc\(100vw - 2rem\)"/);
   assert.match(source, /text-\[var\(--tier-resize-handle\)\]/);
   assert.match(styles, /--tier-resize-handle:\s*#ffffff/);
-  assert.match(styles, /:root\[data-theme="light"\][\s\S]*--tier-resize-handle:\s*#5eead4/);
+  assert.match(styles, /:root\[data-theme="light"\][\s\S]*--tier-resize-handle:\s*#00b8db/);
   assert.match(source, /<svg[\s\S]*viewBox="0 0 32 32"/);
+  assert.match(source, /<path d="M10 32C22 29 29 22 32 10V32Z"/);
 });
 
 test("tier settings expose three local card sizes and a separate reset", () => {
