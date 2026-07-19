@@ -609,6 +609,19 @@ export default function TierBoard({
     );
   }
 
+  function handleCatalogImageClick(nikkeName: string) {
+    if (!canEdit || draggedNikkeRef.current === nikkeName) return;
+    const finalRow = board.rows.at(-1);
+    if (!finalRow) return;
+    onChange(
+      moveNikke(board, {
+        nikkeName,
+        targetRowId: finalRow.id,
+        targetIndex: finalRow.nikkeNames.length,
+      })
+    );
+  }
+
   return (
     <DndContext
       id="nikke-tier-dnd"
@@ -742,6 +755,7 @@ export default function TierBoard({
           bursts={bursts}
           elements={elements}
           roles={roles}
+          onImageClick={handleCatalogImageClick}
         />
       </div>
 

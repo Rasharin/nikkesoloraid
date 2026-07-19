@@ -179,6 +179,21 @@ test("full Nikke catalog uses cards one visual step smaller than before", () => 
   assert.match(board, /getTierCardSizeClasses\(cardSize\)/);
 });
 
+test("catalog image clicks move a Nikke to the final tier without replacing drag behavior", () => {
+  const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+  const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(catalog, /onImageClick:\s*\(nikkeName: string\) => void/);
+  assert.match(catalog, /data-tier-catalog-image/);
+  assert.match(catalog, /onImageClick\(nikke\.name\)/);
+  assert.match(board, /function handleCatalogImageClick\(nikkeName: string\)/);
+  assert.match(board, /draggedNikkeRef\.current === nikkeName/);
+  assert.match(board, /const finalRow = board\.rows\.at\(-1\)/);
+  assert.match(board, /targetRowId:\s*finalRow\.id/);
+  assert.match(board, /targetIndex:\s*finalRow\.nikkeNames\.length/);
+  assert.match(board, /onImageClick=\{handleCatalogImageClick\}/);
+});
+
 test("left tier resizing does not stretch the full Nikke catalog", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 

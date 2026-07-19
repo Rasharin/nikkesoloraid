@@ -89,6 +89,31 @@ test("moves a nikke between rows without copying", () => {
   assert.deepEqual(moved.rows[1].nikkeNames, ["라피"]);
 });
 
+test("moves an assigned nikke to the end of the final row without copying", () => {
+  const board: TierBoardData = {
+    sectionName: "니케 티어",
+    updatedAt: null,
+    rows: [
+      { id: "s", name: "S", color: "#ef4444", nikkeNames: ["라피"] },
+      { id: "d", name: "D", color: "#3b82f6", nikkeNames: ["아니스"] },
+    ],
+  };
+
+  const finalRow = board.rows.at(-1)!;
+  const moved = moveNikke(board, {
+    nikkeName: "라피",
+    targetRowId: finalRow.id,
+    targetIndex: finalRow.nikkeNames.length,
+  });
+
+  assert.deepEqual(moved.rows[0].nikkeNames, []);
+  assert.deepEqual(moved.rows[1].nikkeNames, ["아니스", "라피"]);
+  assert.equal(
+    moved.rows.flatMap((row) => row.nikkeNames).filter((name) => name === "라피").length,
+    1
+  );
+});
+
 test("reorders a nikke within the same row", () => {
   const board: TierBoardData = {
     sectionName: "니케 티어",

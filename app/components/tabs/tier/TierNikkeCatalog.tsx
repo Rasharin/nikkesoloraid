@@ -29,6 +29,7 @@ type TierNikkeCatalogProps = {
   bursts: readonly { readonly n: number; readonly label: string }[];
   elements: readonly TierFilterOption[];
   roles: readonly TierFilterOption[];
+  onImageClick: (nikkeName: string) => void;
 };
 
 function toggleValue<T>(set: Set<T>, value: T) {
@@ -43,11 +44,13 @@ function CatalogCard({
   assigned,
   canEdit,
   getPublicUrl,
+  onImageClick,
 }: {
   nikke: TierNikkeRow;
   assigned: boolean;
   canEdit: boolean;
   getPublicUrl: TierNikkeCatalogProps["getPublicUrl"];
+  onImageClick: TierNikkeCatalogProps["onImageClick"];
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `tier-catalog-${nikke.id}`,
@@ -74,7 +77,13 @@ function CatalogCard({
         canEdit ? "cursor-grab border-[var(--border)] active:cursor-grabbing" : "cursor-default border-[var(--border)]"
       }`}
     >
-      <div className="relative aspect-square w-full bg-[var(--theme-panel)]">
+      <div
+        data-tier-catalog-image
+        onClick={() => {
+          if (canEdit) onImageClick(nikke.name);
+        }}
+        className="relative aspect-square w-full bg-[var(--theme-panel)]"
+      >
         {imageUrl ? (
           <Image
             fill
@@ -106,6 +115,7 @@ export default function TierNikkeCatalog({
   bursts,
   elements,
   roles,
+  onImageClick,
 }: TierNikkeCatalogProps) {
   const [search, setSearch] = useState("");
   const [catalogCollapsed, setCatalogCollapsed] = useState(false);
@@ -229,6 +239,7 @@ export default function TierNikkeCatalog({
                   assigned={assignedTiers.has(nikke.name)}
                   canEdit={canEdit}
                   getPublicUrl={getPublicUrl}
+                  onImageClick={onImageClick}
                 />
               ))}
             </div>
