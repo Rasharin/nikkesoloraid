@@ -185,6 +185,25 @@ test("tier catalog includes name search and all three filter groups", () => {
   assert.match(source, /useDraggable/);
 });
 
+test("tier catalog header toggles search filters and cards", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.match(
+    source,
+    /const \[catalogCollapsed, setCatalogCollapsed\] = useState\(false\)/,
+  );
+  assert.match(source, /aria-expanded=\{!catalogCollapsed\}/);
+  assert.match(
+    source,
+    /catalogCollapsed \? "전체 니케 목록 펼치기" : "전체 니케 목록 접기"/,
+  );
+  assert.match(source, /catalogCollapsed \? "rotate-180" : ""/);
+  assert.match(
+    source,
+    /\{!catalogCollapsed \? \([\s\S]*data-tier-filter-bar[\s\S]*filteredNikkes\.length > 0/,
+  );
+});
+
 test("assigned catalog nikkes use a gray image treatment without tier badges", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
 

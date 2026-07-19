@@ -108,6 +108,7 @@ export default function TierNikkeCatalog({
   roles,
 }: TierNikkeCatalogProps) {
   const [search, setSearch] = useState("");
+  const [catalogCollapsed, setCatalogCollapsed] = useState(false);
   const [selectedBursts, setSelectedBursts] = useState<Set<number>>(new Set());
   const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set());
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
@@ -145,21 +146,48 @@ export default function TierNikkeCatalog({
 
   return (
     <section className="rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)] lg:p-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-[var(--text)]">전체 니케 목록</h2>
-        </div>
-        <div className="w-full lg:max-w-md">
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="니케 이름 검색"
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-cyan-400"
-          />
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="shrink-0 text-lg font-semibold text-[var(--text)]">전체 니케 목록</h2>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+          {!catalogCollapsed ? (
+            <div className="w-full lg:max-w-md">
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="니케 이름 검색"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-cyan-400"
+              />
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setCatalogCollapsed((collapsed) => !collapsed)}
+            aria-expanded={!catalogCollapsed}
+            aria-label={catalogCollapsed ? "전체 니케 목록 펼치기" : "전체 니케 목록 접기"}
+            title={catalogCollapsed ? "전체 니케 목록 펼치기" : "전체 니케 목록 접기"}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--theme-text-soft)] transition hover:border-cyan-400 hover:text-[var(--text)]"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className={`h-5 w-5 transition-transform ${catalogCollapsed ? "rotate-180" : ""}`}
+            >
+              <path
+                d="m6 9 6 6 6-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         </div>
       </div>
 
-      <div data-tier-filter-bar className="mt-3 flex w-full items-center justify-start gap-1 overflow-x-auto pb-1">
+      {!catalogCollapsed ? (
+        <>
+          <div data-tier-filter-bar className="mt-3 flex w-full items-center justify-start gap-1 overflow-x-auto pb-1">
               {bursts.map((burst) => (
                 <button
                   key={burst.n}
@@ -190,25 +218,27 @@ export default function TierNikkeCatalog({
                   {role.label}
                 </button>
               ))}
-      </div>
+          </div>
 
-      {filteredNikkes.length > 0 ? (
-        <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-10">
-          {filteredNikkes.map((nikke) => (
-            <CatalogCard
-              key={nikke.id}
-              nikke={nikke}
-              assigned={assignedTiers.has(nikke.name)}
-              canEdit={canEdit}
-              getPublicUrl={getPublicUrl}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="mt-4 rounded-xl border border-dashed border-[var(--border)] p-8 text-center text-sm text-[var(--muted)]">
-          조건에 맞는 니케가 없습니다.
-        </div>
-      )}
+          {filteredNikkes.length > 0 ? (
+            <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-10">
+              {filteredNikkes.map((nikke) => (
+                <CatalogCard
+                  key={nikke.id}
+                  nikke={nikke}
+                  assigned={assignedTiers.has(nikke.name)}
+                  canEdit={canEdit}
+                  getPublicUrl={getPublicUrl}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-dashed border-[var(--border)] p-8 text-center text-sm text-[var(--muted)]">
+              조건에 맞는 니케가 없습니다.
+            </div>
+          )}
+        </>
+      ) : null}
     </section>
   );
 }
