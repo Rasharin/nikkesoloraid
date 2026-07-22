@@ -15,7 +15,7 @@ type HeaderProps = {
 
 function HeaderContent({ tab, onTabChange, onProfileClick }: HeaderProps) {
   return (
-    <div className="sticky top-0 z-10 -mx-4 mb-4 bg-[var(--bg)] px-4 py-3.5 backdrop-blur lg:-mx-8 lg:px-8 lg:py-4">
+    <div className="full-width-header-bg sticky top-0 z-10 -mx-4 mb-4 bg-[var(--bg)] px-4 py-3.5 backdrop-blur lg:-mx-8 lg:px-8 lg:py-4">
       <div className="flex flex-col gap-3 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-6">
         <div className="flex flex-col items-start">
           <Link

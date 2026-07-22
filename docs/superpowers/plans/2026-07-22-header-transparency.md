@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**목표:** 헤더 콘텐츠는 선명하게 유지하면서 중앙과 좌우 확장 배경만 50% 투명하게 만든다.
+**목표:** 헤더 콘텐츠는 선명하게 유지하면서 중앙과 좌우 확장 배경을 60% 불투명하게 만든다.
 
 **구조:** `full-width-header-bg` 클래스에서 공통 반투명 색상 변수를 정의하고 헤더 본체와 `::before`가 이를 함께 사용한다. 기존 헤더 레이아웃과 스태킹 구조는 변경하지 않는다.
 
@@ -11,7 +11,7 @@
 ## 전체 제약
 
 - 헤더 로고, 메뉴, 버튼에는 투명도를 적용하지 않는다.
-- 다크·라이트 테마 모두 기존 `--bg` 색상을 기준으로 50% 투명도를 계산한다.
+- 다크·라이트 테마 모두 기존 `--bg` 색상을 기준으로 60% 불투명도를 계산한다.
 - 좌우 확장 배경과 중앙 헤더 배경은 같은 색과 투명도를 사용한다.
 
 ---
@@ -29,7 +29,7 @@
 - [ ] **1단계: 실패하는 테스트 작성**
 
 ```ts
-assert.match(globalStyles, /--header-bg-translucent:\s*color-mix\(in srgb, var\(--bg\) 50%, transparent\)/);
+assert.match(globalStyles, /--header-bg-translucent:\s*color-mix\(in srgb, var\(--bg\) 60%, transparent\)/);
 assert.match(globalStyles, /background:\s*var\(--header-bg-translucent\)/);
 ```
 
@@ -43,7 +43,7 @@ assert.match(globalStyles, /background:\s*var\(--header-bg-translucent\)/);
 
 ```css
 .full-width-header-bg {
-  --header-bg-translucent: color-mix(in srgb, var(--bg) 50%, transparent);
+  --header-bg-translucent: color-mix(in srgb, var(--bg) 60%, transparent);
   background: var(--header-bg-translucent);
   isolation: isolate;
 }
