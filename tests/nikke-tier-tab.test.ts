@@ -93,16 +93,20 @@ test("catalog dragging opens and commits a sortable insertion gap", () => {
   assert.match(source, /sameVisualLine\s*\?\s*activeCenterX < cardCenterX\s*:\s*activeCenterY < cardCenterY/);
 });
 
-test("tier cards use a fully opaque overlay across row boundaries", () => {
+test("tier and catalog cards use a fully opaque overlay that stays aligned while scrolling", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+  const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
 
   assert.match(source, /DragOverlay/);
   assert.match(source, /function TierNikkeCardVisual/);
-  assert.match(source, /const \[activeTierNikkeName, setActiveTierNikkeName\]/);
-  assert.match(source, /activeData\.source === "tier"/);
+  assert.match(source, /const \[activeDraggedNikkeName, setActiveDraggedNikkeName\]/);
+  assert.match(source, /setActiveDraggedNikkeName\(activeData\.nikkeName \?\? null\)/);
   assert.match(source, /visibility:\s*isDragging\s*\?\s*"hidden"\s*:\s*undefined/);
   assert.match(source, /<DragOverlay[\s\S]*?<TierNikkeCardVisual/);
+  assert.match(catalog, /transform:\s*isDragging\s*\?\s*undefined\s*:\s*CSS\.Translate\.toString\(transform\)/);
+  assert.match(catalog, /visibility:\s*isDragging\s*\?\s*"hidden"\s*:\s*undefined/);
   assert.doesNotMatch(source, /opacity:\s*isDragging/);
+  assert.doesNotMatch(catalog, /opacity:\s*isDragging/);
   assert.doesNotMatch(source, /니케를 여기에 놓으세요|배치된 니케가 없습니다/);
 });
 
@@ -282,15 +286,16 @@ test("catalog nikke names use 13px text with tighter vertical padding", () => {
   assert.doesNotMatch(source, /text-\[11px\] text-\[var\(--theme-text-soft\)\]/);
 });
 
-test("catalog cards follow the pointer without transition lag at full opacity", () => {
+test("catalog source cards preserve their slot while the drag overlay follows the pointer", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
 
   assert.doesNotMatch(source, /opacity:\s*isDragging/);
   assert.match(source, /setNodeRef,\s*transform,\s*isDragging/);
-  assert.match(source, /transform:\s*CSS\.Translate\.toString\(transform\)/);
+  assert.match(source, /transform:\s*isDragging\s*\?\s*undefined\s*:\s*CSS\.Translate\.toString\(transform\)/);
   assert.match(source, /transition:\s*isDragging\s*\?\s*"none"\s*:\s*undefined/);
-  assert.match(source, /zIndex:\s*isDragging\s*\?\s*30\s*:\s*undefined/);
-  assert.match(source, /position:\s*isDragging\s*\?\s*"relative"\s*:\s*undefined/);
+  assert.match(source, /visibility:\s*isDragging\s*\?\s*"hidden"\s*:\s*undefined/);
+  assert.doesNotMatch(source, /zIndex:\s*isDragging/);
+  assert.doesNotMatch(source, /position:\s*isDragging/);
   assert.doesNotMatch(source, /text-left transition/);
 });
 

@@ -60,10 +60,9 @@ function CatalogCard({
     data: { source: "catalog", nikkeName: nikke.name },
   });
   const style: CSSProperties = {
-    transform: CSS.Translate.toString(transform),
+    transform: isDragging ? undefined : CSS.Translate.toString(transform),
     transition: isDragging ? "none" : undefined,
-    zIndex: isDragging ? 30 : undefined,
-    position: isDragging ? "relative" : undefined,
+    visibility: isDragging ? "hidden" : undefined,
   };
   const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
 

@@ -403,7 +403,7 @@ export default function TierBoard({
   const [cardSize, setCardSize] = useState<TierCardSize>("default");
   const [resizingEdge, setResizingEdge] = useState<TierResizeEdge | null>(null);
   const [catalogPreview, setCatalogPreview] = useState<CatalogDropPreview | null>(null);
-  const [activeTierNikkeName, setActiveTierNikkeName] = useState<string | null>(null);
+  const [activeDraggedNikkeName, setActiveDraggedNikkeName] = useState<string | null>(null);
   const minimumSectionSizeRef = useRef<TierSectionSize | null>(null);
   const localLayoutLoadedRef = useRef(false);
   const catalogPreviewRef = useRef<CatalogDropPreview | null>(null);
@@ -412,8 +412,8 @@ export default function TierBoard({
     () => new Map(nikkes.map((nikke) => [nikke.name, nikke])),
     [nikkes]
   );
-  const activeTierNikke = activeTierNikkeName
-    ? nikkesByName.get(activeTierNikkeName) ?? null
+  const activeDraggedNikke = activeDraggedNikkeName
+    ? nikkesByName.get(activeDraggedNikkeName) ?? null
     : null;
   const assignedTiers = useMemo(() => {
     const map = new Map<string, string>();
@@ -538,9 +538,7 @@ export default function TierBoard({
   function handleDragStart(event: DragStartEvent) {
     const activeData = (event.active.data.current ?? {}) as DragData;
     draggedNikkeRef.current = activeData.nikkeName ?? null;
-    setActiveTierNikkeName(
-      activeData.source === "tier" && activeData.nikkeName ? activeData.nikkeName : null
-    );
+    setActiveDraggedNikkeName(activeData.nikkeName ?? null);
   }
 
   function updateCatalogPreview(nextPreview: CatalogDropPreview | null) {
@@ -588,7 +586,7 @@ export default function TierBoard({
 
   function clearDraggedNikkeSoon() {
     updateCatalogPreview(null);
-    setActiveTierNikkeName(null);
+    setActiveDraggedNikkeName(null);
     window.setTimeout(() => {
       draggedNikkeRef.current = null;
     }, 0);
@@ -784,10 +782,10 @@ export default function TierBoard({
           easing: "cubic-bezier(0.2, 0, 0, 1)",
         }}
       >
-        {activeTierNikke ? (
+        {activeDraggedNikke ? (
           <div className="pointer-events-none">
             <TierNikkeCardVisual
-              nikke={activeTierNikke}
+              nikke={activeDraggedNikke}
               getPublicUrl={getPublicUrl}
               cardSize={cardSize}
               overlay
