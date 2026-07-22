@@ -1,19 +1,19 @@
-# Header Transparency Design
+# 헤더 반투명 배경 디자인
 
-## Goal
+## 목표
 
-Keep the header's existing size, position, content alignment, and full-width background coverage while making the background approximately 50% transparent.
+헤더의 기존 크기, 위치, 콘텐츠 정렬, 좌우 전체 배경 범위를 유지하면서 배경만 약 50% 투명하게 만든다.
 
-## Design
+## 디자인
 
-- Apply one shared translucent color to both the header element and its full-width `::before` background extension.
-- Use `color-mix(in srgb, var(--bg) 50%, transparent)` so dark and light themes derive transparency from the existing header color.
-- Preserve the existing `backdrop-blur`, stacking context, spacing, and header content opacity.
-- Do not apply `opacity` to the header element because that would fade the logo, navigation text, and buttons.
+- 헤더 본체와 좌우를 채우는 `::before` 배경에 동일한 반투명 색상을 적용한다.
+- `color-mix(in srgb, var(--bg) 50%, transparent)`를 사용해 다크·라이트 테마의 기존 헤더 색상에서 투명도를 파생한다.
+- 기존 `backdrop-blur`, 스태킹 컨텍스트, 간격 및 헤더 콘텐츠의 불투명도는 유지한다.
+- 헤더 요소 전체에 `opacity`를 적용하면 로고, 메뉴 글자와 버튼도 흐려지므로 사용하지 않는다.
 
-## Validation
+## 검증
 
-- Assert that the shared header background rule uses the 50% color mix.
-- Assert that the full-width pseudo-element uses the same background value.
-- Run the header regression tests, full test suite, lint for changed files, and a production build.
-- In the browser, verify that the header content remains fully opaque and both viewport edges use the same translucent background layer.
+- 공통 헤더 배경 규칙이 50% 색상 혼합을 사용하는지 검사한다.
+- 좌우 확장 가상 요소도 동일한 배경값을 사용하는지 검사한다.
+- 헤더 회귀 테스트, 전체 테스트, 변경 파일 린트와 프로덕션 빌드를 실행한다.
+- 브라우저에서 헤더 콘텐츠는 선명하고 화면 양끝은 동일한 반투명 배경인지 확인한다.
