@@ -15,6 +15,19 @@ export const DEFAULT_TIER_CATALOG_SETTINGS: TierCatalogSettings = {
   sortMode: "name",
 };
 
+export function getTierCatalogGridStyle(width: number, imageSize: number, sideMode: boolean) {
+  const gap = sideMode ? 4 : 8;
+  const minimumFixedWidth = imageSize * 3 + gap * 2;
+  if (width < minimumFixedWidth) {
+    return { gridTemplateColumns: "repeat(3, minmax(0, 1fr))" };
+  }
+  const columns = Math.max(3, Math.floor((width + gap) / (imageSize + gap)));
+  return {
+    gridTemplateColumns: `repeat(${columns}, ${imageSize}px)`,
+    justifyContent: "space-between" as const,
+  };
+}
+
 export function parseTierCatalogSettings(value: string | null): TierCatalogSettings | null {
   if (!value) return null;
   try {

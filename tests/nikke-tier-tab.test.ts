@@ -214,11 +214,11 @@ test("full tier reset also restores the local section and card size", () => {
   assert.match(source, /onResetAll=\{handleResetAll\}/);
 });
 
-test("full Nikke catalog uses cards one visual step smaller than before", () => {
+test("full Nikke catalog keeps compact image loading hints", () => {
   const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
   const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
-  assert.match(catalog, /grid-cols-5 gap-2 sm:grid-cols-7 lg:grid-cols-12/);
+  assert.match(catalog, /"mt-4 grid gap-2"/);
   assert.match(catalog, /sizes="\(max-width: 640px\) 20vw, 88px"/);
   assert.match(board, /getTierCardSizeClasses\(cardSize\)/);
 });
@@ -315,13 +315,31 @@ test("burst sorting renders full-width I II III separators before catalog cards"
   assert.match(source, /gridColumn: "1 \/ -1"/);
 });
 
-test("bottom tier catalog keeps its existing responsive grid and vertical collapse", () => {
+test("bottom tier catalog applies image size settings and keeps vertical collapse", () => {
   const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+  const settings = fs.readFileSync("lib/tier-catalog-settings.ts", "utf8");
 
-  assert.match(catalog, /grid-cols-5 gap-2 sm:grid-cols-7 lg:grid-cols-12/);
+  assert.match(catalog, /catalogGridWidth/);
+  assert.match(catalog, /catalogGridStyle/);
+  assert.match(catalog, /getTierCatalogGridStyle/);
+  assert.match(settings, /gridTemplateColumns/);
+  assert.match(settings, /sideMode \? 4 : 8/);
+  assert.match(catalog, /"mt-4 grid gap-2"/);
   assert.match(catalog, /layoutMode === "bottom"/);
   assert.match(catalog, /d="m6 9 6 6 6-6"/);
   assert.match(catalog, /catalogCollapsed \? "rotate-180" : ""/);
+});
+
+test("bottom catalog places its full-width search immediately before settings", () => {
+  const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.match(catalog, /sideMode \? "basis-full max-w-none" : "flex-1"/);
+  assert.match(catalog, /data-tier-catalog-search/);
+  assert.match(catalog, /data-tier-catalog-settings-button/);
+  assert.match(catalog, /data-tier-catalog-search[\s\S]*!sideMode \? settingsButton/);
+  assert.doesNotMatch(catalog, /flex items-center gap-2[^\n]*justify-between/);
+  assert.doesNotMatch(catalog, /lg:max-w-md/);
+  assert.match(catalog, /layoutMode === "bottom"[\s\S]*className="ml-auto grid h-10 w-10/);
 });
 
 test("tier settings expose three local card sizes and a separate reset", () => {

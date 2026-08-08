@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   DEFAULT_TIER_CATALOG_SETTINGS,
   TIER_CATALOG_SETTINGS_KEY,
+  getTierCatalogGridStyle,
   groupNikkesByBurst,
   parseTierCatalogSettings,
 } from "../lib/tier-catalog-settings.ts";
@@ -57,4 +58,15 @@ test("burst grouping keeps unknown burst entries in a final group", () => {
 
   assert.deepEqual(grouped.map((group) => group.burst), [1, null]);
   assert.deepEqual(grouped[1]?.nikkes.map((nikke) => nikke.name), ["가", "다"]);
+});
+
+test("bottom catalog image size changes its computed column count", () => {
+  assert.deepEqual(getTierCatalogGridStyle(1120, 64, false), {
+    gridTemplateColumns: "repeat(15, 64px)",
+    justifyContent: "space-between",
+  });
+  assert.deepEqual(getTierCatalogGridStyle(1120, 96, false), {
+    gridTemplateColumns: "repeat(10, 96px)",
+    justifyContent: "space-between",
+  });
 });

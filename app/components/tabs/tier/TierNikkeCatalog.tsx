@@ -12,6 +12,7 @@ import {
   TIER_CATALOG_IMAGE_SIZE_MAX,
   TIER_CATALOG_IMAGE_SIZE_MIN,
   TIER_CATALOG_SETTINGS_KEY,
+  getTierCatalogGridStyle,
   groupNikkesByBurst,
   parseTierCatalogSettings,
   type TierCatalogSettings,
@@ -134,8 +135,8 @@ export default function TierNikkeCatalog({
   const [catalogCollapsed, setCatalogCollapsed] = useState(false);
   const [catalogSettingsOpen, setCatalogSettingsOpen] = useState(false);
   const [catalogSettings, setCatalogSettings] = useState<TierCatalogSettings>(() => readCatalogSettings());
-  const [sideGridWidth, setSideGridWidth] = useState(0);
-  const sideGridRef = useRef<HTMLDivElement | null>(null);
+  const [catalogGridWidth, setCatalogGridWidth] = useState(0);
+  const catalogGridRef = useRef<HTMLDivElement | null>(null);
   const [selectedBursts, setSelectedBursts] = useState<Set<number>>(new Set());
   const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set());
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
@@ -171,10 +172,10 @@ export default function TierNikkeCatalog({
   );
 
   useEffect(() => {
-    if (!sideMode || catalogCollapsed) return;
-    const grid = sideGridRef.current;
+    if (catalogCollapsed) return;
+    const grid = catalogGridRef.current;
     if (!grid) return;
-    const observer = new ResizeObserver(([entry]) => setSideGridWidth(entry.contentRect.width));
+    const observer = new ResizeObserver(([entry]) => setCatalogGridWidth(entry.contentRect.width));
     observer.observe(grid);
     return () => observer.disconnect();
   }, [catalogCollapsed, sideMode]);
@@ -193,16 +194,34 @@ export default function TierNikkeCatalog({
         : "border-[var(--border)] text-[var(--theme-text-soft)] hover:border-neutral-400"
     }`;
 
-  const sideGridStyle = useMemo<CSSProperties | undefined>(() => {
-    if (!sideMode) return undefined;
-    const gap = 4;
-    const minimumFixedWidth = catalogSettings.imageSize * 3 + gap * 2;
-    if (sideGridWidth < minimumFixedWidth) {
-      return { gridTemplateColumns: "repeat(3, minmax(0, 1fr))" };
-    }
-    const columns = Math.max(3, Math.floor((sideGridWidth + gap) / (catalogSettings.imageSize + gap)));
-    return { gridTemplateColumns: `repeat(${columns}, ${catalogSettings.imageSize}px)` };
-  }, [catalogSettings.imageSize, sideGridWidth, sideMode]);
+  const catalogGridStyle = useMemo<CSSProperties>(
+    () => getTierCatalogGridStyle(catalogGridWidth, catalogSettings.imageSize, sideMode),
+    [catalogGridWidth, catalogSettings.imageSize, sideMode]
+  );
+
+  const settingsButton = (
+    <button
+      data-tier-catalog-settings-button
+      type="button"
+      onClick={() => setCatalogSettingsOpen((open) => !open)}
+      aria-expanded={catalogSettingsOpen}
+      aria-label="전체 니케 목록 설정"
+      title="전체 니케 목록 설정"
+      className={`grid shrink-0 place-items-center rounded-xl border transition hover:border-cyan-400 hover:text-[var(--text)] ${
+        sideMode ? "h-8 w-8" : "h-10 w-10"
+      } ${catalogSettingsOpen ? "border-cyan-500/40 bg-cyan-500/10" : "border-[var(--border)] bg-[var(--card)]"}`}
+    >
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4">
+        <path
+          d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.8 7.8 0 0 0-.08-1.08l2.05-1.6-2-3.46-2.52 1a8.2 8.2 0 0 0-1.86-1.08L14.6 3h-4l-.4 2.78a8.2 8.2 0 0 0-1.86 1.08l-2.52-1-2 3.46 2.05 1.6A7.8 7.8 0 0 0 5.8 12c0 .37.03.73.08 1.08l-2.05 1.6 2 3.46 2.52-1a8.2 8.2 0 0 0 1.86 1.08L10.6 21h4l.4-2.78a8.2 8.2 0 0 0 1.86-1.08l2.52 1 2-3.46-2.05-1.6c.05-.35.08-.71.08-1.08Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
 
   return (
     <section
@@ -216,7 +235,7 @@ export default function TierNikkeCatalog({
           : "p-4 lg:p-5"
       }`}
     >
-      <div className={`flex items-center gap-2 ${sideMode ? "flex-wrap justify-start" : "justify-between"}`}>
+      <div className={`flex items-center gap-2 ${sideMode ? "flex-wrap" : ""}`}>
         {sideMode ? (
           <button
             type="button"
@@ -248,27 +267,11 @@ export default function TierNikkeCatalog({
             <h2 className={`shrink-0 font-semibold text-[var(--text)] ${sideMode ? "text-sm" : "text-lg"}`}>
               전체 니케 목록
             </h2>
-            <button
-              type="button"
-              onClick={() => setCatalogSettingsOpen((open) => !open)}
-              aria-expanded={catalogSettingsOpen}
-              aria-label="전체 니케 목록 설정"
-              title="전체 니케 목록 설정"
-              className={`grid shrink-0 place-items-center rounded-xl border transition hover:border-cyan-400 hover:text-[var(--text)] ${
-                sideMode ? "h-8 w-8" : "h-10 w-10"
-              } ${catalogSettingsOpen ? "border-cyan-500/40 bg-cyan-500/10" : "border-[var(--border)] bg-[var(--card)]"}`}
+            {sideMode ? settingsButton : null}
+            <div
+              data-tier-catalog-search
+              className={`min-w-0 ${sideMode ? "basis-full max-w-none" : "flex-1"}`}
             >
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4">
-                <path
-                  d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.8 7.8 0 0 0-.08-1.08l2.05-1.6-2-3.46-2.52 1a8.2 8.2 0 0 0-1.86-1.08L14.6 3h-4l-.4 2.78a8.2 8.2 0 0 0-1.86 1.08l-2.52-1-2 3.46 2.05 1.6A7.8 7.8 0 0 0 5.8 12c0 .37.03.73.08 1.08l-2.05 1.6 2 3.46 2.52-1a8.2 8.2 0 0 0 1.86 1.08L10.6 21h4l.4-2.78a8.2 8.2 0 0 0 1.86-1.08l2.52 1 2-3.46-2.05-1.6c.05-.35.08-.71.08-1.08Z"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-            <div className={`min-w-0 flex-1 ${sideMode ? "basis-full max-w-none" : "lg:max-w-md"}`}>
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -278,6 +281,7 @@ export default function TierNikkeCatalog({
                 }`}
               />
             </div>
+            {!sideMode ? settingsButton : null}
           </>
         ) : null}
 
@@ -288,7 +292,7 @@ export default function TierNikkeCatalog({
             aria-expanded={!catalogCollapsed}
             aria-label={catalogCollapsed ? "전체 니케 목록 펼치기" : "전체 니케 목록 접기"}
             title={catalogCollapsed ? "전체 니케 목록 펼치기" : "전체 니케 목록 접기"}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--theme-text-soft)] transition hover:border-cyan-400 hover:text-[var(--text)]"
+            className="ml-auto grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--theme-text-soft)] transition hover:border-cyan-400 hover:text-[var(--text)]"
           >
             <svg
               aria-hidden="true"
@@ -409,13 +413,13 @@ export default function TierNikkeCatalog({
           >
             {filteredNikkes.length > 0 ? (
               <div
-                ref={sideGridRef}
+                ref={catalogGridRef}
                 data-tier-catalog-grid
-                style={sideGridStyle}
+                style={catalogGridStyle}
                 className={
                   sideMode
                     ? "tier-side-catalog-grid grid"
-                    : "mt-4 grid grid-cols-5 gap-2 sm:grid-cols-7 lg:grid-cols-12"
+                    : "mt-4 grid gap-2"
                 }
               >
                 {catalogSettings.sortMode === "name"
