@@ -39,6 +39,7 @@ import {
   TIER_LOCAL_LAYOUT_KEY,
   clampTierSectionSize,
   getTierCardSizeClasses,
+  getTierSectionLayoutWidth,
   parseTierLocalLayout,
   resizeTierSection,
   type TierCardSize,
@@ -71,6 +72,8 @@ type CatalogDropPreview = {
 };
 
 const VIEWPORT_RESIZE_MARGIN = 16;
+const SIDE_CATALOG_MIN_WIDTH = 128;
+const SIDE_LAYOUT_GAP = 20;
 
 const tierCollisionDetection: CollisionDetection = (args) => {
   const pointerCollisions = pointerWithin(args);
@@ -404,6 +407,7 @@ export default function TierBoard({
 }: TierBoardProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sectionSize, setSectionSize] = useState<TierSectionSize | null>(null);
+  const [minimumSectionSize, setMinimumSectionSize] = useState<TierSectionSize | null>(null);
   const [sectionOffsetX, setSectionOffsetX] = useState(0);
   const [cardSize, setCardSize] = useState<TierCardSize>("default");
   const [catalogLayoutMode, setCatalogLayoutMode] = useState<TierCatalogLayoutMode>(() => {
@@ -447,6 +451,7 @@ export default function TierBoard({
     const rect = node.getBoundingClientRect();
     const minimum = { width: Math.round(rect.width), height: Math.round(rect.height) };
     minimumSectionSizeRef.current = minimum;
+    setMinimumSectionSize(minimum);
     localLayoutLoadedRef.current = true;
 
     let stored = null;
@@ -457,8 +462,16 @@ export default function TierBoard({
       setSectionSize(minimum);
       return;
     }
-    setSectionSize(clampTierSectionSize(stored, minimum));
-    setSectionOffsetX(stored.offsetX ?? 0);
+    const normalized = resizeTierSection(
+      clampTierSectionSize(stored, minimum),
+      { x: 0, y: 0 },
+      "right",
+      minimum,
+      Number.POSITIVE_INFINITY,
+      stored.offsetX ?? 0
+    );
+    setSectionSize(normalized.size);
+    setSectionOffsetX(normalized.offsetX);
     setCardSize(stored.cardSize);
   }, [canEdit]);
 
@@ -506,10 +519,21 @@ export default function TierBoard({
       height: sectionSize?.height ?? measuredMinimum.height,
     };
     const initialOffsetX = sectionOffsetX;
-    const maximumWidth =
+    const layoutRoot = sectionElement.closest<HTMLElement>("[data-tier-layout-mode]");
+    const sideLayoutRight = layoutRoot?.getBoundingClientRect().right;
+    const edgeMaximumWidth =
       edge === "left"
         ? sectionRect.right - VIEWPORT_RESIZE_MARGIN
-        : window.innerWidth - VIEWPORT_RESIZE_MARGIN - sectionRect.left;
+        : catalogLayoutMode === "side" && sideLayoutRight
+          ? sideLayoutRight - sectionRect.left - SIDE_LAYOUT_GAP - SIDE_CATALOG_MIN_WIDTH
+          : window.innerWidth - VIEWPORT_RESIZE_MARGIN - sectionRect.left;
+    const parsedMaximumWidth = Number.parseFloat(
+      window.getComputedStyle(sectionElement).maxWidth
+    );
+    const configuredMaximumWidth = Number.isFinite(parsedMaximumWidth)
+      ? parsedMaximumWidth
+      : edgeMaximumWidth;
+    const maximumWidth = Math.min(edgeMaximumWidth, configuredMaximumWidth);
     const startX = event.clientX;
     const startY = event.clientY;
     let finalSize = initial;
@@ -524,10 +548,11 @@ export default function TierBoard({
         },
         edge,
         measuredMinimum,
-        maximumWidth
+        maximumWidth,
+        initialOffsetX
       );
       finalSize = result.size;
-      finalOffsetX = initialOffsetX + result.offsetDeltaX;
+      finalOffsetX = result.offsetX;
       setSectionSize(finalSize);
       setSectionOffsetX(finalOffsetX);
     }
@@ -688,9 +713,24 @@ export default function TierBoard({
     >
       <div
         data-tier-layout-mode={catalogLayoutMode}
+        style={
+          catalogLayoutMode === "side"
+            ? {
+                width: "calc(100% + max(0px, (100vw - 72rem) / 2 - 2rem))",
+                gridTemplateColumns:
+                  sectionSize && minimumSectionSize
+                    ? `${getTierSectionLayoutWidth(
+                        sectionSize,
+                        sectionOffsetX,
+                        minimumSectionSize.width
+                      )}px minmax(8rem, 1fr)`
+                    : "auto minmax(8rem, 1fr)",
+              }
+            : undefined
+        }
         className={
           catalogLayoutMode === "side"
-            ? "grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-5"
+            ? "grid min-w-0 items-start gap-5 overflow-visible"
             : "grid grid-cols-[minmax(0,1fr)] gap-5"
         }
       >
@@ -704,7 +744,7 @@ export default function TierBoard({
                   height: sectionSize.height,
                   maxWidth:
                     catalogLayoutMode === "side"
-                      ? "calc(100vw - clamp(15rem,42vw,44rem) - 4rem)"
+                      ? undefined
                       : "calc(100vw - 2rem)",
                   transform: `translateX(${sectionOffsetX}px)`,
                 }

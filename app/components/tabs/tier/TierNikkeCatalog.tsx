@@ -2,11 +2,20 @@
 
 import Image from "next/image";
 import { useDraggable } from "@dnd-kit/core";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { CSS } from "@dnd-kit/utilities";
 import { formatNikkeDisplayName } from "../../../../lib/nikke-display";
 import { matchesSelectedElements } from "../../../../lib/nikke-elements";
 import type { TierCatalogLayoutMode } from "../../../../lib/tier-catalog-layout";
+import {
+  DEFAULT_TIER_CATALOG_SETTINGS,
+  TIER_CATALOG_IMAGE_SIZE_MAX,
+  TIER_CATALOG_IMAGE_SIZE_MIN,
+  TIER_CATALOG_SETTINGS_KEY,
+  groupNikkesByBurst,
+  parseTierCatalogSettings,
+  type TierCatalogSettings,
+} from "../../../../lib/tier-catalog-settings";
 
 export type TierNikkeRow = {
   id: string;
@@ -123,9 +132,14 @@ export default function TierNikkeCatalog({
 }: TierNikkeCatalogProps) {
   const [search, setSearch] = useState("");
   const [catalogCollapsed, setCatalogCollapsed] = useState(false);
+  const [catalogSettingsOpen, setCatalogSettingsOpen] = useState(false);
+  const [catalogSettings, setCatalogSettings] = useState<TierCatalogSettings>(() => readCatalogSettings());
+  const [sideGridWidth, setSideGridWidth] = useState(0);
+  const sideGridRef = useRef<HTMLDivElement | null>(null);
   const [selectedBursts, setSelectedBursts] = useState<Set<number>>(new Set());
   const [selectedElements, setSelectedElements] = useState<Set<string>>(new Set());
   const [selectedRoles, setSelectedRoles] = useState<Set<string>>(new Set());
+  const sideMode = layoutMode === "side";
 
   const filteredNikkes = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -151,6 +165,27 @@ export default function TierNikkeCatalog({
     });
   }, [nikkes, search, selectedBursts, selectedElements, selectedRoles]);
 
+  const burstGroups = useMemo(
+    () => (catalogSettings.sortMode === "burst" ? groupNikkesByBurst(filteredNikkes) : []),
+    [catalogSettings.sortMode, filteredNikkes]
+  );
+
+  useEffect(() => {
+    if (!sideMode || catalogCollapsed) return;
+    const grid = sideGridRef.current;
+    if (!grid) return;
+    const observer = new ResizeObserver(([entry]) => setSideGridWidth(entry.contentRect.width));
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, [catalogCollapsed, sideMode]);
+
+  const updateCatalogSettings = (next: TierCatalogSettings) => {
+    setCatalogSettings(next);
+    try {
+      window.localStorage.setItem(TIER_CATALOG_SETTINGS_KEY, JSON.stringify(next));
+    } catch { }
+  };
+
   const filterButtonClass = (active: boolean) =>
     `shrink-0 rounded-lg border transition ${layoutMode === "side" ? "px-2 py-1 text-[11px]" : "px-2.5 py-1 text-xs"} ${
       active
@@ -158,7 +193,16 @@ export default function TierNikkeCatalog({
         : "border-[var(--border)] text-[var(--theme-text-soft)] hover:border-neutral-400"
     }`;
 
-  const sideMode = layoutMode === "side";
+  const sideGridStyle = useMemo<CSSProperties | undefined>(() => {
+    if (!sideMode) return undefined;
+    const gap = 4;
+    const minimumFixedWidth = catalogSettings.imageSize * 3 + gap * 2;
+    if (sideGridWidth < minimumFixedWidth) {
+      return { gridTemplateColumns: "repeat(3, minmax(0, 1fr))" };
+    }
+    const columns = Math.max(3, Math.floor((sideGridWidth + gap) / (catalogSettings.imageSize + gap)));
+    return { gridTemplateColumns: `repeat(${columns}, ${catalogSettings.imageSize}px)` };
+  }, [catalogSettings.imageSize, sideGridWidth, sideMode]);
 
   return (
     <section
@@ -204,6 +248,26 @@ export default function TierNikkeCatalog({
             <h2 className={`shrink-0 font-semibold text-[var(--text)] ${sideMode ? "text-sm" : "text-lg"}`}>
               전체 니케 목록
             </h2>
+            <button
+              type="button"
+              onClick={() => setCatalogSettingsOpen((open) => !open)}
+              aria-expanded={catalogSettingsOpen}
+              aria-label="전체 니케 목록 설정"
+              title="전체 니케 목록 설정"
+              className={`grid shrink-0 place-items-center rounded-xl border transition hover:border-cyan-400 hover:text-[var(--text)] ${
+                sideMode ? "h-8 w-8" : "h-10 w-10"
+              } ${catalogSettingsOpen ? "border-cyan-500/40 bg-cyan-500/10" : "border-[var(--border)] bg-[var(--card)]"}`}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4">
+                <path
+                  d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-3.5a7.8 7.8 0 0 0-.08-1.08l2.05-1.6-2-3.46-2.52 1a8.2 8.2 0 0 0-1.86-1.08L14.6 3h-4l-.4 2.78a8.2 8.2 0 0 0-1.86 1.08l-2.52-1-2 3.46 2.05 1.6A7.8 7.8 0 0 0 5.8 12c0 .37.03.73.08 1.08l-2.05 1.6 2 3.46 2.52-1a8.2 8.2 0 0 0 1.86 1.08L10.6 21h4l.4-2.78a8.2 8.2 0 0 0 1.86-1.08l2.52 1 2-3.46-2.05-1.6c.05-.35.08-.71.08-1.08Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
             <div className={`min-w-0 flex-1 ${sideMode ? "basis-full max-w-none" : "lg:max-w-md"}`}>
               <input
                 value={search}
@@ -246,6 +310,66 @@ export default function TierNikkeCatalog({
 
       {!catalogCollapsed ? (
         <>
+          {catalogSettingsOpen ? (
+            <div
+              data-tier-catalog-settings
+              className={`mt-3 grid shrink-0 gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] ${
+                sideMode ? "p-3 text-xs" : "p-4 text-sm sm:grid-cols-2"
+              }`}
+            >
+              <label className="grid gap-2 text-[var(--theme-text-soft)]">
+                <span className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-[var(--text)]">이미지 크기</span>
+                  <span>{Math.round(catalogSettings.imageSize)}px</span>
+                </span>
+                <input
+                  type="range"
+                  min={40}
+                  max={96}
+                  step={1}
+                  value={Math.round(catalogSettings.imageSize)}
+                  onChange={(event) => updateCatalogSettings({
+                    ...catalogSettings,
+                    imageSize: Math.min(
+                      TIER_CATALOG_IMAGE_SIZE_MAX,
+                      Math.max(TIER_CATALOG_IMAGE_SIZE_MIN, Number(event.target.value))
+                    ),
+                  })}
+                  className="w-full accent-cyan-400"
+                />
+              </label>
+
+              <fieldset className="grid gap-2">
+                <legend className="font-medium text-[var(--text)]">기본 정렬</legend>
+                <div className="flex gap-2">
+                  {([
+                    ["name", "이름순"],
+                    ["burst", "버스트순"],
+                  ] as const).map(([sortMode, label]) => (
+                    <label
+                      key={sortMode}
+                      className={`flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 transition ${
+                        catalogSettings.sortMode === sortMode
+                          ? "border-cyan-500/40 bg-cyan-500/10 text-[var(--text)]"
+                          : "border-[var(--border)] text-[var(--theme-text-soft)]"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="tier-catalog-sort-mode"
+                        value={sortMode}
+                        checked={catalogSettings.sortMode === sortMode}
+                        onChange={() => updateCatalogSettings({ ...catalogSettings, sortMode })}
+                        className="accent-cyan-400"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            </div>
+          ) : null}
+
           <div data-tier-filter-bar className="mt-3 flex w-full shrink-0 items-center justify-start gap-1 overflow-x-auto pb-1">
             {bursts.map((burst) => (
               <button
@@ -285,23 +409,48 @@ export default function TierNikkeCatalog({
           >
             {filteredNikkes.length > 0 ? (
               <div
+                ref={sideGridRef}
                 data-tier-catalog-grid
+                style={sideGridStyle}
                 className={
                   sideMode
-                    ? "tier-side-catalog-grid grid grid-cols-6 gap-2"
+                    ? "tier-side-catalog-grid grid"
                     : "mt-4 grid grid-cols-5 gap-2 sm:grid-cols-7 lg:grid-cols-12"
                 }
               >
-                {filteredNikkes.map((nikke) => (
-                  <CatalogCard
-                    key={nikke.id}
-                    nikke={nikke}
-                    assigned={assignedTiers.has(nikke.name)}
-                    canEdit={canEdit}
-                    getPublicUrl={getPublicUrl}
-                    onImageClick={onImageClick}
-                  />
-                ))}
+                {catalogSettings.sortMode === "name"
+                  ? filteredNikkes.map((nikke) => (
+                      <CatalogCard
+                        key={nikke.id}
+                        nikke={nikke}
+                        assigned={assignedTiers.has(nikke.name)}
+                        canEdit={canEdit}
+                        getPublicUrl={getPublicUrl}
+                        onImageClick={onImageClick}
+                      />
+                    ))
+                  : burstGroups.map((group) => (
+                      <div key={group.burst ?? "other"} style={{ display: "contents" }}>
+                        <div
+                          data-tier-burst-separator
+                          style={{ gridColumn: "1 / -1" }}
+                          className="flex items-center gap-2 py-1 font-semibold text-[var(--theme-text-soft)]"
+                        >
+                          <span>{group.burst ? BURST_GROUP_LABELS[group.burst] : "기타"}</span>
+                          <span className="h-px flex-1 bg-[var(--border)]" aria-hidden="true" />
+                        </div>
+                        {group.nikkes.map((nikke) => (
+                          <CatalogCard
+                            key={nikke.id}
+                            nikke={nikke}
+                            assigned={assignedTiers.has(nikke.name)}
+                            canEdit={canEdit}
+                            getPublicUrl={getPublicUrl}
+                            onImageClick={onImageClick}
+                          />
+                        ))}
+                      </div>
+                    ))}
               </div>
             ) : (
               <div className="mt-4 rounded-xl border border-dashed border-[var(--border)] p-8 text-center text-sm text-[var(--muted)]">
@@ -314,3 +463,14 @@ export default function TierNikkeCatalog({
     </section>
   );
 }
+
+function readCatalogSettings(): TierCatalogSettings {
+  if (typeof window === "undefined") return DEFAULT_TIER_CATALOG_SETTINGS;
+  try {
+    return parseTierCatalogSettings(window.localStorage.getItem(TIER_CATALOG_SETTINGS_KEY)) ?? DEFAULT_TIER_CATALOG_SETTINGS;
+  } catch {
+    return DEFAULT_TIER_CATALOG_SETTINGS;
+  }
+}
+
+const BURST_GROUP_LABELS = { 1: "Ⅰ", 2: "Ⅱ", 3: "Ⅲ" } as const;

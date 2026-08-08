@@ -180,6 +180,8 @@ test("tier editors can resize their local board above the measured minimum", () 
   assert.match(source, /width:\s*Math\.round\(sectionRect\.width\)/);
   assert.match(source, /sectionRect\.right - VIEWPORT_RESIZE_MARGIN/);
   assert.match(source, /window\.innerWidth - VIEWPORT_RESIZE_MARGIN - sectionRect\.left/);
+  assert.match(source, /window\.getComputedStyle\(sectionElement\)\.maxWidth/);
+  assert.match(source, /Math\.min\(edgeMaximumWidth, configuredMaximumWidth\)/);
   assert.match(styles, /--tier-resize-handle:\s*#ffffff/);
   assert.match(styles, /:root\[data-theme="light"\][\s\S]*--tier-resize-handle:\s*#00b8db/);
   assert.match(source, /tier-resize-handle/);
@@ -242,37 +244,75 @@ test("left tier resizing does not stretch the full Nikke catalog", () => {
   assert.match(source, /"grid grid-cols-\[minmax\(0,1fr\)\] gap-5"/);
 });
 
-test("side tier catalog follows the board height and responds from six columns", () => {
+test("side tier catalog keeps card size down to three columns, then shrinks three columns", () => {
   const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
   const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
   const globals = fs.readFileSync("app/globals.css", "utf8");
 
   assert.match(board, /ResizeObserver/);
   assert.match(board, /data-tier-layout-mode=\{catalogLayoutMode\}/);
+  assert.match(board, /width: "calc\(100% \+ max\(0px, \(100vw - 72rem\) \/ 2 - 2rem\)\)"/);
   assert.match(board, /catalogLayoutMode === "side"/);
   assert.match(board, /height: tierSectionHeight/);
   assert.match(catalog, /layoutMode: TierCatalogLayoutMode/);
   assert.match(catalog, /data-tier-catalog-layout=\{layoutMode\}/);
   assert.match(catalog, /data-tier-catalog-scroll-region/);
   assert.match(catalog, /data-tier-catalog-grid/);
-  assert.match(catalog, /grid-cols-6/);
+  assert.match(catalog, /tier-side-catalog-grid grid/);
   assert.match(catalog, /overflow-x-auto/);
   assert.match(catalog, /overflow-y-auto/);
   assert.match(catalog, /layoutMode === "side"/);
   assert.match(catalog, /sideMode \? "basis-full max-w-none"/);
   assert.match(globals, /container-type:\s*inline-size/);
-  assert.match(globals, /@container tier-catalog \(max-width:/);
-  assert.match(globals, /repeat\(2, minmax\(0, 1fr\)\)/);
-  assert.match(globals, /repeat\(1, minmax\(0, 1fr\)\)/);
+  assert.match(globals, /grid-template-columns:\s*repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(globals, /@container tier-catalog \(min-width: 12\.575rem\)/);
+  assert.match(globals, /repeat\(3, 4\.025rem\)/);
+  assert.match(globals, /@container tier-catalog \(min-width: 16\.85rem\)/);
+  assert.match(globals, /repeat\(4, 4\.025rem\)/);
+  assert.match(globals, /@container tier-catalog \(min-width: 25\.4rem\)/);
+  assert.match(globals, /repeat\(6, 4\.025rem\)/);
+  assert.match(globals, /@container tier-catalog \(min-width: 29\.675rem\)/);
+  assert.match(globals, /repeat\(7, 4\.025rem\)/);
+  assert.match(globals, /@container tier-catalog \(min-width: 51\.05rem\)/);
+  assert.match(globals, /repeat\(12, 4\.025rem\)/);
+  assert.match(globals, /\.tier-side-catalog-grid\s*\{[^}]*justify-content:\s*space-between/s);
 });
 
 test("side catalog keeps its left collapse anchor and expands to the right", () => {
   const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
   const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
 
-  assert.match(board, /grid-cols-\[auto_minmax\(0,1fr\)\]/);
+  assert.match(board, /overflow-visible/);
+  assert.match(board, /getTierSectionLayoutWidth/);
+  assert.match(board, /gridTemplateColumns/);
+  assert.match(board, /minmax\(8rem, 1fr\)/);
   assert.match(catalog, /"tier-side-catalog flex h-full min-h-0 w-full flex-col p-3"/);
   assert.match(catalog, /"h-full w-14 overflow-hidden p-2"/);
+});
+
+test("open tier catalog exposes persisted image size and default sort settings", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.match(source, /aria-label="전체 니케 목록 설정"/);
+  assert.match(source, /catalogSettingsOpen/);
+  assert.match(source, /!catalogCollapsed \? \(/);
+  assert.match(source, /type="range"/);
+  assert.match(source, /min=\{40\}/);
+  assert.match(source, /max=\{96\}/);
+  assert.match(source, /TIER_CATALOG_SETTINGS_KEY/);
+  assert.match(source, /sortMode === "name"/);
+  assert.match(source, /sortMode === "burst"/);
+});
+
+test("burst sorting renders full-width I II III separators before catalog cards", () => {
+  const source = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.match(source, /groupNikkesByBurst/);
+  assert.match(source, /data-tier-burst-separator/);
+  assert.match(source, /Ⅰ/);
+  assert.match(source, /Ⅱ/);
+  assert.match(source, /Ⅲ/);
+  assert.match(source, /gridColumn: "1 \/ -1"/);
 });
 
 test("bottom tier catalog keeps its existing responsive grid and vertical collapse", () => {

@@ -92,26 +92,53 @@ export function getTierCardSizeClasses(size: TierCardSize): TierCardSizeClasses 
   return CARD_SIZE_CLASSES[size];
 }
 
+export function getTierSectionLayoutWidth(
+  size: TierSectionSize,
+  offsetX: number,
+  minimumWidth: number
+): number {
+  return Math.max(minimumWidth, size.width + Math.min(0, offsetX));
+}
+
 export function resizeTierSection(
   initial: TierSectionSize,
   delta: { x: number; y: number },
   edge: TierResizeEdge,
   minimum: TierSectionSize,
-  maximumWidth = Number.POSITIVE_INFINITY
-): { size: TierSectionSize; offsetDeltaX: number } {
-  const requestedWidth = initial.width + (edge === "left" ? -delta.x : delta.x);
+  maximumWidth = Number.POSITIVE_INFINITY,
+  initialOffsetX = 0
+): { size: TierSectionSize; offsetX: number } {
   const effectiveMaximumWidth = Math.max(0, maximumWidth);
-  const effectiveMinimumWidth = Math.min(minimum.width, effectiveMaximumWidth);
+  const baselineWidth = Math.min(minimum.width, effectiveMaximumWidth);
+  const currentWidth = Math.min(Math.max(initial.width, baselineWidth), effectiveMaximumWidth);
+  const currentExtension = Math.max(0, currentWidth - baselineWidth);
+  const currentLeftExtension = Math.min(
+    Math.max(0, -initialOffsetX),
+    currentExtension
+  );
+  const currentRightExtension = currentExtension - currentLeftExtension;
+  const availableExtension = Math.max(0, effectiveMaximumWidth - baselineWidth);
+  const nextLeftExtension =
+    edge === "left"
+      ? Math.min(
+          Math.max(0, currentLeftExtension - delta.x),
+          Math.max(0, availableExtension - currentRightExtension)
+        )
+      : currentLeftExtension;
+  const nextRightExtension =
+    edge === "right"
+      ? Math.min(
+          Math.max(0, currentRightExtension + delta.x),
+          Math.max(0, availableExtension - currentLeftExtension)
+        )
+      : currentRightExtension;
   const size = {
-    width: Math.min(
-      Math.max(requestedWidth, effectiveMinimumWidth),
-      effectiveMaximumWidth
-    ),
+    width: baselineWidth + nextLeftExtension + nextRightExtension,
     height: Math.max(initial.height + delta.y, minimum.height),
   };
 
   return {
     size,
-    offsetDeltaX: edge === "left" ? initial.width - size.width : 0,
+    offsetX: nextLeftExtension > 0 ? -nextLeftExtension : 0,
   };
 }

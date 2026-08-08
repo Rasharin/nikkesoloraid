@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   clampTierSectionSize,
+  getTierSectionLayoutWidth,
   getTierCardSizeClasses,
   parseTierLocalLayout,
   resizeTierSection,
@@ -41,7 +42,7 @@ test("resizes from either bottom edge while preserving the left handle anchor", 
       "right",
       { width: 760, height: 540 }
     ),
-    { size: { width: 920, height: 640 }, offsetDeltaX: 0 }
+    { size: { width: 920, height: 640 }, offsetX: 0 }
   );
   assert.deepEqual(
     resizeTierSection(
@@ -50,11 +51,11 @@ test("resizes from either bottom edge while preserving the left handle anchor", 
       "left",
       { width: 760, height: 540 }
     ),
-    { size: { width: 920, height: 640 }, offsetDeltaX: -120 }
+    { size: { width: 920, height: 640 }, offsetX: -120 }
   );
 });
 
-test("left resize clamps width and offsets only by the applied width change", () => {
+test("left resize cannot shrink past the default left edge", () => {
   assert.deepEqual(
     resizeTierSection(
       { width: 800, height: 600 },
@@ -62,7 +63,7 @@ test("left resize clamps width and offsets only by the applied width change", ()
       "left",
       { width: 760, height: 540 }
     ),
-    { size: { width: 760, height: 540 }, offsetDeltaX: 40 }
+    { size: { width: 800, height: 540 }, offsetX: 0 }
   );
 });
 
@@ -75,7 +76,7 @@ test("caps horizontal resizing at the viewport maximum width", () => {
       { width: 760, height: 540 },
       850
     ),
-    { size: { width: 850, height: 620 }, offsetDeltaX: 0 }
+    { size: { width: 850, height: 620 }, offsetX: 0 }
   );
   assert.deepEqual(
     resizeTierSection(
@@ -85,7 +86,7 @@ test("caps horizontal resizing at the viewport maximum width", () => {
       { width: 760, height: 540 },
       850
     ),
-    { size: { width: 850, height: 620 }, offsetDeltaX: -50 }
+    { size: { width: 850, height: 620 }, offsetX: -50 }
   );
 });
 
@@ -98,7 +99,92 @@ test("allows a viewport maximum narrower than the measured desktop minimum", () 
       { width: 760, height: 540 },
       700
     ),
-    { size: { width: 700, height: 600 }, offsetDeltaX: 0 }
+    { size: { width: 700, height: 600 }, offsetX: 0 }
+  );
+});
+
+test("alternating resize handles stay anchored to the default left and right edges", () => {
+  const minimum = { width: 800, height: 600 };
+  const leftExpanded = resizeTierSection(
+    minimum,
+    { x: -100, y: 0 },
+    "left",
+    minimum,
+    1200,
+    0
+  );
+  assert.deepEqual(leftExpanded, {
+    size: { width: 900, height: 600 },
+    offsetX: -100,
+  });
+
+  const bothExpanded = resizeTierSection(
+    leftExpanded.size,
+    { x: 100, y: 0 },
+    "right",
+    minimum,
+    1200,
+    leftExpanded.offsetX
+  );
+  assert.deepEqual(bothExpanded, {
+    size: { width: 1000, height: 600 },
+    offsetX: -100,
+  });
+
+  const rightReset = resizeTierSection(
+    bothExpanded.size,
+    { x: -300, y: 0 },
+    "right",
+    minimum,
+    1200,
+    bothExpanded.offsetX
+  );
+  assert.deepEqual(rightReset, {
+    size: { width: 900, height: 600 },
+    offsetX: -100,
+  });
+
+  const fullyReset = resizeTierSection(
+    rightReset.size,
+    { x: 200, y: 0 },
+    "left",
+    minimum,
+    1200,
+    rightReset.offsetX
+  );
+  assert.deepEqual(fullyReset, {
+    size: minimum,
+    offsetX: 0,
+  });
+});
+
+test("left resize applies only the remaining extension at the configured maximum", () => {
+  assert.deepEqual(
+    resizeTierSection(
+      { width: 1192, height: 600 },
+      { x: -40, y: 0 },
+      "left",
+      { width: 1152, height: 600 },
+      1206,
+      0
+    ),
+    {
+      size: { width: 1206, height: 600 },
+      offsetX: -14,
+    }
+  );
+});
+
+test("left extension does not move the catalog track while right extension does", () => {
+  const minimumWidth = 800;
+
+  assert.equal(
+    getTierSectionLayoutWidth({ width: 1000, height: 600 }, -200, minimumWidth),
+    800
+  );
+  assert.equal(
+    getTierSectionLayoutWidth({ width: 1000, height: 600 }, 0, minimumWidth),
+    1000
   );
 });
 
