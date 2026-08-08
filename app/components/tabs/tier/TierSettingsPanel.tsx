@@ -8,12 +8,15 @@ import {
   type TierRow,
 } from "../../../../lib/nikke-tier";
 import type { TierCardSize } from "../../../../lib/tier-local-layout";
+import type { TierCatalogLayoutMode } from "../../../../lib/tier-catalog-layout";
 
 type TierSettingsPanelProps = {
   rows: TierRow[];
   cardSize: TierCardSize;
+  layoutMode: TierCatalogLayoutMode;
   onChange: (rows: TierRow[]) => void;
   onCardSizeChange: (size: TierCardSize) => void;
+  onLayoutModeChange: (mode: TierCatalogLayoutMode) => void;
   onClearAssignments: () => void;
   onResetAll: () => void;
   onResetLocalLayout: () => void;
@@ -35,8 +38,10 @@ function createTierRow(index: number): TierRow {
 export default function TierSettingsPanel({
   rows,
   cardSize,
+  layoutMode,
   onChange,
   onCardSizeChange,
+  onLayoutModeChange,
   onClearAssignments,
   onResetAll,
   onResetLocalLayout,
@@ -61,13 +66,34 @@ export default function TierSettingsPanel({
           <h3 className="font-semibold text-[var(--text)]">설정</h3>
           <p className="mt-1 text-xs text-[var(--muted)]">줄 이름, 순서와 색상을 변경할 수 있습니다.</p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--theme-text-soft)]"
-        >
-          닫기
-        </button>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-[var(--theme-text-soft)]">
+            <span className={layoutMode === "side" ? "text-cyan-300" : ""}>가로모드</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={layoutMode === "bottom"}
+              aria-label="전체 니케 목록 가로 세로 배치"
+              onClick={() => onLayoutModeChange(layoutMode === "side" ? "bottom" : "side")}
+              className="relative h-6 w-11 rounded-full border border-[var(--border)] bg-[var(--theme-panel)] p-0.5 transition hover:border-cyan-400"
+            >
+              <span
+                aria-hidden="true"
+                className={`block h-4.5 w-4.5 rounded-full bg-cyan-400 shadow transition-transform ${
+                  layoutMode === "bottom" ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+            <span className={layoutMode === "bottom" ? "text-cyan-300" : ""}>세로모드</span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--theme-text-soft)]"
+          >
+            닫기
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--theme-panel)] p-3">

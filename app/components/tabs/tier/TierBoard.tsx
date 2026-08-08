@@ -45,6 +45,11 @@ import {
   type TierResizeEdge,
   type TierSectionSize,
 } from "../../../../lib/tier-local-layout";
+import {
+  TIER_CATALOG_LAYOUT_KEY,
+  parseTierCatalogLayoutMode,
+  type TierCatalogLayoutMode,
+} from "../../../../lib/tier-catalog-layout";
 import TierNikkeCatalog, {
   type TierFilterOption,
   type TierNikkeRow,
@@ -401,6 +406,14 @@ export default function TierBoard({
   const [sectionSize, setSectionSize] = useState<TierSectionSize | null>(null);
   const [sectionOffsetX, setSectionOffsetX] = useState(0);
   const [cardSize, setCardSize] = useState<TierCardSize>("default");
+  const [catalogLayoutMode, setCatalogLayoutMode] = useState<TierCatalogLayoutMode>(() => {
+    if (typeof window === "undefined") return "bottom";
+    try {
+      return parseTierCatalogLayoutMode(window.localStorage.getItem(TIER_CATALOG_LAYOUT_KEY));
+    } catch {
+      return "bottom";
+    }
+  });
   const [resizingEdge, setResizingEdge] = useState<TierResizeEdge | null>(null);
   const [catalogPreview, setCatalogPreview] = useState<CatalogDropPreview | null>(null);
   const [activeDraggedNikkeName, setActiveDraggedNikkeName] = useState<string | null>(null);
@@ -626,6 +639,13 @@ export default function TierBoard({
     handleResetLocalLayout();
   }
 
+  function handleCatalogLayoutModeChange(nextMode: TierCatalogLayoutMode) {
+    setCatalogLayoutMode(nextMode);
+    try {
+      localStorage.setItem(TIER_CATALOG_LAYOUT_KEY, nextMode);
+    } catch { }
+  }
+
   function handleCatalogImageClick(nikkeName: string) {
     if (!canEdit || draggedNikkeRef.current === nikkeName) return;
     const finalRow = board.rows.at(-1);
@@ -693,8 +713,10 @@ export default function TierBoard({
             <TierSettingsPanel
               rows={board.rows}
               cardSize={cardSize}
+              layoutMode={catalogLayoutMode}
               onChange={updateRows}
               onCardSizeChange={handleCardSizeChange}
+              onLayoutModeChange={handleCatalogLayoutModeChange}
               onClearAssignments={() => onChange(clearTierAssignments(board))}
               onResetAll={handleResetAll}
               onResetLocalLayout={handleResetLocalLayout}

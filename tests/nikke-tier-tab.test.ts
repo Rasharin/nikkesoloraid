@@ -25,6 +25,23 @@ test("tier settings offers confirmed assignment and full reset actions", () => {
   assert.match(board, /createDefaultTierBoard\(\)/);
 });
 
+test("tier settings exposes one persisted horizontal and vertical layout switch", () => {
+  const settings = fs.readFileSync("app/components/tabs/tier/TierSettingsPanel.tsx", "utf8");
+  const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+
+  assert.match(settings, /layoutMode: TierCatalogLayoutMode/);
+  assert.match(settings, /onLayoutModeChange: \(mode: TierCatalogLayoutMode\) => void/);
+  assert.match(settings, /role="switch"/);
+  assert.match(settings, /aria-checked=\{layoutMode === "bottom"\}/);
+  assert.match(settings, /가로모드/);
+  assert.match(settings, /세로모드/);
+  assert.match(board, /parseTierCatalogLayoutMode/);
+  assert.match(board, /TIER_CATALOG_LAYOUT_KEY/);
+  assert.match(board, /localStorage\.setItem\(TIER_CATALOG_LAYOUT_KEY, nextMode\)/);
+  assert.match(board, /layoutMode=\{catalogLayoutMode\}/);
+  assert.match(board, /onLayoutModeChange=\{handleCatalogLayoutModeChange\}/);
+});
+
 test("clicking an editable tier nikke removes it from the tier", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
