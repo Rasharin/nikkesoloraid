@@ -407,6 +407,18 @@ html[data-theme="light"] :where(input::placeholder, textarea::placeholder),
   }
 }
 
+@container tier-catalog (max-width: 14rem) {
+  .tier-side-catalog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container tier-catalog (max-width: 10rem) {
+  .tier-side-catalog-grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+}
+
 html[data-theme="light"] :where(.deck-save-button) {
   border-color: #000000 !important;
 }

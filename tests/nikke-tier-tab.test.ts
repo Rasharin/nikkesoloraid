@@ -259,8 +259,20 @@ test("side tier catalog follows the board height and responds from six columns",
   assert.match(catalog, /overflow-x-auto/);
   assert.match(catalog, /overflow-y-auto/);
   assert.match(catalog, /layoutMode === "side"/);
+  assert.match(catalog, /sideMode \? "basis-full max-w-none"/);
   assert.match(globals, /container-type:\s*inline-size/);
   assert.match(globals, /@container tier-catalog \(max-width:/);
+  assert.match(globals, /repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(globals, /repeat\(1, minmax\(0, 1fr\)\)/);
+});
+
+test("side catalog keeps its left collapse anchor and expands to the right", () => {
+  const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+  const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.match(board, /grid-cols-\[auto_minmax\(0,1fr\)\]/);
+  assert.match(catalog, /"tier-side-catalog flex h-full min-h-0 w-full flex-col p-3"/);
+  assert.match(catalog, /"h-full w-14 overflow-hidden p-2"/);
 });
 
 test("bottom tier catalog keeps its existing responsive grid and vertical collapse", () => {

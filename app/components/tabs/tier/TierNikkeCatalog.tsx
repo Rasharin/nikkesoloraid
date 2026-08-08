@@ -168,11 +168,11 @@ export default function TierNikkeCatalog({
         sideMode
           ? catalogCollapsed
             ? "h-full w-14 overflow-hidden p-2"
-            : "tier-side-catalog flex h-full min-h-0 w-[clamp(15rem,42vw,44rem)] flex-col p-3"
+            : "tier-side-catalog flex h-full min-h-0 w-full flex-col p-3"
           : "p-4 lg:p-5"
       }`}
     >
-      <div className={`flex items-center gap-2 ${sideMode ? "justify-start" : "justify-between"}`}>
+      <div className={`flex items-center gap-2 ${sideMode ? "flex-wrap justify-start" : "justify-between"}`}>
         {sideMode ? (
           <button
             type="button"
@@ -204,7 +204,7 @@ export default function TierNikkeCatalog({
             <h2 className={`shrink-0 font-semibold text-[var(--text)] ${sideMode ? "text-sm" : "text-lg"}`}>
               전체 니케 목록
             </h2>
-            <div className={`min-w-0 flex-1 ${sideMode ? "max-w-none" : "lg:max-w-md"}`}>
+            <div className={`min-w-0 flex-1 ${sideMode ? "basis-full max-w-none" : "lg:max-w-md"}`}>
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}

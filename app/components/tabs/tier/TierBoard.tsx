@@ -690,7 +690,7 @@ export default function TierBoard({
         data-tier-layout-mode={catalogLayoutMode}
         className={
           catalogLayoutMode === "side"
-            ? "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-5"
+            ? "grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-5"
             : "grid grid-cols-[minmax(0,1fr)] gap-5"
         }
       >
