@@ -24,7 +24,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useCallback, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import {
   clearTierAssignments,
   createDefaultTierBoard,
@@ -414,10 +414,12 @@ export default function TierBoard({
       return "bottom";
     }
   });
+  const [tierSectionHeight, setTierSectionHeight] = useState<number | null>(null);
   const [resizingEdge, setResizingEdge] = useState<TierResizeEdge | null>(null);
   const [catalogPreview, setCatalogPreview] = useState<CatalogDropPreview | null>(null);
   const [activeDraggedNikkeName, setActiveDraggedNikkeName] = useState<string | null>(null);
   const minimumSectionSizeRef = useRef<TierSectionSize | null>(null);
+  const sectionElementRef = useRef<HTMLElement | null>(null);
   const localLayoutLoadedRef = useRef(false);
   const catalogPreviewRef = useRef<CatalogDropPreview | null>(null);
   const draggedNikkeRef = useRef<string | null>(null);
@@ -440,6 +442,7 @@ export default function TierBoard({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const setSectionNode = useCallback((node: HTMLElement | null) => {
+    sectionElementRef.current = node;
     if (!node || !canEdit || localLayoutLoadedRef.current) return;
     const rect = node.getBoundingClientRect();
     const minimum = { width: Math.round(rect.width), height: Math.round(rect.height) };
@@ -458,6 +461,20 @@ export default function TierBoard({
     setSectionOffsetX(stored.offsetX ?? 0);
     setCardSize(stored.cardSize);
   }, [canEdit]);
+
+  useEffect(() => {
+    const sectionElement = sectionElementRef.current;
+    if (!sectionElement) return;
+
+    const updateHeight = () => {
+      setTierSectionHeight(Math.round(sectionElement.getBoundingClientRect().height));
+    };
+    updateHeight();
+
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(sectionElement);
+    return () => observer.disconnect();
+  }, []);
 
   function persistLocalLayout(
     size: TierSectionSize,
@@ -669,7 +686,14 @@ export default function TierBoard({
       onDragCancel={clearDraggedNikkeSoon}
       onDragEnd={handleDragEnd}
     >
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
+      <div
+        data-tier-layout-mode={catalogLayoutMode}
+        className={
+          catalogLayoutMode === "side"
+            ? "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-5"
+            : "grid grid-cols-[minmax(0,1fr)] gap-5"
+        }
+      >
         <section
           ref={setSectionNode}
           className="relative flex flex-col rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)] lg:p-5"
@@ -678,7 +702,10 @@ export default function TierBoard({
               ? {
                   width: sectionSize.width,
                   height: sectionSize.height,
-                  maxWidth: "calc(100vw - 2rem)",
+                  maxWidth:
+                    catalogLayoutMode === "side"
+                      ? "calc(100vw - clamp(15rem,42vw,44rem) - 4rem)"
+                      : "calc(100vw - 2rem)",
                   transform: `translateX(${sectionOffsetX}px)`,
                 }
               : undefined
@@ -786,16 +813,26 @@ export default function TierBoard({
           ) : null}
         </section>
 
-        <TierNikkeCatalog
-          nikkes={nikkes}
-          assignedTiers={assignedTiers}
-          canEdit={canEdit}
-          getPublicUrl={getPublicUrl}
-          bursts={bursts}
-          elements={elements}
-          roles={roles}
-          onImageClick={handleCatalogImageClick}
-        />
+        <div
+          className={catalogLayoutMode === "side" ? "min-h-0 min-w-0" : ""}
+          style={
+            catalogLayoutMode === "side" && tierSectionHeight
+              ? { height: tierSectionHeight }
+              : undefined
+          }
+        >
+          <TierNikkeCatalog
+            nikkes={nikkes}
+            assignedTiers={assignedTiers}
+            canEdit={canEdit}
+            getPublicUrl={getPublicUrl}
+            bursts={bursts}
+            elements={elements}
+            roles={roles}
+            layoutMode={catalogLayoutMode}
+            onImageClick={handleCatalogImageClick}
+          />
+        </div>
       </div>
 
       <DragOverlay

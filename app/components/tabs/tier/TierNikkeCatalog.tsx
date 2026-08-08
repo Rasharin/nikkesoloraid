@@ -6,6 +6,7 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { CSS } from "@dnd-kit/utilities";
 import { formatNikkeDisplayName } from "../../../../lib/nikke-display";
 import { matchesSelectedElements } from "../../../../lib/nikke-elements";
+import type { TierCatalogLayoutMode } from "../../../../lib/tier-catalog-layout";
 
 export type TierNikkeRow = {
   id: string;
@@ -31,6 +32,7 @@ type TierNikkeCatalogProps = {
   bursts: readonly { readonly n: number; readonly label: string }[];
   elements: readonly TierFilterOption[];
   roles: readonly TierFilterOption[];
+  layoutMode: TierCatalogLayoutMode;
   onImageClick: (nikkeName: string) => void;
 };
 
@@ -101,7 +103,7 @@ function CatalogCard({
           <span className="pointer-events-none absolute inset-0 bg-neutral-500/35" aria-hidden="true" />
         ) : null}
       </div>
-      <div className="truncate px-1.5 py-[5px] text-center text-[13px] text-[var(--theme-text-soft)]">
+      <div className="tier-catalog-card-name truncate px-1.5 py-[5px] text-center text-[13px] text-[var(--theme-text-soft)]">
         {formatNikkeDisplayName(nikke.name)}
       </div>
     </button>
@@ -116,6 +118,7 @@ export default function TierNikkeCatalog({
   bursts,
   elements,
   roles,
+  layoutMode,
   onImageClick,
 }: TierNikkeCatalogProps) {
   const [search, setSearch] = useState("");
@@ -149,27 +152,72 @@ export default function TierNikkeCatalog({
   }, [nikkes, search, selectedBursts, selectedElements, selectedRoles]);
 
   const filterButtonClass = (active: boolean) =>
-    `shrink-0 rounded-lg border px-2.5 py-1 text-xs transition ${
+    `shrink-0 rounded-lg border transition ${layoutMode === "side" ? "px-2 py-1 text-[11px]" : "px-2.5 py-1 text-xs"} ${
       active
         ? "border-cyan-500/40 bg-cyan-500/10 text-[var(--text)]"
         : "border-[var(--border)] text-[var(--theme-text-soft)] hover:border-neutral-400"
     }`;
 
+  const sideMode = layoutMode === "side";
+
   return (
-    <section className="rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.18)] lg:p-5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="shrink-0 text-lg font-semibold text-[var(--text)]">전체 니케 목록</h2>
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-          {!catalogCollapsed ? (
-            <div className="w-full lg:max-w-md">
+    <section
+      data-tier-catalog-layout={layoutMode}
+      data-tier-catalog-collapsed={catalogCollapsed}
+      className={`tier-catalog-container rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] shadow-[0_16px_40px_rgba(0,0,0,0.18)] transition-[width,padding] ${
+        sideMode
+          ? catalogCollapsed
+            ? "h-full w-14 overflow-hidden p-2"
+            : "tier-side-catalog flex h-full min-h-0 w-[clamp(15rem,42vw,44rem)] flex-col p-3"
+          : "p-4 lg:p-5"
+      }`}
+    >
+      <div className={`flex items-center gap-2 ${sideMode ? "justify-start" : "justify-between"}`}>
+        {sideMode ? (
+          <button
+            type="button"
+            onClick={() => setCatalogCollapsed((collapsed) => !collapsed)}
+            aria-expanded={!catalogCollapsed}
+            aria-label={catalogCollapsed ? "전체 니케 목록 펼치기" : "전체 니케 목록 접기"}
+            title={catalogCollapsed ? "전체 니케 목록 펼치기" : "전체 니케 목록 접기"}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--theme-text-soft)] transition hover:border-cyan-400 hover:text-[var(--text)]"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+            >
+              <path
+                d={catalogCollapsed ? "m9 6 6 6-6 6" : "m15 6-6 6 6 6"}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        ) : null}
+
+        {!catalogCollapsed ? (
+          <>
+            <h2 className={`shrink-0 font-semibold text-[var(--text)] ${sideMode ? "text-sm" : "text-lg"}`}>
+              전체 니케 목록
+            </h2>
+            <div className={`min-w-0 flex-1 ${sideMode ? "max-w-none" : "lg:max-w-md"}`}>
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="니케 이름 검색"
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--text)] outline-none focus:border-cyan-400"
+                className={`w-full rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--text)] outline-none focus:border-cyan-400 ${
+                  sideMode ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm"
+                }`}
               />
             </div>
-          ) : null}
+          </>
+        ) : null}
+
+        {layoutMode === "bottom" ? (
           <button
             type="button"
             onClick={() => setCatalogCollapsed((collapsed) => !collapsed)}
@@ -193,62 +241,74 @@ export default function TierNikkeCatalog({
               />
             </svg>
           </button>
-        </div>
+        ) : null}
       </div>
 
       {!catalogCollapsed ? (
         <>
-          <div data-tier-filter-bar className="mt-3 flex w-full items-center justify-start gap-1 overflow-x-auto pb-1">
-              {bursts.map((burst) => (
-                <button
-                  key={burst.n}
-                  type="button"
-                  onClick={() => setSelectedBursts((prev) => toggleValue(prev, burst.n))}
-                  className={filterButtonClass(selectedBursts.has(burst.n))}
-                >
-                  {burst.label}
-                </button>
-              ))}
-              {elements.map((element) => (
-                <button
-                  key={element.v}
-                  type="button"
-                  onClick={() => setSelectedElements((prev) => toggleValue(prev, element.v))}
-                  className={filterButtonClass(selectedElements.has(element.v))}
-                >
-                  {element.label}
-                </button>
-              ))}
-              {roles.map((role) => (
-                <button
-                  key={role.v}
-                  type="button"
-                  onClick={() => setSelectedRoles((prev) => toggleValue(prev, role.v))}
-                  className={filterButtonClass(selectedRoles.has(role.v))}
-                >
-                  {role.label}
-                </button>
-              ))}
+          <div data-tier-filter-bar className="mt-3 flex w-full shrink-0 items-center justify-start gap-1 overflow-x-auto pb-1">
+            {bursts.map((burst) => (
+              <button
+                key={burst.n}
+                type="button"
+                onClick={() => setSelectedBursts((prev) => toggleValue(prev, burst.n))}
+                className={filterButtonClass(selectedBursts.has(burst.n))}
+              >
+                {burst.label}
+              </button>
+            ))}
+            {elements.map((element) => (
+              <button
+                key={element.v}
+                type="button"
+                onClick={() => setSelectedElements((prev) => toggleValue(prev, element.v))}
+                className={filterButtonClass(selectedElements.has(element.v))}
+              >
+                {element.label}
+              </button>
+            ))}
+            {roles.map((role) => (
+              <button
+                key={role.v}
+                type="button"
+                onClick={() => setSelectedRoles((prev) => toggleValue(prev, role.v))}
+                className={filterButtonClass(selectedRoles.has(role.v))}
+              >
+                {role.label}
+              </button>
+            ))}
           </div>
 
-          {filteredNikkes.length > 0 ? (
-            <div className="mt-4 grid grid-cols-5 gap-2 sm:grid-cols-7 lg:grid-cols-12">
-              {filteredNikkes.map((nikke) => (
-                <CatalogCard
-                  key={nikke.id}
-                  nikke={nikke}
-                  assigned={assignedTiers.has(nikke.name)}
-                  canEdit={canEdit}
-                  getPublicUrl={getPublicUrl}
-                  onImageClick={onImageClick}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="mt-4 rounded-xl border border-dashed border-[var(--border)] p-8 text-center text-sm text-[var(--muted)]">
-              조건에 맞는 니케가 없습니다.
-            </div>
-          )}
+          <div
+            data-tier-catalog-scroll-region
+            className={sideMode ? "mt-3 min-h-0 flex-1 overflow-y-auto pr-1" : ""}
+          >
+            {filteredNikkes.length > 0 ? (
+              <div
+                data-tier-catalog-grid
+                className={
+                  sideMode
+                    ? "tier-side-catalog-grid grid grid-cols-6 gap-2"
+                    : "mt-4 grid grid-cols-5 gap-2 sm:grid-cols-7 lg:grid-cols-12"
+                }
+              >
+                {filteredNikkes.map((nikke) => (
+                  <CatalogCard
+                    key={nikke.id}
+                    nikke={nikke}
+                    assigned={assignedTiers.has(nikke.name)}
+                    canEdit={canEdit}
+                    getPublicUrl={getPublicUrl}
+                    onImageClick={onImageClick}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl border border-dashed border-[var(--border)] p-8 text-center text-sm text-[var(--muted)]">
+                조건에 맞는 니케가 없습니다.
+              </div>
+            )}
+          </div>
         </>
       ) : null}
     </section>

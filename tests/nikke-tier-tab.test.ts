@@ -174,7 +174,7 @@ test("tier editors can resize their local board above the measured minimum", () 
   assert.match(source, /aria-label="티어 섹션 오른쪽 크기 조절"/);
   assert.match(source, /canEdit \? \(/);
   assert.match(source, /overflow-y-auto/);
-  assert.match(source, /maxWidth:\s*"calc\(100vw - 2rem\)"/);
+  assert.match(source, /:\s*"calc\(100vw - 2rem\)"/);
   assert.match(source, /const VIEWPORT_RESIZE_MARGIN = 16/);
   assert.match(source, /getBoundingClientRect\(\)/);
   assert.match(source, /width:\s*Math\.round\(sectionRect\.width\)/);
@@ -239,7 +239,37 @@ test("catalog image clicks move a Nikke to the final tier without replacing drag
 test("left tier resizing does not stretch the full Nikke catalog", () => {
   const source = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
 
-  assert.match(source, /className="grid grid-cols-\[minmax\(0,1fr\)\] gap-5"/);
+  assert.match(source, /"grid grid-cols-\[minmax\(0,1fr\)\] gap-5"/);
+});
+
+test("side tier catalog follows the board height and responds from six columns", () => {
+  const board = fs.readFileSync("app/components/tabs/tier/TierBoard.tsx", "utf8");
+  const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+  const globals = fs.readFileSync("app/globals.css", "utf8");
+
+  assert.match(board, /ResizeObserver/);
+  assert.match(board, /data-tier-layout-mode=\{catalogLayoutMode\}/);
+  assert.match(board, /catalogLayoutMode === "side"/);
+  assert.match(board, /height: tierSectionHeight/);
+  assert.match(catalog, /layoutMode: TierCatalogLayoutMode/);
+  assert.match(catalog, /data-tier-catalog-layout=\{layoutMode\}/);
+  assert.match(catalog, /data-tier-catalog-scroll-region/);
+  assert.match(catalog, /data-tier-catalog-grid/);
+  assert.match(catalog, /grid-cols-6/);
+  assert.match(catalog, /overflow-x-auto/);
+  assert.match(catalog, /overflow-y-auto/);
+  assert.match(catalog, /layoutMode === "side"/);
+  assert.match(globals, /container-type:\s*inline-size/);
+  assert.match(globals, /@container tier-catalog \(max-width:/);
+});
+
+test("bottom tier catalog keeps its existing responsive grid and vertical collapse", () => {
+  const catalog = fs.readFileSync("app/components/tabs/tier/TierNikkeCatalog.tsx", "utf8");
+
+  assert.match(catalog, /grid-cols-5 gap-2 sm:grid-cols-7 lg:grid-cols-12/);
+  assert.match(catalog, /layoutMode === "bottom"/);
+  assert.match(catalog, /d="m6 9 6 6 6-6"/);
+  assert.match(catalog, /catalogCollapsed \? "rotate-180" : ""/);
 });
 
 test("tier settings expose three local card sizes and a separate reset", () => {
