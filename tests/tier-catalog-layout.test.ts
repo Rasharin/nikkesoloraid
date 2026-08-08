@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   TIER_CATALOG_LAYOUT_KEY,
   parseTierCatalogLayoutMode,
-} from "../lib/tier-catalog-layout";
+} from "../lib/tier-catalog-layout.ts";
 
 test("tier catalog layout uses a versioned local key", () => {
   assert.equal(TIER_CATALOG_LAYOUT_KEY, "soloraid_tier_catalog_layout_v1");
