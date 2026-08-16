@@ -8,6 +8,35 @@ export type SoloRaidScheduleActionCandidate = {
   createdAt: string;
 };
 
+export function formatSoloRaidScheduleLabel(label: string, maxLength = 15) {
+  return label.length > maxLength ? `${label.slice(0, maxLength)}...` : label;
+}
+
+export function validateSoloRaidScheduleEdit(input: {
+  title: string;
+  description: string;
+  startsAt: string | null | undefined;
+  endsAt: string | null | undefined;
+}):
+  | { ok: true; value: { title: string; description: string; startsAt: string; endsAt: string } }
+  | { ok: false; reason: string } {
+  const title = input.title.trim();
+  if (!title) return { ok: false, reason: "보스 이름을 입력해줘" };
+
+  const windowValidation = validateSoloRaidScheduleWindow(input.startsAt, input.endsAt);
+  if (!windowValidation.ok) return windowValidation;
+
+  return {
+    ok: true,
+    value: {
+      title,
+      description: input.description.trim(),
+      startsAt: input.startsAt as string,
+      endsAt: input.endsAt as string,
+    },
+  };
+}
+
 export function parseKstDateTimeInput(value: string): string | null {
   const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
   if (!match) return null;

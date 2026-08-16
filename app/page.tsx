@@ -48,6 +48,7 @@ import {
   buildActiveSoloRaidEndScheduleWindow,
   buildImmediateSoloRaidScheduleWindow,
   parseKstDateTimeInput,
+  validateSoloRaidScheduleEdit,
   validateSoloRaidScheduleWindow,
   type SoloRaidScheduleStatus,
 } from "../lib/solo-raid-schedule";
@@ -212,6 +213,8 @@ type AddSoloRaidSchedulePayload = AddSoloRaidPayload & {
 };
 type UpdateSoloRaidSchedulePayload = {
   id: string;
+  title: string;
+  description: string;
   startsAtInput: string;
   endsAtInput: string;
 };
@@ -4289,7 +4292,12 @@ export default function Page() {
   async function updateSoloRaidSchedule(payload: UpdateSoloRaidSchedulePayload) {
     const startsAt = parseKstDateTimeInput(payload.startsAtInput);
     const endsAt = parseKstDateTimeInput(payload.endsAtInput);
-    const validation = validateSoloRaidScheduleWindow(startsAt, endsAt);
+    const validation = validateSoloRaidScheduleEdit({
+      title: payload.title,
+      description: payload.description,
+      startsAt,
+      endsAt,
+    });
 
     if (!canManageBosses) {
       showToast("마스터 계정만 가능");
@@ -4299,8 +4307,8 @@ export default function Page() {
       showToast("수정할 예약을 찾을 수 없어");
       return false;
     }
-    if (!validation.ok || !startsAt || !endsAt) {
-      showToast(validation.ok ? "예약 시각을 확인해줘" : validation.reason);
+    if (!validation.ok) {
+      showToast(validation.reason);
       return false;
     }
 
@@ -4309,13 +4317,13 @@ export default function Page() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ startsAt, endsAt }),
+        body: JSON.stringify(validation.value),
       });
       const data = (await response.json().catch(() => ({}))) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "예약 수정 실패");
 
       await refreshSoloRaidScheduleState({ processDue: true });
-      showToast("예약 기간 수정 완료");
+      showToast("예약 수정 완료");
       return true;
     } catch (error) {
       console.error(error);

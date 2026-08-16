@@ -7,6 +7,7 @@ import {
   canDeleteSoloRaidSchedule,
   canEditSoloRaidScheduleWindow,
   formatIsoToKstDateTimeInput,
+  formatSoloRaidScheduleLabel,
   type SoloRaidScheduleStatus,
 } from "../../../lib/solo-raid-schedule";
 import type { ScoreDisplayMode } from "../../../lib/score-format";
@@ -128,7 +129,13 @@ type MyPageTabProps = {
     startsAtInput: string;
     endsAtInput: string;
   }) => Promise<boolean>;
-  onUpdateSoloRaidSchedule: (payload: { id: string; startsAtInput: string; endsAtInput: string }) => Promise<boolean>;
+  onUpdateSoloRaidSchedule: (payload: {
+    id: string;
+    title: string;
+    description: string;
+    startsAtInput: string;
+    endsAtInput: string;
+  }) => Promise<boolean>;
   onUpdateActiveSoloRaidEndSchedule: (payload: { endsAtInput: string }) => Promise<boolean>;
   onDeleteSoloRaidSchedule: (id: string) => Promise<boolean>;
   onEndSoloRaid: () => Promise<boolean>;
@@ -235,6 +242,8 @@ export default function MyPageTab({
   const [savingRaid, setSavingRaid] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [editingScheduleTitle, setEditingScheduleTitle] = useState("");
+  const [editingScheduleDescription, setEditingScheduleDescription] = useState("");
   const [editingScheduleStartsAt, setEditingScheduleStartsAt] = useState("");
   const [editingScheduleEndsAt, setEditingScheduleEndsAt] = useState("");
   const [savingScheduleEditId, setSavingScheduleEditId] = useState<string | null>(null);
@@ -424,6 +433,8 @@ export default function MyPageTab({
 
   function startEditingSchedule(schedule: SoloRaidSchedule) {
     setEditingScheduleId(schedule.id);
+    setEditingScheduleTitle(schedule.raidLabel);
+    setEditingScheduleDescription(schedule.description);
     setEditingScheduleStartsAt(formatIsoToKstDateTimeInput(schedule.startsAt));
     setEditingScheduleEndsAt(formatIsoToKstDateTimeInput(schedule.endsAt));
   }
@@ -434,11 +445,15 @@ export default function MyPageTab({
     try {
       const saved = await onUpdateSoloRaidSchedule({
         id: scheduleId,
+        title: editingScheduleTitle,
+        description: editingScheduleDescription,
         startsAtInput: editingScheduleStartsAt,
         endsAtInput: editingScheduleEndsAt,
       });
       if (!saved) return;
       setEditingScheduleId(null);
+      setEditingScheduleTitle("");
+      setEditingScheduleDescription("");
       setEditingScheduleStartsAt("");
       setEditingScheduleEndsAt("");
     } finally {
@@ -1496,7 +1511,7 @@ export default function MyPageTab({
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-medium text-neutral-100">3. 예약된 레이드 관리</div>
-                    <div className="mt-1 text-xs text-neutral-400">예약 상태만 기간 정정과 삭제가 가능합니다.</div>
+                    <div className="mt-1 text-xs text-neutral-400">예약 상태만 이름, 설명, 기간 수정과 삭제가 가능합니다.</div>
                   </div>
                   <div className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">
                     {loadingSoloRaidSchedules ? "불러오는 중" : `${scheduledRaidSchedules.length}개`}
@@ -1517,7 +1532,9 @@ export default function MyPageTab({
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm font-semibold text-neutral-100">{schedule.raidLabel}</span>
+                                <span title={schedule.raidLabel} className="text-sm font-semibold text-neutral-100">
+                                  {formatSoloRaidScheduleLabel(schedule.raidLabel)}
+                                </span>
                                 <span className="rounded-full border border-neutral-700 px-2 py-0.5 text-[11px] text-neutral-300">
                                   {scheduleStatusLabel(schedule.status)}
                                 </span>
@@ -1533,7 +1550,7 @@ export default function MyPageTab({
                                 disabled={!editable}
                                 className="rounded-2xl border border-neutral-700 px-3 py-2 text-xs active:scale-[0.99] disabled:opacity-50"
                               >
-                                {isEditing ? "취소" : "기간 정정"}
+                                {isEditing ? "취소" : "수정"}
                               </button>
                               <button
                                 type="button"
@@ -1546,27 +1563,41 @@ export default function MyPageTab({
                             </div>
                           </div>
                           {isEditing ? (
-                            <div className="mt-3 grid gap-2 lg:grid-cols-[1fr_1fr_auto]">
+                            <div className="mt-3 space-y-2">
                               <input
-                                type="datetime-local"
-                                value={editingScheduleStartsAt}
-                                onChange={(event) => setEditingScheduleStartsAt(event.target.value)}
-                                className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                                value={editingScheduleTitle}
+                                onChange={(event) => setEditingScheduleTitle(event.target.value)}
+                                placeholder="보스 이름"
+                                className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                               />
-                              <input
-                                type="datetime-local"
-                                value={editingScheduleEndsAt}
-                                onChange={(event) => setEditingScheduleEndsAt(event.target.value)}
-                                className="rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                              <textarea
+                                value={editingScheduleDescription}
+                                onChange={(event) => setEditingScheduleDescription(event.target.value)}
+                                placeholder="보스 설명"
+                                className="h-24 w-full resize-none rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                               />
-                              <button
-                                type="button"
-                                onClick={() => void handleUpdateSoloRaidSchedule(schedule.id)}
-                                disabled={savingScheduleEditId === schedule.id}
-                                className="rounded-2xl border border-emerald-800/60 px-4 py-3 text-sm text-emerald-300 active:scale-[0.99] disabled:opacity-50"
-                              >
-                                {savingScheduleEditId === schedule.id ? "저장 중..." : "저장"}
-                              </button>
+                              <div className="grid gap-2 lg:grid-cols-[1fr_1fr_auto]">
+                                <input
+                                  type="datetime-local"
+                                  value={editingScheduleStartsAt}
+                                  onChange={(event) => setEditingScheduleStartsAt(event.target.value)}
+                                  className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                                />
+                                <input
+                                  type="datetime-local"
+                                  value={editingScheduleEndsAt}
+                                  onChange={(event) => setEditingScheduleEndsAt(event.target.value)}
+                                  className="min-w-0 rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => void handleUpdateSoloRaidSchedule(schedule.id)}
+                                  disabled={savingScheduleEditId === schedule.id}
+                                  className="rounded-2xl border border-emerald-800/60 px-4 py-3 text-sm text-emerald-300 active:scale-[0.99] disabled:opacity-50"
+                                >
+                                  {savingScheduleEditId === schedule.id ? "저장 중..." : "저장"}
+                                </button>
+                              </div>
                             </div>
                           ) : null}
                         </div>

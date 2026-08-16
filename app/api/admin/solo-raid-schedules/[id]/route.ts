@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { canDeleteSoloRaidSchedule, canEditSoloRaidScheduleWindow, validateSoloRaidScheduleWindow } from "@/lib/solo-raid-schedule";
+import {
+  canDeleteSoloRaidSchedule,
+  canEditSoloRaidScheduleWindow,
+  validateSoloRaidScheduleEdit,
+} from "@/lib/solo-raid-schedule";
 import {
   getScheduleMasterContext,
   mapSoloRaidSchedule,
@@ -22,9 +26,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!id) return NextResponse.json({ error: "예약을 찾을 수 없습니다." }, { status: 404 });
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const title = text(body.title);
+  const description = text(body.description);
   const startsAt = text(body.startsAt);
   const endsAt = text(body.endsAt);
-  const validation = validateSoloRaidScheduleWindow(startsAt, endsAt);
+  const validation = validateSoloRaidScheduleEdit({ title, description, startsAt, endsAt });
   if (!validation.ok) return NextResponse.json({ error: validation.reason }, { status: 400 });
 
   const { data: current, error: currentError } = await masterContext.admin
@@ -44,7 +50,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
   const { data, error } = await masterContext.admin
     .from("solo_raid_schedules")
-    .update({ starts_at: startsAt, ends_at: endsAt, updated_at: new Date().toISOString() })
+    .update({
+      raid_label: validation.value.title,
+      description: validation.value.description,
+      starts_at: validation.value.startsAt,
+      ends_at: validation.value.endsAt,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id)
     .eq("status", "scheduled")
     .select(SOLO_RAID_SCHEDULE_COLUMNS)
