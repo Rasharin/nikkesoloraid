@@ -12,6 +12,10 @@ export function formatSoloRaidScheduleLabel(label: string, maxLength = 15) {
   return label.length > maxLength ? `${label.slice(0, maxLength)}...` : label;
 }
 
+export function resolveSoloRaidScheduleDraftText(stateValue: string, liveInputValue: string | null | undefined) {
+  return liveInputValue ?? stateValue;
+}
+
 export function validateSoloRaidScheduleEdit(input: {
   title: string;
   description: string;

@@ -1,13 +1,14 @@
 ﻿"use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatNikkeDisplayName, formatNikkeDisplayNames } from "../../../lib/nikke-display";
 import {
   canDeleteSoloRaidSchedule,
   canEditSoloRaidScheduleWindow,
   formatIsoToKstDateTimeInput,
   formatSoloRaidScheduleLabel,
+  resolveSoloRaidScheduleDraftText,
   type SoloRaidScheduleStatus,
 } from "../../../lib/solo-raid-schedule";
 import type { ScoreDisplayMode } from "../../../lib/score-format";
@@ -235,6 +236,8 @@ export default function MyPageTab({
   const [adminSection, setAdminSection] = useState<AdminSectionKey>("nikkes");
   const [newRaidName, setNewRaidName] = useState("");
   const [newRaidDescription, setNewRaidDescription] = useState("");
+  const newRaidNameInputRef = useRef<HTMLInputElement>(null);
+  const newRaidDescriptionInputRef = useRef<HTMLTextAreaElement>(null);
   const [newRaidImageFile, setNewRaidImageFile] = useState<File | null>(null);
   const [newRaidStartsAt, setNewRaidStartsAt] = useState("");
   const [newRaidEndsAt, setNewRaidEndsAt] = useState("");
@@ -244,6 +247,8 @@ export default function MyPageTab({
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   const [editingScheduleTitle, setEditingScheduleTitle] = useState("");
   const [editingScheduleDescription, setEditingScheduleDescription] = useState("");
+  const editingScheduleTitleInputRef = useRef<HTMLInputElement>(null);
+  const editingScheduleDescriptionInputRef = useRef<HTMLTextAreaElement>(null);
   const [editingScheduleStartsAt, setEditingScheduleStartsAt] = useState("");
   const [editingScheduleEndsAt, setEditingScheduleEndsAt] = useState("");
   const [savingScheduleEditId, setSavingScheduleEditId] = useState<string | null>(null);
@@ -390,8 +395,8 @@ export default function MyPageTab({
     setSavingRaid(true);
     try {
       const saved = await onAddSoloRaid({
-        title: newRaidName,
-        description: newRaidDescription,
+        title: resolveSoloRaidScheduleDraftText(newRaidName, newRaidNameInputRef.current?.value),
+        description: resolveSoloRaidScheduleDraftText(newRaidDescription, newRaidDescriptionInputRef.current?.value),
         imageFile: newRaidImageFile,
         startsAtInput: newRaidStartsAt,
         endsAtInput: newRaidEndsAt,
@@ -413,8 +418,8 @@ export default function MyPageTab({
     setSavingSchedule(true);
     try {
       const saved = await onAddSoloRaidSchedule({
-        title: newRaidName,
-        description: newRaidDescription,
+        title: resolveSoloRaidScheduleDraftText(newRaidName, newRaidNameInputRef.current?.value),
+        description: resolveSoloRaidScheduleDraftText(newRaidDescription, newRaidDescriptionInputRef.current?.value),
         imageFile: newRaidImageFile,
         startsAtInput: newRaidStartsAt,
         endsAtInput: newRaidEndsAt,
@@ -445,8 +450,11 @@ export default function MyPageTab({
     try {
       const saved = await onUpdateSoloRaidSchedule({
         id: scheduleId,
-        title: editingScheduleTitle,
-        description: editingScheduleDescription,
+        title: resolveSoloRaidScheduleDraftText(editingScheduleTitle, editingScheduleTitleInputRef.current?.value),
+        description: resolveSoloRaidScheduleDraftText(
+          editingScheduleDescription,
+          editingScheduleDescriptionInputRef.current?.value
+        ),
         startsAtInput: editingScheduleStartsAt,
         endsAtInput: editingScheduleEndsAt,
       });
@@ -1389,12 +1397,14 @@ export default function MyPageTab({
                 </div>
                 <div className="mt-2 space-y-2">
                   <input
+                    ref={newRaidNameInputRef}
                     value={newRaidName}
                     onChange={(event) => setNewRaidName(event.target.value)}
                     placeholder="보스 이름"
                     className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                   />
                   <textarea
+                    ref={newRaidDescriptionInputRef}
                     value={newRaidDescription}
                     onChange={(event) => setNewRaidDescription(event.target.value)}
                     placeholder="보스 설명"
@@ -1565,12 +1575,14 @@ export default function MyPageTab({
                           {isEditing ? (
                             <div className="mt-3 space-y-2">
                               <input
+                                ref={editingScheduleTitleInputRef}
                                 value={editingScheduleTitle}
                                 onChange={(event) => setEditingScheduleTitle(event.target.value)}
                                 placeholder="보스 이름"
                                 className="w-full rounded-2xl border border-neutral-800 bg-neutral-950/50 px-4 py-3 text-sm outline-none"
                               />
                               <textarea
+                                ref={editingScheduleDescriptionInputRef}
                                 value={editingScheduleDescription}
                                 onChange={(event) => setEditingScheduleDescription(event.target.value)}
                                 placeholder="보스 설명"

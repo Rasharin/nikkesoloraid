@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatSoloRaidScheduleLabel, validateSoloRaidScheduleEdit } from "../lib/solo-raid-schedule.ts";
+import {
+  formatSoloRaidScheduleLabel,
+  resolveSoloRaidScheduleDraftText,
+  validateSoloRaidScheduleEdit,
+} from "../lib/solo-raid-schedule.ts";
 
 test("formatSoloRaidScheduleLabel shortens names longer than 15 characters", () => {
   assert.equal(formatSoloRaidScheduleLabel("123456789012345"), "123456789012345");
@@ -36,4 +40,9 @@ test("validateSoloRaidScheduleEdit rejects an empty boss name", () => {
   });
 
   assert.equal(result.ok, false);
+});
+
+test("resolveSoloRaidScheduleDraftText keeps the latest IME input value", () => {
+  assert.equal(resolveSoloRaidScheduleDraftText("사치스러운 거", "사치스러운 거미"), "사치스러운 거미");
+  assert.equal(resolveSoloRaidScheduleDraftText("사치스러운 거미", null), "사치스러운 거미");
 });
