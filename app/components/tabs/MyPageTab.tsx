@@ -12,6 +12,9 @@ import {
   type SoloRaidScheduleStatus,
 } from "../../../lib/solo-raid-schedule";
 import type { ScoreDisplayMode } from "../../../lib/score-format";
+import type { BlaBlaLinkIntegration } from "../../../lib/blablalink";
+import BlaBlaLinkButton from "../blablalink/BlaBlaLinkButton";
+import BlaBlaLinkMappingManager from "../blablalink/BlaBlaLinkMappingManager";
 import { matchesSelectedElements, normalizeSecondaryElement } from "../../../lib/nikke-elements";
 import BlockedUsersSection from "../../components/mypage/BlockedUsersSection";
 
@@ -154,6 +157,8 @@ type MyPageTabProps = {
   activeRaidKey: string | null;
   activeRaidPeriod: { startsAt: string | null; endsAt: string | null };
   rankingByRaidKey: Record<string, { rank: number; total: number }>;
+  blaBlaLinkIntegration: BlaBlaLinkIntegration | null;
+  onBlaBlaLinkSynced: (integration: BlaBlaLinkIntegration) => void;
 };
 
 function formatRankLabel(rank: number, total: number): string {
@@ -231,6 +236,8 @@ export default function MyPageTab({
   activeRaidKey,
   activeRaidPeriod,
   rankingByRaidKey,
+  blaBlaLinkIntegration,
+  onBlaBlaLinkSynced,
 }: MyPageTabProps) {
   const [openRaidKey, setOpenRaidKey] = useState<string>("");
   const [adminSection, setAdminSection] = useState<AdminSectionKey>("nikkes");
@@ -775,6 +782,16 @@ export default function MyPageTab({
             </button>
           </div>
         </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+          <div>
+            <div className="text-sm font-medium text-neutral-100">BlaBlaLink 계정</div>
+            <div className="mt-1 text-xs text-neutral-400">
+              {blaBlaLinkIntegration ? `싱크로 ${blaBlaLinkIntegration.synchroLevel ?? "-"} · 마지막 동기화 ${blaBlaLinkIntegration.syncedAt ? new Date(blaBlaLinkIntegration.syncedAt).toLocaleString("ko-KR") : "-"}` : "연동되지 않았습니다."}
+            </div>
+          </div>
+          <BlaBlaLinkButton integration={blaBlaLinkIntegration} onSynced={onBlaBlaLinkSynced} />
+        </div>
       </section>
 
       {showBossManagement ? (
@@ -814,6 +831,7 @@ export default function MyPageTab({
 
           {adminSection === "nikkes" ? (
             <div className="mt-4 space-y-4">
+              <BlaBlaLinkMappingManager getPublicUrl={getPublicUrl} />
               <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>

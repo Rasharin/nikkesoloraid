@@ -6,6 +6,8 @@ import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { formatRecommendationRankLabel } from "../../../lib/recommend";
 import GiseonDeckSection from "../recommend/GiseonDeckSection";
 import RecommendationRecordPanel from "../recommend/RecommendationRecordPanel";
+import Best5SynchroChart from "../blablalink/Best5SynchroChart";
+import type { Best5ChartPoint } from "../../../lib/blablalink";
 
 type NikkeRow = {
   id: string;
@@ -95,6 +97,8 @@ type RecommendTabProps = {
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   fmt: (value: number) => string;
   myRankingData: { rank: number; total: number } | null;
+  best5SynchroChartPoints: Best5ChartPoint[];
+  currentSynchroLevel: number | null;
 };
 
 export default function RecommendTab({
@@ -128,6 +132,8 @@ export default function RecommendTab({
   getPublicUrl,
   fmt,
   myRankingData,
+  best5SynchroChartPoints,
+  currentSynchroLevel,
 }: RecommendTabProps) {
   const [showWriteForm, setShowWriteForm] = useState(false);
   const [tipContent, setTipContent] = useState("");
@@ -259,6 +265,7 @@ export default function RecommendTab({
   return (
     <div className="grid gap-2 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
       <div className="order-1 space-y-2">
+        <Best5SynchroChart points={best5SynchroChartPoints} currentSynchroLevel={currentSynchroLevel} fmt={fmt} />
         <GiseonDeckSection
           raidKey={raidKey}
           soloRaidActive={soloRaidActive}
@@ -490,6 +497,7 @@ export default function RecommendTab({
           </section>
         ) : null}
 
+        <Best5SynchroChart points={best5SynchroChartPoints} currentSynchroLevel={currentSynchroLevel} fmt={fmt} compact />
         <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>

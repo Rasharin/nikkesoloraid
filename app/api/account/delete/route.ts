@@ -59,6 +59,9 @@ export async function POST() {
   });
 
   const cleanupTables = [
+    "blablalink_best5_snapshots",
+    "blablalink_user_characters",
+    "blablalink_integrations",
     "solo_raid_recommendations",
     "favorite_nikkes",
     "decks",

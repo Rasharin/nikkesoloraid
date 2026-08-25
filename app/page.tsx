@@ -54,6 +54,7 @@ import {
 } from "../lib/solo-raid-schedule";
 import type { ContactPostDetail, ContactPostStatus, ContactPostSummary, ContactPostVisibility } from "../lib/contact-board";
 import { normalizeSecondaryElement } from "../lib/nikke-elements";
+import { partitionNikkesByOwnership, type Best5ChartPoint, type BlaBlaLinkIntegration } from "../lib/blablalink";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
    ${selected
@@ -1505,6 +1506,8 @@ export default function Page() {
   const [selectedNames, setSelectedNames] = useState<string[]>([]);
   const [selectedNamesReady, setSelectedNamesReady] = useState(false);
   const [favoriteNames, setFavoriteNames] = useState<Set<string>>(new Set());
+  const [blaBlaLinkIntegration, setBlaBlaLinkIntegration] = useState<BlaBlaLinkIntegration | null>(null);
+  const [best5SynchroChartPoints, setBest5SynchroChartPoints] = useState<Best5ChartPoint[]>([]);
 
   const [homeEditRequest, setHomeEditRequest] = useState<Deck | null>(null);
 
@@ -1613,6 +1616,27 @@ export default function Page() {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  useEffect(() => {
+    if (!userId) {
+      setBlaBlaLinkIntegration(null);
+      setBest5SynchroChartPoints([]);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/blablalink", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`BlaBlaLink state failed: ${response.status}`);
+        return response.json() as Promise<{ integration: BlaBlaLinkIntegration | null; chartPoints: Best5ChartPoint[] }>;
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setBlaBlaLinkIntegration(payload.integration);
+        setBest5SynchroChartPoints(Array.isArray(payload.chartPoints) ? payload.chartPoints : []);
+      })
+      .catch((error) => console.warn("[blablalink] state loading skipped", error));
+    return () => { cancelled = true; };
+  }, [userId, blaBlaLinkIntegration?.syncedAt]);
 
   useEffect(() => {
     const cached = readCachedSupabaseData();
@@ -2895,6 +2919,15 @@ export default function Page() {
     return m;
   }, [nikkes]);
 
+  const ownedNikkeIdSet = useMemo(
+    () => blaBlaLinkIntegration ? new Set(blaBlaLinkIntegration.ownedNikkeIds) : null,
+    [blaBlaLinkIntegration]
+  );
+  const integrationNikkes = useMemo(
+    () => partitionNikkesByOwnership(nikkes, ownedNikkeIdSet),
+    [nikkes, ownedNikkeIdSet]
+  );
+
   const nikkeNameLookup = useMemo(() => {
     const lookup = new Map<string, string>();
     const prioritizedNikkes = [...nikkes].sort(compareNikkeNamePriority);
@@ -2927,8 +2960,8 @@ export default function Page() {
         const canonicalName = nikkeNameLookup.get(normToken(name));
         return canonicalName ? nikkeMap.get(canonicalName) ?? null : null;
 	      })
-	      .filter((nikke): nikke is NikkeRow => nikke !== null);
-	  }, [selectedNames, nikkeMap, nikkeNameLookup]);
+	      .filter((nikke): nikke is NikkeRow => nikke !== null && (!ownedNikkeIdSet || ownedNikkeIdSet.has(nikke.id)));
+	  }, [selectedNames, nikkeMap, nikkeNameLookup, ownedNikkeIdSet]);
 	  const soloRaidInProgress = appConfigLoaded && soloRaidActive && Boolean(activeRaidKey);
 
 		  const currentDeckRaidKey = useMemo(() => {
@@ -5733,7 +5766,9 @@ export default function Page() {
               nikkeMap={nikkeMap}
               getPublicUrl={getPublicUrl}
               fmt={fmt}
-              myRankingData={selectedRecommendRaidKey === currentDeckRaidKey ? myRankingData : null}
+	              myRankingData={selectedRecommendRaidKey === currentDeckRaidKey ? myRankingData : null}
+	              best5SynchroChartPoints={best5SynchroChartPoints}
+	              currentSynchroLevel={blaBlaLinkIntegration?.synchroLevel ?? null}
             />
           </div>
         )}
@@ -5749,7 +5784,10 @@ export default function Page() {
 	              onScoreDisplayModeChange={updateScoreDisplayMode}
 	              selectedNames={selectedNames}
 		              selectedNikkes={selectednikkes}
-		              nikkes={nikkes}
+		              nikkes={integrationNikkes.owned}
+		              unownedNikkes={integrationNikkes.unowned}
+		              blaBlaLinkIntegration={blaBlaLinkIntegration}
+		              onBlaBlaLinkSynced={setBlaBlaLinkIntegration}
 		              favoriteNames={favoriteNames}
 		              recommendedNames={recommendedNikkeNames}
 		              nikkeMap={nikkeMap}
@@ -5858,6 +5896,8 @@ export default function Page() {
             activeRaidKey={soloRaidInProgress ? activeRaidKey : null}
             activeRaidPeriod={{ startsAt: activeRaidBoss?.starts_at ?? null, endsAt: activeRaidBoss?.ends_at ?? null }}
             rankingByRaidKey={rankingByRaidKey}
+            blaBlaLinkIntegration={blaBlaLinkIntegration}
+            onBlaBlaLinkSynced={setBlaBlaLinkIntegration}
           />
         )}
           </>
