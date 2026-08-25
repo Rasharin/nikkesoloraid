@@ -14,7 +14,9 @@ export default function Best5SynchroChart({ points, currentSynchroLevel, fmt, co
       <div className="mt-2 text-xs text-neutral-400">표시할 실제 저장 데이터가 없습니다.</div>
     </section>
   );
-  const width = 640, height = compact ? 170 : 220, padding = 54;
+  const width = 560;
+  const height = compact ? 270 : 320;
+  const padding = 62;
   const minLevel = Math.min(...points.map((point) => point.synchroLevel));
   const maxLevel = Math.max(...points.map((point) => point.synchroLevel));
   const maxTotal = Math.max(...points.map((point) => point.total));
@@ -27,17 +29,17 @@ export default function Best5SynchroChart({ points, currentSynchroLevel, fmt, co
   return (
     <section className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">싱크로별 합계 딜량</h2>{currentSynchroLevel ? <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-xs text-sky-200">내 싱크로 {currentSynchroLevel}</span> : null}</div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="mt-3 h-auto w-full" role="img" aria-label="싱크로별 합계 딜량 그래프">
+      <svg viewBox={`0 0 ${width} ${height}`} className="mt-4 h-auto w-full" role="img" aria-label="싱크로별 합계 딜량 그래프">
         {yTicks.map((tick) => {
           const majorTick = tick % Y_TICK_STEP === 0;
           return <g key={tick}>
             <line x1={padding} x2={width-padding} y1={y(tick)} y2={y(tick)} stroke="currentColor" strokeDasharray={majorTick ? "10 6" : "3 5"} className={majorTick ? "text-neutral-700" : "text-neutral-800"} />
-            {majorTick ? <text x={padding-8} y={y(tick)+4} textAnchor="end" className="fill-neutral-500 text-[10px]">{tick / Y_TICK_STEP * 100}억</text> : null}
+            {majorTick ? <text x={padding-10} y={y(tick)+5} textAnchor="end" className="fill-neutral-400 text-[15px] font-medium">{tick / Y_TICK_STEP * 100}억</text> : null}
           </g>;
         })}
         {currentX !== null ? <line x1={currentX} x2={currentX} y1={padding / 2} y2={height-padding} stroke="currentColor" strokeDasharray="5 5" className="text-sky-400" /> : null}
         <path d={path} fill="none" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" className="text-cyan-400" />
-        {points.map((point) => <g key={point.synchroLevel}><circle cx={x(point.synchroLevel)} cy={y(point.total)} r="5" fill="currentColor" className="text-cyan-200"><title>{`싱크로 ${point.synchroLevel}: ${fmt(point.total)}`}</title></circle><text x={x(point.synchroLevel)} y={height-12} textAnchor="middle" className="fill-neutral-400 text-[11px]">{point.synchroLevel}</text></g>)}
+        {points.map((point) => <g key={point.synchroLevel}><circle cx={x(point.synchroLevel)} cy={y(point.total)} r="6" fill="currentColor" className="text-cyan-200"><title>{`싱크로 ${point.synchroLevel}: ${fmt(point.total)}`}</title></circle><text x={x(point.synchroLevel)} y={height-16} textAnchor="middle" className="fill-neutral-300 text-[14px] font-medium">{point.synchroLevel}</text></g>)}
       </svg>
     </section>
   );

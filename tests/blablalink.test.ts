@@ -116,6 +116,9 @@ test("recommend tab keeps only the side synchro chart with the concise title", (
   assert.match(chart, /100억/);
   assert.match(chart, /yTicks\.map/);
   assert.match(chart, /strokeDasharray=\{majorTick \? "10 6" : "3 5"\}/);
+  assert.match(chart, /height = compact \? 270 : 320/);
+  assert.match(chart, /padding = 62/);
+  assert.match(chart, /text-\[15px\]/);
 });
 
 test("mapBlaBlaLinkCharacters keeps mapped characters and reports unmapped name codes", () => {
