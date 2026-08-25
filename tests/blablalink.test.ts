@@ -111,6 +111,11 @@ test("recommend tab keeps only the side synchro chart with the concise title", (
   assert.match(recommend, /Best5SynchroChart[^\n]*compact/);
   assert.match(chart, /싱크로별 합계 딜량/);
   assert.doesNotMatch(chart, /싱크로 레벨별 Best 5덱 합계 딜량/);
+  assert.match(chart, /const Y_TICK_STEP = 10_000_000_000/);
+  assert.match(chart, /const Y_MINOR_TICK_STEP = 5_000_000_000/);
+  assert.match(chart, /100억/);
+  assert.match(chart, /yTicks\.map/);
+  assert.match(chart, /strokeDasharray=\{majorTick \? "10 6" : "3 5"\}/);
 });
 
 test("mapBlaBlaLinkCharacters keeps mapped characters and reports unmapped name codes", () => {
