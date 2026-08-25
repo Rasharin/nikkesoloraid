@@ -1913,6 +1913,7 @@ export default function ImaginarySoloRaidTab({
             <Image src="/blablalink-icon.png" alt="blablalink" width={24} height={24} className="h-6 w-6 rounded-full object-contain" />
             <span className="whitespace-nowrap text-xs font-bold text-[var(--theme-text-soft)] sm:text-sm">Blablalink</span>
           </a>
+          <BlaBlaLinkButton integration={blaBlaLinkIntegration} deckToolbar onSynced={onBlaBlaLinkSynced} />
           <div className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 text-xs font-medium text-[var(--theme-text-soft)] sm:text-sm">
             <span className="whitespace-nowrap text-neutral-400">점수 표기</span>
             <span suppressHydrationWarning className={`whitespace-nowrap ${scoreDisplayMode === "eok" ? "text-neutral-100" : "text-neutral-500"}`}>
@@ -2339,7 +2340,6 @@ export default function ImaginarySoloRaidTab({
             </div>
 
             <div className={`${wideDeckLayout ? "flex w-full flex-wrap items-center gap-2" : "ml-auto flex shrink-0 items-center gap-2"}`}>
-              <BlaBlaLinkButton integration={blaBlaLinkIntegration} onSynced={onBlaBlaLinkSynced} />
               {!wideDeckLayout ? (
                 <button
                   type="button"

@@ -73,6 +73,7 @@ export async function GET() {
 type MutationBody =
   | { action: "manual"; nikkeId: string; resourceId: number }
   | { action: "verify"; nikkeId: string }
+  | { action: "verify-all" }
   | { action: "reset"; nikkeId: string }
   | { action: "auto" };
 
@@ -82,7 +83,15 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null) as MutationBody | null;
   if (!body) return NextResponse.json({ error: "요청을 확인할 수 없습니다." }, { status: 400 });
   try {
-    if (body.action === "verify") {
+    if (body.action === "verify-all") {
+      const { data, error } = await auth.client.from("nikkes")
+        .update({ mapping_verified: true })
+        .eq("mapping_verified", false)
+        .not("resource_id", "is", null)
+        .select("id");
+      if (error) throw error;
+      return NextResponse.json({ ok: true, verified: data?.length ?? 0 });
+    } else if (body.action === "verify") {
       const { error } = await auth.client.from("nikkes").update({ mapping_verified: true }).eq("id", body.nikkeId);
       if (error) throw error;
     } else if (body.action === "reset") {

@@ -62,11 +62,13 @@ export default function BlaBlaLinkMappingManager({
       const response = await fetch("/api/admin/blablalink-mappings", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
-      const payload = await response.json().catch(() => null) as { error?: string; updated?: number; ambiguous?: number; unmatched?: number } | null;
+      const payload = await response.json().catch(() => null) as { error?: string; updated?: number; verified?: number; ambiguous?: number; unmatched?: number } | null;
       if (!response.ok) throw new Error(payload?.error ?? "매핑을 저장하지 못했습니다.");
-      setMessage("updated" in (payload ?? {})
-        ? `자동 매칭 ${payload?.updated ?? 0}건 완료 · 모호 ${payload?.ambiguous ?? 0}건 · 미매칭 ${payload?.unmatched ?? 0}건`
-        : "매핑을 저장했습니다.");
+      setMessage(payload?.verified !== undefined
+        ? `미검증 매칭 ${payload.verified}건을 일괄 확인했습니다.`
+        : "updated" in (payload ?? {})
+          ? `자동 매칭 ${payload?.updated ?? 0}건 완료 · 모호 ${payload?.ambiguous ?? 0}건 · 미매칭 ${payload?.unmatched ?? 0}건`
+          : "매핑을 저장했습니다.");
       setEditingId(null);
       setCandidateSearch("");
       await load();
@@ -103,10 +105,16 @@ export default function BlaBlaLinkMappingManager({
           <div className="text-sm font-semibold text-neutral-100">BlaBlaLink 캐릭터 매칭</div>
           <div className="mt-1 text-xs text-neutral-400">이미지는 기존 사이트 이미지를 사용하며, 동기화는 resource_id로 연결됩니다.</div>
         </div>
-        <button type="button" disabled={busy !== null} onClick={() => void mutate({ action: "auto" }, "auto")}
-          className="rounded-xl border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-xs text-sky-100 disabled:opacity-50">
-          {busy === "auto" ? "자동 매칭 중..." : "자동 매칭 실행"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" disabled={busy !== null} onClick={() => void mutate({ action: "verify-all" }, "verify-all")}
+            className="rounded-xl border border-emerald-600/60 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100 disabled:opacity-50">
+            {busy === "verify-all" ? "일괄 확인 중..." : "일괄 매칭 확인"}
+          </button>
+          <button type="button" disabled={busy !== null} onClick={() => void mutate({ action: "auto" }, "auto")}
+            className="rounded-xl border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-xs text-sky-100 disabled:opacity-50">
+            {busy === "auto" ? "자동 매칭 중..." : "자동 매칭 실행"}
+          </button>
+        </div>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -125,8 +133,8 @@ export default function BlaBlaLinkMappingManager({
         </details>
       ) : null}
 
-      <div className="mt-3 max-h-[560px] space-y-2 overflow-y-auto pr-1">
-        {!data ? <div className="p-4 text-center text-sm text-neutral-400">매핑 정보를 불러오는 중...</div> : filtered.length === 0 ? <div className="p-4 text-center text-sm text-neutral-400">해당 조건의 캐릭터가 없습니다.</div> : filtered.map((row) => {
+      <div className="mt-3 grid max-h-[560px] grid-cols-1 gap-2 overflow-y-auto pr-1 lg:grid-cols-2">
+        {!data ? <div className="p-4 text-center text-sm text-neutral-400 lg:col-span-2">매핑 정보를 불러오는 중...</div> : filtered.length === 0 ? <div className="p-4 text-center text-sm text-neutral-400 lg:col-span-2">해당 조건의 캐릭터가 없습니다.</div> : filtered.map((row) => {
           const candidate = data.candidates.find((item) => item.resourceId === row.resource_id);
           const imageUrl = row.image_path ? getPublicUrl("nikke-images", row.image_path) : "";
           return <article key={row.id} className="rounded-xl border border-neutral-800 bg-neutral-950/50 p-3">

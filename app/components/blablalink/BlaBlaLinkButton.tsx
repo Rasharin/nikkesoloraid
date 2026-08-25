@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import type { BlaBlaLinkIntegration } from "@/lib/blablalink";
 import { BLABLALINK_SERVERS, type BlaBlaLinkServerKey } from "@/lib/blablalink/constants";
 
 type Props = {
   integration: BlaBlaLinkIntegration | null;
   disabled?: boolean;
+  deckToolbar?: boolean;
   onSynced: (integration: BlaBlaLinkIntegration) => void;
 };
 
-export default function BlaBlaLinkButton({ integration, disabled = false, onSynced }: Props) {
+export default function BlaBlaLinkButton({ integration, disabled = false, deckToolbar = false, onSynced }: Props) {
   const [open, setOpen] = useState(false);
   const [server, setServer] = useState<BlaBlaLinkServerKey>(integration?.server ?? "korea");
   const [profileUrl, setProfileUrl] = useState("");
@@ -41,9 +43,16 @@ export default function BlaBlaLinkButton({ integration, disabled = false, onSync
 
   return (
     <>
-      <button type="button" disabled={disabled} onClick={() => setOpen(true)} className="rounded-xl border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-sm font-semibold text-sky-200 transition hover:border-sky-300 disabled:cursor-not-allowed disabled:opacity-50">
-        {integration ? "블라블라링크 다시 동기화" : "블라블라링크 연동"}
-      </button>
+      {deckToolbar ? (
+        <button type="button" disabled={disabled} onClick={() => setOpen(true)} className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 transition hover:border-[var(--theme-border-strong)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50">
+          <Image src="/blablalink-icon.png" alt="blablalink" width={24} height={24} className="h-6 w-6 rounded-full object-contain" />
+          <span className="whitespace-nowrap text-xs font-bold text-[var(--theme-text-soft)] sm:text-sm">BlaBlalink 동기화</span>
+        </button>
+      ) : (
+        <button type="button" disabled={disabled} onClick={() => setOpen(true)} className="rounded-xl border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-sm font-semibold text-sky-200 transition hover:border-sky-300 disabled:cursor-not-allowed disabled:opacity-50">
+          {integration ? "블라블라링크 다시 동기화" : "블라블라링크 연동"}
+        </button>
+      )}
       {open ? (
         <div className="fixed inset-0 z-[120] grid place-items-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="blablalink-dialog-title" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setOpen(false); }}>
           <div className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] p-5 shadow-2xl">

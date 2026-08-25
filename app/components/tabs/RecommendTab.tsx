@@ -265,7 +265,6 @@ export default function RecommendTab({
   return (
     <div className="grid gap-2 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
       <div className="order-1 space-y-2">
-        <Best5SynchroChart points={best5SynchroChartPoints} currentSynchroLevel={currentSynchroLevel} fmt={fmt} />
         <GiseonDeckSection
           raidKey={raidKey}
           soloRaidActive={soloRaidActive}

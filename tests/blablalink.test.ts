@@ -78,10 +78,39 @@ test("BlaBlaLink modal and browser payload expose only server and profileUrl", (
   assert.match(component, /내 프로필 입력 링크의 BlaBlalink 주소를 입력 해주세요/);
   assert.match(component, /<strong[^>]*>프로필과 니케 목록은 공개<\/strong>/);
   assert.match(component, /연동까지 다소 시간이 걸릴 수 있습니다\./);
+  assert.match(component, /deckToolbar\?: boolean/);
+  assert.match(component, /BlaBlalink 동기화/);
+  assert.match(component, /\/blablalink-icon\.png/);
   assert.match(component, /JSON\.stringify\(\{ server, profileUrl \}\)/);
   assert.doesNotMatch(component, /gameOpenId|gameToken|game_openid|game_token/);
   assert.match(route, /profileUrl/);
   assert.doesNotMatch(route, /body\.gameOpenId|body\.gameToken/);
+
+  const deckBuilding = readFileSync(new URL("../app/components/tabs/ImaginarySoloRaidTab.tsx", import.meta.url), "utf8");
+  assert.match(deckBuilding, /deckToolbar/);
+});
+
+test("BlaBlaLink mapping manager supports a two-column grid and bulk verification", () => {
+  const component = readFileSync(new URL("../app/components/blablalink/BlaBlaLinkMappingManager.tsx", import.meta.url), "utf8");
+  const route = readFileSync(new URL("../app/api/admin/blablalink-mappings/route.ts", import.meta.url), "utf8");
+
+  assert.match(component, /lg:grid-cols-2/);
+  assert.match(component, /일괄 매칭 확인/);
+  assert.match(component, /action: "verify-all"/);
+  assert.match(route, /action: "verify-all"/);
+  assert.doesNotMatch(route, /verify-all[\s\S]*?mapping_source", "auto"[\s\S]*?return NextResponse\.json\(\{ ok: true, verified/);
+  assert.match(route, /mapping_verified", false/);
+  assert.match(route, /resource_id", "is", null/);
+});
+
+test("recommend tab keeps only the side synchro chart with the concise title", () => {
+  const recommend = readFileSync(new URL("../app/components/tabs/RecommendTab.tsx", import.meta.url), "utf8");
+  const chart = readFileSync(new URL("../app/components/blablalink/Best5SynchroChart.tsx", import.meta.url), "utf8");
+
+  assert.equal((recommend.match(/<Best5SynchroChart/g) ?? []).length, 1);
+  assert.match(recommend, /Best5SynchroChart[^\n]*compact/);
+  assert.match(chart, /싱크로별 합계 딜량/);
+  assert.doesNotMatch(chart, /싱크로 레벨별 Best 5덱 합계 딜량/);
 });
 
 test("mapBlaBlaLinkCharacters keeps mapped characters and reports unmapped name codes", () => {
