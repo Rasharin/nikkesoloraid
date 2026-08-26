@@ -7,7 +7,7 @@ import { formatRecommendationRankLabel } from "../../../lib/recommend";
 import GiseonDeckSection from "../recommend/GiseonDeckSection";
 import RecommendationRecordPanel from "../recommend/RecommendationRecordPanel";
 import Best5SynchroChart from "../blablalink/Best5SynchroChart";
-import type { Best5ChartPoint } from "../../../lib/blablalink";
+import type { Best5ChartRangePoint } from "../../../lib/blablalink";
 
 type NikkeRow = {
   id: string;
@@ -97,7 +97,7 @@ type RecommendTabProps = {
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
   fmt: (value: number) => string;
   myRankingData: { rank: number; total: number } | null;
-  best5SynchroChartPoints: Best5ChartPoint[];
+  best5SynchroChartPoints: Best5ChartRangePoint[];
   currentSynchroLevel: number | null;
 };
 

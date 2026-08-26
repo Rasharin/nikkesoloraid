@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
-import { buildBest5ChartPoints, type BlaBlaLinkServerKey } from "@/lib/blablalink";
+import { buildBest5ChartPoints, type Best5ChartRangePoint, type BlaBlaLinkServerKey } from "@/lib/blablalink";
 import { BlaBlaLinkProfileUrlError, parseBlaBlaLinkProfileUrl } from "@/lib/blablalink/profile-url";
 import { isBlaBlaLinkServerKey } from "@/lib/blablalink/constants";
 import { BlaBlaLinkError, fetchBlaBlaLinkProfile, getBlaBlaLinkServerSessionCookie, hashGameOpenId } from "@/lib/server/blablalink-api";
@@ -34,7 +34,7 @@ export async function GET() {
     clients.client.from("blablalink_integrations").select("server_key,synchro_level,synced_at").maybeSingle(),
     clients.client.from("blablalink_user_characters").select("nikke_id"),
   ]);
-  let chartPoints: Array<{ synchroLevel: number; total: number }> = [];
+  let chartPoints: Best5ChartRangePoint[] = [];
   if (clients.admin) {
     const { data: rows } = await clients.admin.from("blablalink_best5_snapshots").select("synchro_level,total");
     chartPoints = buildBest5ChartPoints((rows ?? []).map((row) => ({ synchroLevel: Number(row.synchro_level), total: Number(row.total) })));

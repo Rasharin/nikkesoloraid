@@ -54,7 +54,7 @@ import {
 } from "../lib/solo-raid-schedule";
 import type { ContactPostDetail, ContactPostStatus, ContactPostSummary, ContactPostVisibility } from "../lib/contact-board";
 import { normalizeSecondaryElement } from "../lib/nikke-elements";
-import { partitionNikkesByOwnership, type Best5ChartPoint, type BlaBlaLinkIntegration } from "../lib/blablalink";
+import { partitionNikkesByOwnership, type Best5ChartRangePoint, type BlaBlaLinkIntegration } from "../lib/blablalink";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
    ${selected
@@ -1507,7 +1507,7 @@ export default function Page() {
   const [selectedNamesReady, setSelectedNamesReady] = useState(false);
   const [favoriteNames, setFavoriteNames] = useState<Set<string>>(new Set());
   const [blaBlaLinkIntegration, setBlaBlaLinkIntegration] = useState<BlaBlaLinkIntegration | null>(null);
-  const [best5SynchroChartPoints, setBest5SynchroChartPoints] = useState<Best5ChartPoint[]>([]);
+  const [best5SynchroChartPoints, setBest5SynchroChartPoints] = useState<Best5ChartRangePoint[]>([]);
 
   const [homeEditRequest, setHomeEditRequest] = useState<Deck | null>(null);
 
@@ -1627,7 +1627,7 @@ export default function Page() {
     fetch("/api/blablalink", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error(`BlaBlaLink state failed: ${response.status}`);
-        return response.json() as Promise<{ integration: BlaBlaLinkIntegration | null; chartPoints: Best5ChartPoint[] }>;
+        return response.json() as Promise<{ integration: BlaBlaLinkIntegration | null; chartPoints: Best5ChartRangePoint[] }>;
       })
       .then((payload) => {
         if (cancelled) return;

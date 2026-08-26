@@ -146,17 +146,34 @@ test("partitionNikkesByOwnership preserves the full legacy list when integration
   });
 });
 
-test("buildBest5ChartPoints keeps only real positive stored totals and chooses the best total per level", () => {
+test("buildBest5ChartPoints groups synchro levels into 50-level ranges and keeps each range's best total", () => {
   assert.deepEqual(
     buildBest5ChartPoints([
-      { synchroLevel: 350, total: 1000 },
-      { synchroLevel: 300, total: 700 },
-      { synchroLevel: 350, total: 1200 },
+      { synchroLevel: 100, total: 500 },
+      { synchroLevel: 150, total: 700 },
+      { synchroLevel: 151, total: 600 },
+      { synchroLevel: 199, total: 900 },
+      { synchroLevel: 200, total: 800 },
+      { synchroLevel: 201, total: 1000 },
       { synchroLevel: 400, total: 0 },
     ]),
     [
-      { synchroLevel: 300, total: 700 },
-      { synchroLevel: 350, total: 1200 },
+      { rangeStart: 100, rangeEnd: 150, total: 700 },
+      { rangeStart: 151, rangeEnd: 200, total: 900 },
+      { rangeStart: 201, rangeEnd: 250, total: 1000 },
+    ]
+  );
+});
+
+test("buildBest5ChartPoints omits ranges without stored data", () => {
+  assert.deepEqual(
+    buildBest5ChartPoints([
+      { synchroLevel: 150, total: 700 },
+      { synchroLevel: 201, total: 1000 },
+    ]),
+    [
+      { rangeStart: 100, rangeEnd: 150, total: 700 },
+      { rangeStart: 201, rangeEnd: 250, total: 1000 },
     ]
   );
 });

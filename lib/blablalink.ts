@@ -66,14 +66,25 @@ export function partitionNikkesByOwnership<T extends { id: string }>(
 }
 
 export type Best5ChartPoint = { synchroLevel: number; total: number };
+export type Best5ChartRangePoint = { rangeStart: number; rangeEnd: number; total: number };
 
-export function buildBest5ChartPoints(rows: readonly Best5ChartPoint[]) {
-  const bestByLevel = new Map<number, number>();
+function getSynchroLevelRange(synchroLevel: number) {
+  if (synchroLevel < 100) {
+    const rangeStart = Math.floor((synchroLevel - 1) / 50) * 50 + 1;
+    return { rangeStart, rangeEnd: Math.min(rangeStart + 49, 99) };
+  }
+  if (synchroLevel <= 150) return { rangeStart: 100, rangeEnd: 150 };
+  const rangeStart = Math.floor((synchroLevel - 151) / 50) * 50 + 151;
+  return { rangeStart, rangeEnd: rangeStart + 49 };
+}
+
+export function buildBest5ChartPoints(rows: readonly Best5ChartPoint[]): Best5ChartRangePoint[] {
+  const bestByRange = new Map<number, Best5ChartRangePoint>();
   for (const row of rows) {
     if (!Number.isInteger(row.synchroLevel) || row.synchroLevel <= 0 || !Number.isFinite(row.total) || row.total <= 0) continue;
-    bestByLevel.set(row.synchroLevel, Math.max(bestByLevel.get(row.synchroLevel) ?? 0, row.total));
+    const range = getSynchroLevelRange(row.synchroLevel);
+    const previous = bestByRange.get(range.rangeStart);
+    if (!previous || row.total > previous.total) bestByRange.set(range.rangeStart, { ...range, total: row.total });
   }
-  return [...bestByLevel]
-    .sort(([left], [right]) => left - right)
-    .map(([synchroLevel, total]) => ({ synchroLevel, total }));
+  return [...bestByRange.values()].sort((left, right) => left.rangeStart - right.rangeStart);
 }
