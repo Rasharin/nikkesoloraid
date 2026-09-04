@@ -90,6 +90,23 @@ test("BlaBlaLink modal and browser payload expose only server and profileUrl", (
   assert.match(deckBuilding, /deckToolbar/);
 });
 
+test("deck building keeps the Nikke management selection and catalog independent from BlaBlaLink ownership", () => {
+  const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const selectedNikkesBlock = page.slice(page.indexOf("const selectednikkes"), page.indexOf("const soloRaidInProgress"));
+  const deckBuildingProps = page.slice(page.indexOf("<ImaginarySoloRaidTab"), page.indexOf("</ImaginarySoloRaidTab>"));
+
+  assert.doesNotMatch(selectedNikkesBlock, /ownedNikkeIdSet/);
+  assert.match(deckBuildingProps, /selectedNikkes=\{selectednikkes\}[\s\S]*nikkes=\{nikkes\}/);
+  assert.doesNotMatch(deckBuildingProps, /integrationNikkes|unownedNikkes/);
+});
+
+test("deck building Nikke picker keeps its original section overlay and does not split unowned Nikkes", () => {
+  const deckBuilding = readFileSync(new URL("../app/components/tabs/ImaginarySoloRaidTab.tsx", import.meta.url), "utf8");
+
+  assert.match(deckBuilding, /className="absolute inset-2 z-30 flex flex-col/);
+  assert.doesNotMatch(deckBuilding, /unownedNikkes|미보유 니케/);
+});
+
 test("BlaBlaLink mapping manager supports a two-column grid and bulk verification", () => {
   const component = readFileSync(new URL("../app/components/blablalink/BlaBlaLinkMappingManager.tsx", import.meta.url), "utf8");
   const route = readFileSync(new URL("../app/api/admin/blablalink-mappings/route.ts", import.meta.url), "utf8");

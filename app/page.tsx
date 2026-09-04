@@ -54,7 +54,7 @@ import {
 } from "../lib/solo-raid-schedule";
 import type { ContactPostDetail, ContactPostStatus, ContactPostSummary, ContactPostVisibility } from "../lib/contact-board";
 import { normalizeSecondaryElement } from "../lib/nikke-elements";
-import { partitionNikkesByOwnership, type Best5ChartRangePoint, type BlaBlaLinkIntegration } from "../lib/blablalink";
+import type { Best5ChartRangePoint, BlaBlaLinkIntegration } from "../lib/blablalink";
 const btnClass = (selected: boolean) =>
   `rounded-xl border px-3 py-1 text-sm transition
    ${selected
@@ -2919,15 +2919,6 @@ export default function Page() {
     return m;
   }, [nikkes]);
 
-  const ownedNikkeIdSet = useMemo(
-    () => blaBlaLinkIntegration ? new Set(blaBlaLinkIntegration.ownedNikkeIds) : null,
-    [blaBlaLinkIntegration]
-  );
-  const integrationNikkes = useMemo(
-    () => partitionNikkesByOwnership(nikkes, ownedNikkeIdSet),
-    [nikkes, ownedNikkeIdSet]
-  );
-
   const nikkeNameLookup = useMemo(() => {
     const lookup = new Map<string, string>();
     const prioritizedNikkes = [...nikkes].sort(compareNikkeNamePriority);
@@ -2960,8 +2951,8 @@ export default function Page() {
         const canonicalName = nikkeNameLookup.get(normToken(name));
         return canonicalName ? nikkeMap.get(canonicalName) ?? null : null;
 	      })
-	      .filter((nikke): nikke is NikkeRow => nikke !== null && (!ownedNikkeIdSet || ownedNikkeIdSet.has(nikke.id)));
-	  }, [selectedNames, nikkeMap, nikkeNameLookup, ownedNikkeIdSet]);
+	      .filter((nikke): nikke is NikkeRow => nikke !== null);
+	  }, [selectedNames, nikkeMap, nikkeNameLookup]);
 	  const soloRaidInProgress = appConfigLoaded && soloRaidActive && Boolean(activeRaidKey);
 
 		  const currentDeckRaidKey = useMemo(() => {
@@ -5784,8 +5775,7 @@ export default function Page() {
 	              onScoreDisplayModeChange={updateScoreDisplayMode}
 	              selectedNames={selectedNames}
 		              selectedNikkes={selectednikkes}
-		              nikkes={integrationNikkes.owned}
-		              unownedNikkes={integrationNikkes.unowned}
+		              nikkes={nikkes}
 		              blaBlaLinkIntegration={blaBlaLinkIntegration}
 		              onBlaBlaLinkSynced={setBlaBlaLinkIntegration}
 		              favoriteNames={favoriteNames}

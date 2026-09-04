@@ -93,7 +93,7 @@ test("every existing Nikke element filter matches primary or secondary element",
   const expectedCalls = new Map([
     ["app/components/tabs/MyPageTab.tsx", 3],
     ["app/components/tabs/SettingsTab.tsx", 1],
-    ["app/components/tabs/ImaginarySoloRaidTab.tsx", 3],
+    ["app/components/tabs/ImaginarySoloRaidTab.tsx", 2],
     ["app/components/tabs/tier/TierNikkeCatalog.tsx", 1],
   ]);
 

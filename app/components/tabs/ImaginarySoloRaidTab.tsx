@@ -79,7 +79,6 @@ type DeckBuildingTabProps = {
   selectedNames: string[];
   selectedNikkes: NikkeRow[];
   nikkes: NikkeRow[];
-  unownedNikkes: NikkeRow[];
   blaBlaLinkIntegration: BlaBlaLinkIntegration | null;
   onBlaBlaLinkSynced: (integration: BlaBlaLinkIntegration) => void;
   favoriteNames: Set<string>;
@@ -657,7 +656,6 @@ export default function ImaginarySoloRaidTab({
   selectedNames,
   selectedNikkes,
   nikkes,
-  unownedNikkes,
   blaBlaLinkIntegration,
   onBlaBlaLinkSynced,
   favoriteNames,
@@ -995,16 +993,6 @@ export default function ImaginarySoloRaidTab({
         return a.name.localeCompare(b.name);
       });
   }, [favoriteNameSet, nikkes, pickerBurstFilter, pickerElementFilter, pickerListFilter, pickerSearch, recommendedNameSet]);
-
-  const filteredUnownedNikkes = useMemo(() => {
-    const query = pickerSearch.trim().toLowerCase();
-    return unownedNikkes.filter((nikke) => {
-      if (query && !nikke.name.toLowerCase().includes(query) && !(nikke.aliases?.some((alias) => alias.toLowerCase().includes(query)) ?? false)) return false;
-      if (!matchesSelectedElements(nikke, pickerElementFilter)) return false;
-      if (pickerBurstFilter.size > 0 && !pickerBurstFilter.has(nikke.burst ?? -1)) return false;
-      return true;
-    });
-  }, [pickerBurstFilter, pickerElementFilter, pickerSearch, unownedNikkes]);
 
   const pickerAvailableNikkes = useMemo(
     () => filteredPickerNikkes.filter((nikke) => !selectedNameSet.has(nikke.name)),
@@ -2209,17 +2197,6 @@ export default function ImaginarySoloRaidTab({
                               <span className="h-px flex-[6] bg-[var(--border)]" />
                             </div>
                             {renderPickerNikkeGrid(pickerAddedNikkes)}
-                          </div>
-                        ) : null}
-                        {blaBlaLinkIntegration && filteredUnownedNikkes.length > 0 ? (
-                          <div className="space-y-2 border-t border-[var(--border)] pt-4">
-                            <div className="text-sm font-semibold text-[var(--muted)]">미보유 니케</div>
-                            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                              {filteredUnownedNikkes.map((nikke) => {
-                                const imageUrl = nikke.image_path ? getPublicUrl("nikke-images", nikke.image_path) : "";
-                                return <div key={nikke.id} className="min-w-0 opacity-55"><div className="relative aspect-square overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] grayscale">{imageUrl ? <Image fill src={imageUrl} alt={nikke.name} className="object-cover" sizes="80px" /> : null}</div><div className="mt-1 truncate text-center text-xs text-[var(--muted)]">{formatNikkeDisplayName(nikke.name)}</div></div>;
-                              })}
-                            </div>
                           </div>
                         ) : null}
                       </div>
