@@ -7,6 +7,7 @@ import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { getDeckSlotId, type DragItemData, type NikkeRow } from "./deckBuilderTypes";
 
 type DeckSlotProps = {
+  duplicate?: boolean;
   deckIndex: number;
   index: number;
   name: string | null;
@@ -19,6 +20,7 @@ type DeckSlotProps = {
 };
 
 export default function DeckSlot({
+  duplicate = false,
   deckIndex,
   index,
   name,
@@ -64,7 +66,7 @@ export default function DeckSlot({
       data-slot-index={index}
       className={`relative isolate flex min-w-0 flex-col items-center ${showDropHint && canDrop ? "z-10" : ""}`}
     >
-      <div className={`relative aspect-square w-full overflow-hidden rounded-2xl border bg-[var(--card)] transition-all duration-150 ${dropStateClass}`}>
+      <div title={duplicate ? "다른 행에서 중복 사용 중" : undefined} data-union-duplicate={duplicate || undefined} className={`relative aspect-square w-full overflow-hidden rounded-2xl border bg-[var(--card)] transition-all duration-150 ${duplicate ? "!border-red-500 ring-2 ring-inset ring-red-500" : dropStateClass}`}>
         {isFilled ? (
           <button
             type="button"

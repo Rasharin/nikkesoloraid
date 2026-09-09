@@ -1,6 +1,8 @@
 ﻿"use client";
 
 import Image from "next/image";
+import { Fragment } from "react";
+import { crossRowDuplicates, UNION_ELEMENTS, type UnionDeckPayload } from "../../../lib/union-raid";
 import {
   closestCenter,
   DndContext,
@@ -53,6 +55,8 @@ type DeckDraftState = {
 };
 
 type DeckBuilderPageState = {
+  rowElements?: Record<string, string | null>;
+  columnElements?: Record<string, string | null>;
   id: number;
   deckDrafts: DeckDraftState[];
   spareSlots: DraftSlot[];
@@ -67,6 +71,7 @@ type Deck = {
 };
 
 type DeckBuildingTabProps = {
+  unionMode?: boolean;
   decksCount: number;
   canRecommend: boolean;
   showMyRecommendation: boolean;
@@ -89,7 +94,7 @@ type DeckBuildingTabProps = {
   onRemoveSelectedNikke: (name: string) => void;
   onAddSelectedNikkes: (names: string[]) => void;
   onShowToast: (message: string) => void;
-  onSubmitDeck: (payload: { draft: string[]; scoreText: string; note?: string; editingId: string | null }) => Promise<boolean>;
+  onSubmitDeck: (payload: UnionDeckPayload) => Promise<boolean>;
   onUpdateDeckScore: (id: string, scoreText: string) => Promise<boolean>;
 };
 
@@ -249,8 +254,8 @@ function CollapseIcon({ open }: { open: boolean }) {
   );
 }
 
-function createEmptyDeckDrafts(): DeckDraftState[] {
-  return Array.from({ length: DECK_DRAFT_COUNT }, (_, index) => ({
+function createEmptyDeckDrafts(unionMode = false): DeckDraftState[] {
+  return Array.from({ length: unionMode ? 6 : DECK_DRAFT_COUNT }, (_, index) => ({
     id: index + 1,
     draft: createEmptyDraft(),
     score: "",
@@ -263,10 +268,10 @@ function createEmptySpareSlots(): DraftSlot[] {
   return Array.from({ length: SPARE_SLOT_COUNT }, () => null);
 }
 
-function createEmptyDeckBuilderPage(id: number): DeckBuilderPageState {
+function createEmptyDeckBuilderPage(id: number, unionMode = false): DeckBuilderPageState {
   return {
     id,
-    deckDrafts: createEmptyDeckDrafts(),
+    deckDrafts: createEmptyDeckDrafts(unionMode),
     spareSlots: createEmptySpareSlots(),
   };
 }
@@ -344,6 +349,8 @@ function normalizeSavedDeckBuilderPage(value: unknown, fallbackId: number): Deck
   return {
     id: typeof saved.id === "number" && Number.isFinite(saved.id) ? saved.id : fallbackId,
     deckDrafts: normalizeSavedDeckDrafts(saved.deckDrafts),
+    rowElements: saved.rowElements && typeof saved.rowElements === "object" ? Object.fromEntries(Object.entries(saved.rowElements).filter(([, value]) => value === null || UNION_ELEMENTS.some(element => element === value))) : {},
+    columnElements: saved.columnElements && typeof saved.columnElements === "object" ? Object.fromEntries(Object.entries(saved.columnElements).filter(([, value]) => value === null || UNION_ELEMENTS.some(element => element === value))) : {},
     spareSlots: normalizeDraftSlots(saved.spareSlots, SPARE_SLOT_COUNT),
   };
 }
@@ -521,10 +528,10 @@ function SpareSlot({ index, name, nikke, imageUrl, activeDrag, hovered, canDrop,
   );
 }
 
-function readSavedDeckBuilderState(): { pages: DeckBuilderPageState[]; activePageId: number } {
-  const fallbackPages = [createEmptyDeckBuilderPage(1)];
+function readSavedDeckBuilderState(unionMode = false): { pages: DeckBuilderPageState[]; activePageId: number } {
+  const fallbackPages = [createEmptyDeckBuilderPage(1, unionMode)];
   try {
-    const rawDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+    const rawDraft = localStorage.getItem(unionMode ? "unionraid_deck_building_draft_v1" : DRAFT_STORAGE_KEY);
     if (!rawDraft) return { pages: fallbackPages, activePageId: 1 };
     const parsed = JSON.parse(rawDraft) as {
       pages?: unknown;
@@ -647,6 +654,7 @@ function canDropOnSpareSlot(index: number, activeDrag: DragItemData | null, spar
 }
 
 export default function ImaginarySoloRaidTab({
+  unionMode = false,
   decksCount,
   canRecommend,
   showMyRecommendation,
@@ -712,7 +720,7 @@ export default function ImaginarySoloRaidTab({
   const hydrated = useHydrated();
 
   if (hydrated && !storageRestored) {
-    const stored = readSavedDeckBuilderState();
+    const stored = readSavedDeckBuilderState(unionMode);
     setDeckPages(stored.pages);
     setActiveDeckPageId(stored.activePageId);
     setWideDeckLayout(readWideDeckLayout());
@@ -733,6 +741,18 @@ export default function ImaginarySoloRaidTab({
   const activeDeckPage = deckPages.find((page) => page.id === activeDeckPageId) ?? deckPages[0] ?? createEmptyDeckBuilderPage(1);
   const deckDrafts = activeDeckPage.deckDrafts;
   const spareSlots = activeDeckPage.spareSlots;
+  const duplicateNames = useMemo(() => unionMode ? crossRowDuplicates(deckDrafts.map(deck => deck.draft)) : undefined, [unionMode, deckDrafts]);
+  const unionColumnGroups = useMemo(
+    () =>
+      Array.from({ length: 3 }, (_, columnIndex) => ({
+        columnIndex,
+        decks: deckDrafts
+          .map((deck, deckIndex) => ({ deck, deckIndex, rowIndex: Math.floor(deckIndex / 3) }))
+          .filter(({ deckIndex }) => deckIndex % 3 === columnIndex),
+      })),
+    [deckDrafts],
+  );
+  const unionMeta = (index: number) => unionMode ? { pageId: activeDeckPageId, rowIndex: Math.floor(index / 3), deckId: deckDrafts[index].id, element: activeDeckPage.columnElements?.[index % 3] ?? null } : undefined;
   const effectiveSelectedDeckDraftIds = useMemo(() => {
     const activeDeckIds = new Set(deckDrafts.map((deck) => deck.id));
     return new Set([...selectedDeckDraftIds].filter((id) => activeDeckIds.has(id)));
@@ -815,7 +835,7 @@ export default function ImaginarySoloRaidTab({
 
     try {
       localStorage.setItem(
-        DRAFT_STORAGE_KEY,
+        unionMode ? "unionraid_deck_building_draft_v1" : DRAFT_STORAGE_KEY,
         JSON.stringify({
           pages: deckPages,
           activePageId: activeDeckPageId,
@@ -823,7 +843,7 @@ export default function ImaginarySoloRaidTab({
         })
       );
     } catch {}
-  }, [activeDeckPageId, deckPages, draftStorageReady]);
+  }, [activeDeckPageId, deckPages, draftStorageReady, unionMode]);
 
   useEffect(() => {
     const previousMode = previousScoreDisplayModeRef.current;
@@ -1015,8 +1035,10 @@ export default function ImaginarySoloRaidTab({
       : undefined;
   const wideLayoutGridClass = !wideDeckLayout
     ? "flex flex-col gap-5"
-    : deckOpen && nikkeOpen
-      ? "grid items-start gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]"
+    : deckOpen && nikkeOpen && unionMode
+      ? "grid items-start gap-3 lg:grid-cols-[minmax(17rem,2fr)_minmax(0,8fr)]"
+      : deckOpen && nikkeOpen
+        ? "grid items-start gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]"
       : deckOpen && !nikkeOpen
         ? "grid items-start gap-5 lg:grid-cols-[56px_minmax(0,1fr)]"
         : !deckOpen && nikkeOpen
@@ -1072,7 +1094,9 @@ export default function ImaginarySoloRaidTab({
   function resetDeckBuilder() {
     updateActiveDeckPage((page) => ({
       ...page,
-      deckDrafts: createEmptyDeckDrafts(),
+      deckDrafts: createEmptyDeckDrafts(unionMode),
+      rowElements: {},
+      columnElements: {},
       spareSlots: createEmptySpareSlots(),
     }));
     scoreRefs.current = [];
@@ -1239,7 +1263,7 @@ export default function ImaginarySoloRaidTab({
     setDeckPages((prev) => {
       const nextId = prev.reduce((maxId, page) => Math.max(maxId, page.id), 0) + 1;
       setActiveDeckPageId(nextId);
-      return [...prev, createEmptyDeckBuilderPage(nextId)];
+      return [...prev, createEmptyDeckBuilderPage(nextId, unionMode)];
     });
   }
 
@@ -1248,7 +1272,7 @@ export default function ImaginarySoloRaidTab({
       if (prev.length <= 1) {
         setActiveDeckPageId(1);
         scoreRefs.current = [];
-        return [createEmptyDeckBuilderPage(1)];
+        return [createEmptyDeckBuilderPage(1, unionMode)];
       }
 
       const activeIndex = prev.findIndex((page) => page.id === activeDeckPageId);
@@ -1633,7 +1657,7 @@ export default function ImaginarySoloRaidTab({
     const target = deckDrafts[deckIndex];
     if (!target) return;
     const completeDraft = target.draft.filter((value): value is string => value !== null);
-    await onSubmitDeck({ draft: completeDraft, scoreText: target.score, note: target.note, editingId: null });
+    await onSubmitDeck({ draft: completeDraft, scoreText: target.score, note: target.note, editingId: null, union: unionMeta(deckIndex) });
   }
 
   async function handleSaveAllDecks() {
@@ -1645,8 +1669,9 @@ export default function ImaginarySoloRaidTab({
     for (const deck of targetDecks) {
       const completeDraft = deck.draft.filter((value): value is string => value !== null);
       if (completeDraft.length !== MAX_DECK_CHARS) continue;
-      if (!deck.score.trim()) continue;
-      await onSubmitDeck({ draft: completeDraft, scoreText: deck.score, note: deck.note, editingId: null });
+      if (!unionMode && !deck.score.trim()) continue;
+      const saved = await onSubmitDeck({ draft: completeDraft, scoreText: deck.score, note: deck.note, editingId: null, union: unionMeta(deckDrafts.indexOf(deck)) });
+      if (unionMode && !saved) break;
     }
   }
 
@@ -1888,7 +1913,7 @@ export default function ImaginarySoloRaidTab({
       onDragCancel={handleDragCancel}
     >
       <div className="space-y-5">
-        {renderRecommendedDecksSection()}
+        {!unionMode && renderRecommendedDecksSection()}
 
         <div className={wideLayoutGridClass}>
         <div className={wideDeckLayout ? "order-1 flex flex-wrap items-center justify-end gap-2 lg:col-span-2" : "order-1 flex flex-wrap items-center justify-end gap-2"}>
@@ -1936,7 +1961,7 @@ export default function ImaginarySoloRaidTab({
           </button>
         </div>
 
-        <section ref={deckSectionRef} className={`${wideDeckLayout ? `order-3 self-start lg:order-3 ${deckOpen ? "p-4" : "p-2"}` : "order-3 p-4"} relative rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}>
+        <section ref={deckSectionRef} className={`${wideDeckLayout ? `order-3 self-start lg:order-3 ${deckOpen ? (unionMode ? "p-2" : "p-4") : "p-2"}` : `order-3 ${unionMode ? "p-2" : "p-4"}`} relative rounded-3xl border border-[var(--border)] bg-[var(--theme-panel)] shadow-[0_16px_40px_rgba(0,0,0,0.24)]`}>
           {wideDeckLayout && !deckOpen ? (
             <button
               type="button"
@@ -2206,39 +2231,90 @@ export default function ImaginarySoloRaidTab({
 	          ) : null}
 
 	          {deckOpen ? (
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            unionMode ? (
               <SortableContext items={deckDraftSortableIds} strategy={rectSortingStrategy}>
-                {deckDrafts.map((deck, deckIndex) => (
-                  <SortableDeckDraft key={deck.id} deck={deck} deckIndex={deckIndex}>
-                    <DeckBuilderSection
-                      deckIndex={deckIndex}
-                      draft={deck.draft}
-                      nikkeMap={effectiveNikkeMap}
-                      getPublicUrl={getPublicUrl}
-                      score={deck.score}
-                      scoreRef={(node) => {
-                        scoreRefs.current[deckIndex] = node;
-                      }}
-                      editingId={deck.editingId}
-                      activeDrag={activeDrag}
-                      hoveredSlotIndex={hoveredSlotTarget?.deckIndex === deckIndex ? hoveredSlotTarget.slotIndex : null}
-                      onScoreChange={(value) => updateDeckScore(deckIndex, value)}
-                      onRemoveFromDraft={(slotIndex) => removeFromDraft(deckIndex, slotIndex)}
-                      onSaveDeck={() => void handleSaveDeck(deckIndex)}
-                      onCopyDeck={() => copyDeckDraft(deckIndex)}
-                      onClearDraft={() => clearDraft(deckIndex)}
-                      onDeleteDeck={() => removeDeckDraft(deckIndex)}
-                      selected={effectiveSelectedDeckDraftIds.has(deck.id)}
-                      onToggleSelected={() => toggleDeckDraftSelected(deck.id)}
-                      note={deck.note}
-                      onNoteChange={(value) => updateDeckNote(deckIndex, value)}
-                      className="border-[var(--border)] bg-[var(--card)] p-1.5 shadow-none"
-                    />
-                  </SortableDeckDraft>
-                ))}
+                <div className="mt-3 grid gap-2 lg:grid-cols-3">
+                  {unionColumnGroups.map((group) => (
+                    <section key={group.columnIndex} className="union-raid-column-section min-w-0 rounded-2xl border border-[var(--border)] bg-black/35 p-1 shadow-inner shadow-black/20">
+                      <div className="mb-2 flex flex-wrap items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--theme-panel)] px-2 py-1.5">
+                        {UNION_ELEMENTS.map(element => <button key={element} type="button" aria-pressed={activeDeckPage.columnElements?.[group.columnIndex] === element}
+                          onClick={() => setDeckPages(pages => pages.map(page => page.id !== activeDeckPageId ? page : { ...page, columnElements: { ...page.columnElements, [group.columnIndex]: page.columnElements?.[group.columnIndex] === element ? null : element } }))}
+                          className={`rounded-lg border px-2 py-0.5 text-xs ${activeDeckPage.columnElements?.[group.columnIndex] === element ? "border-cyan-400 bg-cyan-400/15" : "border-[var(--border)]"}`}>{element}</button>)}
+                      </div>
+                      <div className="space-y-2">
+                        {group.decks.map(({ deck, deckIndex }) => (
+                          <Fragment key={deck.id}>
+                            <SortableDeckDraft deck={deck} deckIndex={deckIndex}>
+                              <DeckBuilderSection
+                                duplicateNames={duplicateNames}
+                                compact={unionMode}
+                                deckIndex={deckIndex}
+                                draft={deck.draft}
+                                nikkeMap={effectiveNikkeMap}
+                                getPublicUrl={getPublicUrl}
+                                score={deck.score}
+                                scoreRef={(node) => {
+                                  scoreRefs.current[deckIndex] = node;
+                                }}
+                                editingId={deck.editingId}
+                                activeDrag={activeDrag}
+                                hoveredSlotIndex={hoveredSlotTarget?.deckIndex === deckIndex ? hoveredSlotTarget.slotIndex : null}
+                                onScoreChange={(value) => updateDeckScore(deckIndex, value)}
+                                onRemoveFromDraft={(slotIndex) => removeFromDraft(deckIndex, slotIndex)}
+                                onSaveDeck={() => void handleSaveDeck(deckIndex)}
+                                onCopyDeck={() => copyDeckDraft(deckIndex)}
+                                onClearDraft={() => clearDraft(deckIndex)}
+                                onDeleteDeck={() => removeDeckDraft(deckIndex)}
+                                selected={effectiveSelectedDeckDraftIds.has(deck.id)}
+                                onToggleSelected={() => toggleDeckDraftSelected(deck.id)}
+                                note={deck.note}
+                                onNoteChange={(value) => updateDeckNote(deckIndex, value)}
+                                className="border-[var(--border)] bg-[var(--card)] shadow-none"
+                              />
+                            </SortableDeckDraft>
+                          </Fragment>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
               </SortableContext>
-              {renderSpareSlots()}
-            </div>
+            ) : (
+              <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                <SortableContext items={deckDraftSortableIds} strategy={rectSortingStrategy}>
+                  {deckDrafts.map((deck, deckIndex) => (
+                    <SortableDeckDraft key={deck.id} deck={deck} deckIndex={deckIndex}>
+                      <DeckBuilderSection
+                        duplicateNames={duplicateNames}
+                        deckIndex={deckIndex}
+                        draft={deck.draft}
+                        nikkeMap={effectiveNikkeMap}
+                        getPublicUrl={getPublicUrl}
+                        score={deck.score}
+                        scoreRef={(node) => {
+                          scoreRefs.current[deckIndex] = node;
+                        }}
+                        editingId={deck.editingId}
+                        activeDrag={activeDrag}
+                        hoveredSlotIndex={hoveredSlotTarget?.deckIndex === deckIndex ? hoveredSlotTarget.slotIndex : null}
+                        onScoreChange={(value) => updateDeckScore(deckIndex, value)}
+                        onRemoveFromDraft={(slotIndex) => removeFromDraft(deckIndex, slotIndex)}
+                        onSaveDeck={() => void handleSaveDeck(deckIndex)}
+                        onCopyDeck={() => copyDeckDraft(deckIndex)}
+                        onClearDraft={() => clearDraft(deckIndex)}
+                        onDeleteDeck={() => removeDeckDraft(deckIndex)}
+                        selected={effectiveSelectedDeckDraftIds.has(deck.id)}
+                        onToggleSelected={() => toggleDeckDraftSelected(deck.id)}
+                        note={deck.note}
+                        onNoteChange={(value) => updateDeckNote(deckIndex, value)}
+                        className="border-[var(--border)] bg-[var(--card)] p-1.5 shadow-none"
+                      />
+                    </SortableDeckDraft>
+                  ))}
+                </SortableContext>
+                {renderSpareSlots()}
+              </div>
+            )
           ) : null}
             </>
           )}

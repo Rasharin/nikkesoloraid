@@ -20,6 +20,8 @@ export async function GET(request: Request) {
   try {
     const admin = createScheduleAdminClient(env);
     const result = await processSoloRaidSchedules(admin);
+    const unionResult = await admin.rpc('manage_union_raid', { action: 'process' });
+    if (unionResult.error) console.error('[union-raid/process]', unionResult.error);
     return NextResponse.json(result);
   } catch (error) {
     console.error("[solo-raid-schedules/process] cron failed", error);
@@ -33,6 +35,8 @@ export async function POST() {
 
   try {
     const result = await processSoloRaidSchedules(context.admin);
+    const unionResult = await context.admin.rpc('manage_union_raid', { action: 'process' });
+    if (unionResult.error) console.error('[union-raid/process]', unionResult.error);
     return NextResponse.json(result);
   } catch (error) {
     console.error("[solo-raid-schedules/process] manual failed", error);

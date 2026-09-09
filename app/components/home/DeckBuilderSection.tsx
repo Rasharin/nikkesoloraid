@@ -10,6 +10,8 @@ import DeckSlot from "./DeckSlot";
 import { getDeckSlotId, parseDeckSlotTarget, type DraftSlot, type DragItemData, type NikkeRow } from "./deckBuilderTypes";
 
 type DeckBuilderSectionProps = {
+  compact?: boolean;
+  duplicateNames?: ReadonlySet<string>;
   deckIndex?: number;
   title?: string;
   draft: DraftSlot[];
@@ -37,6 +39,8 @@ type DeckBuilderSectionProps = {
 };
 
 function DeckBuilderSectionComponent({
+  compact = false,
+  duplicateNames,
   deckIndex = 0,
   title,
   draft,
@@ -75,6 +79,7 @@ function DeckBuilderSectionComponent({
 
               return (
                 <DeckSlot
+                  duplicate={Boolean(name && duplicateNames?.has(name))}
                   key={getDeckSlotId(index, deckIndex)}
                   deckIndex={deckIndex}
                   index={index}
@@ -117,7 +122,7 @@ function DeckBuilderSectionComponent({
           ) : null}
         </div>
 
-        <div className="mt-3 flex flex-nowrap gap-1.5">
+        <div className={`mt-3 flex gap-1.5 ${compact ? 'flex-wrap [&>button]:!text-xs' : 'flex-nowrap'}`}>
           <button
             type="button"
             onClick={onSaveDeck}

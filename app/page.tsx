@@ -1,5 +1,8 @@
 ﻿"use client";
 import Link from "next/link";
+import RaidModeToggle from "./components/union/RaidModeToggle";
+import { useUnionRaid } from "./hooks/useUnionRaid";
+import type { RaidMode } from "../lib/union-raid";
 import Header from "./components/Header";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -1493,6 +1496,8 @@ export default function Page() {
   // decks (Supabase)
   const [decks, setDecks] = useState<Deck[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [raidMode, setRaidMode] = useState<RaidMode>("solo");
+  const unionRaid = useUnionRaid(userId, raidMode === "union", showToast);
   const [loadingDecks, setLoadingDecks] = useState(false);
 
   // supabase data
@@ -2040,6 +2045,20 @@ export default function Page() {
 
     localStorage.removeItem(LOCAL_DECKS_KEY);
     return insertRows.length;
+  }
+
+  function copyUnionDeckToBuilder(deck: { chars: string[]; score: number; note: string }) {
+    try {
+      const key = "unionraid_deck_building_draft_v1";
+      const stored = JSON.parse(localStorage.getItem(key) || '{"pages":[],"activePageId":1}');
+      if (!Array.isArray(stored.pages)) stored.pages = [];
+      let page = stored.pages.find((p: { id: number }) => p.id === stored.activePageId);
+      if (!page) { page = { id: 1, deckDrafts: [], spareSlots: [] }; stored.pages.push(page); stored.activePageId = 1; }
+      const id = Math.max(0, ...page.deckDrafts.map((d: { id: number }) => d.id)) + 1;
+      page.deckDrafts.push({ id, draft: [...deck.chars], score: String(deck.score), note: deck.note, editingId: null });
+      localStorage.setItem(key, JSON.stringify(stored));
+      setRaidMode("union"); navigateToTab("imaginary"); showToast("유니온 덱 빌딩에 복사했습니다.");
+    } catch { showToast("덱 복사에 실패했습니다."); }
   }
 
   function showToast(msg: string) {
@@ -5574,7 +5593,7 @@ export default function Page() {
 
   return (
     <div suppressHydrationWarning className={`theme-${themeMode} ${themeMode === "dark" ? "dark" : ""} min-h-screen bg-[var(--bg)] text-[var(--text)]`}>
-      <div className="mx-auto max-w-xl px-4 pb-10 pt-6 sm:px-4 lg:max-w-7xl lg:px-8 lg:pt-4">
+      <div className={`mx-auto max-w-xl px-4 pb-10 pt-6 sm:px-4 lg:pt-4 ${tab === "imaginary" && raidMode === "union" ? "lg:max-w-[100rem] lg:px-3" : "lg:max-w-7xl lg:px-8"}`}>
         {/* Header */}
         <Header
           tab={tab}
@@ -5670,23 +5689,26 @@ export default function Page() {
         {tab === "saved" && (
           <div className="mx-auto w-full lg:max-w-6xl">
             <SavedTab
-              visibleSavedDecks={visibleSavedDecks}
-	              deckTabs={savedDeckTabs}
-	              seasonOffTab={!soloRaidInProgress ? { key: SEASON_OFF_RAID_KEY, label: SEASON_OFF_TAB_LABEL } : null}
-	              savedDeckTab={currentDeckRaidKey ?? ""}
-              readOnly={!soloRaidInProgress && currentDeckRaidKey !== SEASON_OFF_RAID_KEY}
+              raidMode={raidMode}
+              onRaidModeChange={setRaidMode}
+              visibleSavedDecks={raidMode === "union" ? unionRaid.decks : visibleSavedDecks}
+	              deckTabs={raidMode === "union" ? unionRaid.schedules.filter(s => s.status !== "scheduled").map(s => ({ key: s.raid_key, label: `${s.round}차 유니온 레이드` })) : savedDeckTabs}
+	              seasonOffTab={raidMode === "solo" && !soloRaidInProgress ? { key: SEASON_OFF_RAID_KEY, label: SEASON_OFF_TAB_LABEL } : null}
+	              savedDeckTab={raidMode === "union" ? unionRaid.selectedKey : currentDeckRaidKey ?? ""}
+              readOnly={raidMode === "union" ? unionRaid.selectedKey !== unionRaid.activeUnionRaidKey : !soloRaidInProgress && currentDeckRaidKey !== SEASON_OFF_RAID_KEY}
 	              onSavedDeckTabChange={(key) => {
+                  if (raidMode === "union") { unionRaid.setSelectedKey(key); return; }
 	                if (soloRaidInProgress) {
 	                  setActiveRaidKey(key);
 	                } else {
 	                  setOffSeasonRaidKey(key);
 	                }
 	              }}
-              onUpdateDeckScore={updateDeckScore}
-              onUpdateDeckChars={updateDeckChars}
-              onDeleteDeck={deleteDeck}
-              onDeleteAllDecks={deleteAllVisibleSavedDecks}
-              onCopyDeckToBuilder={copySavedDeckToBuilder}
+              onUpdateDeckScore={raidMode === "union" ? async (id, text) => { const score = parseScoreInput(text); return score !== null && score >= 0 ? unionRaid.update(id, { score }) : false; } : updateDeckScore}
+              onUpdateDeckChars={raidMode === "union" ? (id, chars) => unionRaid.update(id, { chars }) : updateDeckChars}
+              onDeleteDeck={raidMode === "union" ? (id) => void unionRaid.remove(id) : deleteDeck}
+              onDeleteAllDecks={raidMode === "union" ? () => void unionRaid.remove() : deleteAllVisibleSavedDecks}
+              onCopyDeckToBuilder={raidMode === "union" ? copyUnionDeckToBuilder : copySavedDeckToBuilder}
               allNikkeNames={nikkes.map((nikke) => nikke.name)}
               nikkeMap={nikkeMap}
               getPublicUrl={getPublicUrl}
@@ -5765,8 +5787,12 @@ export default function Page() {
         )}
 
         {tab === "imaginary" && (
-          <div className="mx-auto w-full lg:max-w-6xl">
+          <div className={`mx-auto w-full ${raidMode === "union" ? "px-1 lg:max-w-[82rem]" : "lg:max-w-6xl"}`}>
+            <div className="mb-3"><RaidModeToggle mode={raidMode} onChange={setRaidMode} /></div>
+            {raidMode === "union" && <p className="mb-3 text-sm text-[var(--theme-text-soft)]">{unionRaid.error || (unionRaid.activeUnionRaidKey ? `${unionRaid.schedules.find(s => s.raid_key === unionRaid.activeUnionRaidKey)?.round}차 유니온 레이드 진행 중` : "진행 중인 유니온 레이드가 없습니다. 작성한 덱은 기기에 보관됩니다.")}</p>}
             <ImaginarySoloRaidTab
+              key={raidMode}
+              unionMode={raidMode === "union"}
 	              decksCount={activeRaidDecks.length}
 	              canRecommend={canRecommend}
 	              showMyRecommendation={soloRaidInProgress}
@@ -5786,7 +5812,7 @@ export default function Page() {
 	              onRemoveSelectedNikke={removeSelectedNikke}
 	              onAddSelectedNikkes={addSelectedNikkes}
 	              onShowToast={showToast}
-              onSubmitDeck={submitDeckFromHome}
+              onSubmitDeck={raidMode === "union" ? unionRaid.save : submitDeckFromHome}
               onUpdateDeckScore={updateDeckScore}
             />
           </div>

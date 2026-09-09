@@ -1,11 +1,14 @@
 ﻿"use client";
 
 import Image from "next/image";
+import RaidModeToggle from '../union/RaidModeToggle';
+import type { RaidMode } from '../../../lib/union-raid';
 import { useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { formatPlainScoreText } from "../../../lib/score-format";
 
 type Deck = {
+  unionLabel?: string;
   id: string;
   raidKey: string;
   deckKey: string;
@@ -31,6 +34,8 @@ type SavedTabItem = {
 };
 
 type SavedTabProps = {
+  raidMode?: RaidMode;
+  onRaidModeChange?: (mode: RaidMode) => void;
   visibleSavedDecks: Deck[];
   deckTabs: readonly SavedTabItem[];
   seasonOffTab?: SavedTabItem | null;
@@ -49,6 +54,8 @@ type SavedTabProps = {
 };
 
 export default function SavedTab({
+  raidMode = 'solo',
+  onRaidModeChange,
   visibleSavedDecks,
   deckTabs,
   seasonOffTab,
@@ -106,6 +113,7 @@ export default function SavedTab({
       </div>
       <div className="mt-1 text-base text-neutral-400">이름을 클릭하여 니케 수정 가능</div>
 
+      {onRaidModeChange && <div className="mt-3"><RaidModeToggle mode={raidMode} onChange={onRaidModeChange} /></div>}
       <div className="mt-2 flex flex-wrap gap-2">
         {deckTabs.map((tab) => (
           <button
@@ -144,6 +152,7 @@ export default function SavedTab({
           visibleSavedDecks.map((deck) => {
             return (
               <article key={deck.id} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-3">
+                {deck.unionLabel && <div className="mb-2 text-xs text-[var(--theme-text-soft)]">{deck.unionLabel}</div>}
                 <div className="grid grid-cols-5 gap-3">
                   {deck.chars.map((name, slotIndex) => {
                     const nikke = nikkeMap.get(name);

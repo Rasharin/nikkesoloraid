@@ -1,4 +1,5 @@
 ﻿"use client";
+import UnionRaidManager from "../union/UnionRaidManager";
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -76,7 +77,7 @@ type NikkeRow = {
 
 type NikkeElementValue = "iron" | "fire" | "wind" | "water" | "electric" | null;
 type NikkeRoleValue = "attacker" | "supporter" | "defender" | null;
-type AdminSectionKey = "nikkes" | "recommended" | "bosses" | "video" | "blocked-users";
+type AdminSectionKey = "nikkes" | "recommended" | "bosses" | "video" | "blocked-users" | "union";
 type ThemeMode = "dark" | "light";
 
 type MyPageTabProps = {
@@ -829,6 +830,8 @@ export default function MyPageTab({
             ) : null}
           </div>
 
+          {isMaster && <div className="mt-2"><button type="button" onClick={() => setAdminSection("union")} className={adminTabClass(adminSection === "union")}>유레 관리</button></div>}
+          {isMaster && adminSection === "union" && <UnionRaidManager />}
           {adminSection === "nikkes" ? (
             <div className="mt-4 space-y-4">
               <BlaBlaLinkMappingManager getPublicUrl={getPublicUrl} />
