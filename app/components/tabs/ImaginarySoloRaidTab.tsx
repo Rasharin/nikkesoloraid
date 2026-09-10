@@ -23,6 +23,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { buildCopiedRecommendedDeckDrafts, copyDeckDraftAfterIndex } from "../../../lib/deck-building-copy";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
+import { encodeNikkeCalcShareCode, getNikkeCalcShareSelectionError } from "../../../lib/nikke-calc-share";
 import { matchesSelectedElements } from "../../../lib/nikke-elements";
 import { formatPlainScoreText, formatScore, parseScoreInput, type ScoreDisplayMode } from "../../../lib/score-format";
 import { useHydrated } from "../../hooks/useHydrated";
@@ -1133,6 +1134,26 @@ export default function ImaginarySoloRaidTab({
     scoreRefs.current.splice(deckIndex, 1);
   }
 
+  async function shareSelectedDecksToCalculator() {
+    const selectionError = getNikkeCalcShareSelectionError(effectiveSelectedDeckDraftIds.size);
+    if (selectionError) {
+      onShowToast(selectionError);
+      return;
+    }
+
+    const selectedDecks = deckDrafts
+      .filter((deck) => effectiveSelectedDeckDraftIds.has(deck.id))
+      .map((deck) => deck.draft);
+    const code = encodeNikkeCalcShareCode(selectedDecks);
+
+    try {
+      await navigator.clipboard.writeText(code);
+      onShowToast('조합 코드를 복사하였습니다. 니케 계산기 "조합 공유"에 붙여 넣으시면 덱이 복사 됩니다.');
+    } catch {
+      onShowToast("자동 복사에 실패했습니다. 브라우저 권한을 확인해주세요.");
+    }
+  }
+
   function copyDeckDraft(deckIndex: number) {
     setActiveDeckDrafts((prev) => copyDeckDraftAfterIndex(prev, deckIndex));
     onShowToast("덱 복사 완료");
@@ -1917,6 +1938,30 @@ export default function ImaginarySoloRaidTab({
 
         <div className={wideLayoutGridClass}>
         <div className={wideDeckLayout ? "order-1 flex flex-wrap items-center justify-end gap-2 lg:col-span-2" : "order-1 flex flex-wrap items-center justify-end gap-2"}>
+          <div className="flex h-9 items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--theme-text-soft)] shadow-sm">
+            <button
+              type="button"
+              onClick={() => void shareSelectedDecksToCalculator()}
+              aria-label="계산기로 공유"
+              className="flex h-full items-center px-3 text-xs font-semibold transition hover:bg-[var(--theme-panel)] active:scale-[0.99]"
+            >
+              <span className="whitespace-nowrap">계산기 공유</span>
+            </button>
+            <span aria-hidden="true" className="h-5 w-px bg-[var(--border)]" />
+            <a
+              href="https://moris-kr.github.io/nikke-calc/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="니케 계산기 바로가기"
+              title="니케 계산기 바로가기"
+              className="flex h-full w-8 items-center justify-center transition hover:bg-[var(--theme-panel)] active:scale-[0.99]"
+            >
+              <svg aria-hidden="true" viewBox="0 0 20 20" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.5">
+                <path d="M11 4h5v5M16 4l-7 7" />
+                <path d="M15 11v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" />
+              </svg>
+            </a>
+          </div>
           <a
             href="https://www.blablalink.com/"
             target="_blank"
