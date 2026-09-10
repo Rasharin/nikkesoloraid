@@ -17,6 +17,10 @@ export type BlaBlaLinkCharacterSource = {
   core?: number;
 };
 
+export function isBlaBlaLinkPrivacyCode(code: number | null | undefined) {
+  return code === 1301002 || code === 1303002;
+}
+
 export type MappedBlaBlaLinkCharacter = {
   nikkeId: string;
   nameCode: number;

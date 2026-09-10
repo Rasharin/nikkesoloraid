@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 import {
   buildBest5ChartPoints,
+  isBlaBlaLinkPrivacyCode,
   mapBlaBlaLinkCharacters,
   partitionNikkesByOwnership,
 } from "../lib/blablalink.ts";
@@ -20,6 +21,22 @@ test("server validation accepts only the five configured server keys", () => {
   assert.equal(isBlaBlaLinkServerKey("southeast_asia"), true);
   assert.equal(isBlaBlaLinkServerKey("unknown"), false);
   assert.equal(isBlaBlaLinkServerKey(null), false);
+});
+
+test("privacy response codes are identified without classifying upstream failures as privacy", () => {
+  assert.equal(isBlaBlaLinkPrivacyCode(1301002), true);
+  assert.equal(isBlaBlaLinkPrivacyCode(1303002), true);
+  assert.equal(isBlaBlaLinkPrivacyCode(300001), false);
+  assert.equal(isBlaBlaLinkPrivacyCode(500), false);
+});
+
+test("BlaBlaLink API exposes a health endpoint separate from authenticated state loading", () => {
+  const healthRoute = readFileSync(new URL("../app/api/blablalink/health/route.ts", import.meta.url), "utf8");
+  const server = readFileSync(new URL("../lib/server/blablalink-api.ts", import.meta.url), "utf8");
+  assert.match(healthRoute, /export async function GET/);
+  assert.match(server, /game_token/);
+  assert.match(server, /game_openid/);
+  assert.doesNotMatch(healthRoute, /Cookie:\s*cookie/);
 });
 
 test("area resolver falls back sequentially and stops at the first account match", async () => {

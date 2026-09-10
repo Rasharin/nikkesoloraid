@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     if (error instanceof BlaBlaLinkError) {
-      const status = error.code === "AUTH" ? 401 : error.code === "ACCOUNT" ? 404 : error.code === "CONFIG" ? 503 : 502;
+      const status = error.code === "AUTH" ? 401 : error.code === "ACCOUNT" || error.code === "PRIVATE" ? 404 : error.code === "CONFIG" ? 503 : 502;
       return NextResponse.json({ error: error.message, code: error.code }, { status });
     }
     console.error("[blablalink] sync failed", error);

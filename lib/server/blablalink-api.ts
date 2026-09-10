@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import {
   mapBlaBlaLinkCharacters,
+  isBlaBlaLinkPrivacyCode,
   type BlaBlaLinkCharacterSource,
 } from "../blablalink";
 import {
@@ -19,7 +20,11 @@ const LARGE_PRIMES = [224737, 1000639, 2654435761, 2654435769, 1000621, 42949672
 const COMMON_PARAMS = { game_id: "29080", area_id: "global", source: "pc_web", intl_game_id: "29080", language: "ko", env: "prod" };
 
 export class BlaBlaLinkError extends Error {
-  constructor(public code: "AUTH" | "ACCOUNT" | "PRIVATE" | "API" | "NETWORK" | "CONFIG", message: string) {
+  constructor(
+    public code: "AUTH" | "ACCOUNT" | "PRIVATE" | "API" | "NETWORK" | "CONFIG",
+    message: string,
+    public upstreamCode?: number,
+  ) {
     super(message);
   }
 }
@@ -81,9 +86,60 @@ async function postApi(route: string, body: object, cookie: string) {
   }
   const payload = await response.json().catch(() => null) as { code?: number; msg?: string; data?: Record<string, unknown> } | null;
   if (!response.ok || !payload) throw new BlaBlaLinkError("API", "BlaBlaLink API 응답을 확인할 수 없습니다.");
-  if (payload.code === 300001) throw new BlaBlaLinkError("AUTH", "현재 블라블라링크 연결을 사용할 수 없습니다. 잠시 후 다시 시도해주세요.");
-  if (payload.code !== 0) throw new BlaBlaLinkError("API", "블라블라링크 서비스 응답을 확인할 수 없습니다. 잠시 후 다시 시도해주세요.");
+  if (payload.code === 300001) throw new BlaBlaLinkError("AUTH", "현재 블라블라링크 연결을 사용할 수 없습니다. 잠시 후 다시 시도해주세요.", payload.code);
+  if (payload.code !== 0) throw new BlaBlaLinkError("API", "블라블라링크 서비스 응답을 확인할 수 없습니다. 잠시 후 다시 시도해주세요.", payload.code);
   return payload.data ?? {};
+}
+
+function createCookieShape(cookie: string) {
+  const pairs = cookie.split(";").map((part) => part.trim()).filter(Boolean);
+  const names = pairs.map((part) => part.split("=")[0]);
+  return {
+    length: cookie.length,
+    cookies: names.length,
+    hasGameToken: names.includes("game_token"),
+    hasGameOpenId: names.includes("game_openid"),
+  };
+}
+
+export async function getBlaBlaLinkSessionHealth() {
+  const cookie = process.env.BLABLALINK_COOKIE?.trim() ?? "";
+  const shape = createCookieShape(cookie);
+  if (!cookie) return { shape, upstream: null };
+  try {
+    const response = await fetch(
+      "https://api.blablalink.com/api/ugc/proxy/standalonesite/User/GetUserInfoNew",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/plain, */*",
+          Origin: "https://www.blablalink.com",
+          Referer: "https://www.blablalink.com/",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/151.0.0.0 Safari/537.36",
+          "X-Channel-Type": "2",
+          "X-Language": "ko",
+          "X-Common-Params": JSON.stringify(COMMON_PARAMS),
+          Cookie: cookie,
+        },
+        body: "{}",
+        cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    const payload = await response.json().catch(() => null) as { code?: number; msg?: string; data?: { info?: { intl_openid?: string } } } | null;
+    return {
+      shape,
+      upstream: payload ? {
+        httpStatus: response.status,
+        code: payload.code ?? null,
+        msg: payload.msg ?? "",
+        openidTail: payload.data?.info?.intl_openid ? String(payload.data.info.intl_openid).slice(-4) : null,
+      } : { httpStatus: response.status, code: null, msg: "invalid json", openidTail: null },
+    };
+  } catch (error) {
+    return { shape, upstream: { httpStatus: null, code: null, msg: error instanceof Error ? error.message : "network error", openidTail: null } };
+  }
 }
 
 async function loadCharacterMaps(nikkes: readonly { id: string; name: string; resource_id: number | null }[]) {
@@ -118,17 +174,29 @@ export async function fetchBlaBlaLinkProfile(input: {
   }
   const cookie = input.sessionCookie;
   const openId = input.openId.trim();
+  let sawPrivacyResponse = false;
   const resolvedArea = await resolveBlaBlaLinkArea(input.server, async (candidateAreaId) => {
-    const characterData = await postApi(
-      "Game/GetUserCharacters",
-      { intl_open_id: openId, nikke_area_id: candidateAreaId },
-      cookie
-    );
+    let characterData: Record<string, unknown>;
+    try {
+      characterData = await postApi(
+        "Game/GetUserCharacters",
+        { intl_open_id: openId, nikke_area_id: candidateAreaId },
+        cookie
+      );
+    } catch (error) {
+      if (error instanceof BlaBlaLinkError && error.code === "API" && isBlaBlaLinkPrivacyCode(error.upstreamCode)) {
+        sawPrivacyResponse = true;
+        return [];
+      }
+      throw error;
+    }
     return Array.isArray(characterData.characters)
       ? characterData.characters as BlaBlaLinkCharacterSource[]
       : [];
   });
-  if (!resolvedArea) throw new BlaBlaLinkError("ACCOUNT", "프로필 정보를 확인할 수 없습니다. 프로필 공개 상태와 링크를 확인해주세요.");
+  if (!resolvedArea) {
+    throw new BlaBlaLinkError(sawPrivacyResponse ? "PRIVATE" : "ACCOUNT", "프로필 정보를 확인할 수 없습니다. 프로필 공개 상태와 링크를 확인해주세요.");
+  }
   const { areaId, value: sourceCharacters } = resolvedArea;
   const requestBase = { intl_open_id: openId, nikke_area_id: areaId };
   const nameCodes = sourceCharacters.map((character) => character.name_code);
@@ -142,7 +210,12 @@ export async function fetchBlaBlaLinkProfile(input: {
       characterDetails.push(...detailsData.character_details as Array<Record<string, unknown>>);
     }
   }
-  const outpostData = await postApi("Game/GetUserProfileOutpostInfo", requestBase, cookie);
+  let outpostData: Record<string, unknown> = {};
+  try {
+    outpostData = await postApi("Game/GetUserProfileOutpostInfo", requestBase, cookie);
+  } catch (error) {
+    if (error instanceof BlaBlaLinkError && error.code === "AUTH") throw error;
+  }
   const outpostInfo = outpostData.outpost_info && typeof outpostData.outpost_info === "object"
     ? outpostData.outpost_info as Record<string, unknown>
     : {};
