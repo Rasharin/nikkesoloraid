@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { parseScoreInput } from '../../lib/score-format';
-import type { UnionDeckPayload, UnionSchedule } from '../../lib/union-raid';
+import { UNION_SEASON_OFF_KEY, unionDeckStorageTarget, type UnionDeckPayload, type UnionSchedule } from '../../lib/union-raid';
 
 type UnionDeckRow = {
   id: string; user_id: string; raid_key: string; page_id: number; row_index: number; deck_id: number;
@@ -26,7 +26,7 @@ export function useUnionRaid(userId: string | null, enabled: boolean, notify: (m
       if (current !== generation.current) return;
       setSchedules(data.schedules);
       setRows((decks.data ?? []) as UnionDeckRow[]);
-      setSelectedKey(key => data.schedules.some((s: UnionSchedule) => s.raid_key === key) ? key : data.activeUnionRaidKey ?? data.schedules[0]?.raid_key ?? '');
+      setSelectedKey(key => data.schedules.some((s: UnionSchedule) => s.raid_key === key) || key === UNION_SEASON_OFF_KEY ? key : data.activeUnionRaidKey ?? UNION_SEASON_OFF_KEY);
       setError('');
     } catch (cause) {
       if (current === generation.current) setError(cause instanceof Error ? cause.message : '조회 실패');
@@ -45,13 +45,13 @@ export function useUnionRaid(userId: string | null, enabled: boolean, notify: (m
 
   async function save(payload: UnionDeckPayload) {
     if (!userId) { notify('로그인 후 저장해주세요. 작성한 덱은 기기에 보관됩니다.'); return false; }
-    if (!activeUnionRaidKey) { notify('진행 중인 유니온 레이드가 없습니다. 작성한 덱은 기기에 보관됩니다.'); return false; }
+    const targetRaidKey = unionDeckStorageTarget(activeUnionRaidKey);
     if (!payload.union || payload.draft.length !== 5 || new Set(payload.draft).size !== 5) { notify('서로 다른 니케 5명을 선택해주세요.'); return false; }
     const score = !payload.scoreText.trim() || /^0+(?:\.0+)?$/.test(payload.scoreText.trim()) ? 0 : parseScoreInput(payload.scoreText);
     if (score === null || !Number.isFinite(score) || score < 0) { notify('점수를 확인해주세요.'); return false; }
     const meta = payload.union;
     const { error: failure } = await supabase.from('union_raid_decks').upsert({
-      user_id: userId, raid_key: activeUnionRaidKey, page_id: meta.pageId, row_index: meta.rowIndex, deck_id: meta.deckId,
+      user_id: userId, raid_key: targetRaidKey, page_id: meta.pageId, row_index: meta.rowIndex, deck_id: meta.deckId,
       chars: payload.draft, score, note: payload.note ?? '', element: meta.element,
     }, { onConflict: 'user_id,raid_key,page_id,deck_id' });
     if (failure) { notify('유니온 덱 저장에 실패했습니다. 진행 중인 회차를 확인해주세요.'); await refresh(); return false; }
@@ -60,22 +60,32 @@ export function useUnionRaid(userId: string | null, enabled: boolean, notify: (m
     return true;
   }
   async function update(id: string, changes: { chars?: string[]; score?: number }) {
-    if (!userId || selectedKey !== activeUnionRaidKey) return false;
+    if (!userId || (selectedKey !== activeUnionRaidKey && selectedKey !== UNION_SEASON_OFF_KEY)) return false;
     if (changes.chars && (changes.chars.length !== 5 || new Set(changes.chars).size !== 5)) { notify('중복된 니케는 저장할 수 없습니다.'); return false; }
-    const result = await supabase.from('union_raid_decks').update(changes).eq('user_id', userId).eq('raid_key', activeUnionRaidKey).eq('id', id).select('id');
+    const result = await supabase.from('union_raid_decks').update(changes).eq('user_id', userId).eq('raid_key', selectedKey).eq('id', id).select('id');
     if (result.error || !result.data?.length) { notify('수정에 실패했습니다.'); return false; }
     await refresh(); return true;
   }
   async function remove(id?: string) {
-    if (!userId || selectedKey !== activeUnionRaidKey) return;
+    if (!userId || (selectedKey !== activeUnionRaidKey && selectedKey !== UNION_SEASON_OFF_KEY)) return;
     let query = supabase.from('union_raid_decks').delete().eq('user_id', userId).eq('raid_key', selectedKey);
     if (id) query = query.eq('id', id);
     const result = await query.select('id');
     if (result.error || !result.data?.length) notify('삭제에 실패했습니다.');
     await refresh();
   }
+  async function move(id: string, targetRaidKey: string) {
+    if (!userId || !targetRaidKey || targetRaidKey === selectedKey) return false;
+    const validTarget = targetRaidKey === UNION_SEASON_OFF_KEY || schedules.some(schedule => schedule.raid_key === targetRaidKey);
+    if (!validTarget) { notify('이동할 유니온 레이드를 찾을 수 없습니다.'); return false; }
+    const result = await supabase.from('union_raid_decks').update({ raid_key: targetRaidKey }).eq('user_id', userId).eq('raid_key', selectedKey).eq('id', id).select('id');
+    if (result.error || !result.data?.length) { notify('유니온 덱 이동에 실패했습니다.'); return false; }
+    await refresh();
+    notify('유니온 덱 이동 완료');
+    return true;
+  }
   return {
-    schedules, activeUnionRaidKey, selectedKey, setSelectedKey, error, refresh, save, update, remove,
+    schedules, activeUnionRaidKey, selectedKey, setSelectedKey, error, refresh, save, update, remove, move,
     decks: rows.filter(row => row.user_id === userId && row.raid_key === selectedKey).map(row => ({
       id: row.id, raidKey: row.raid_key, deckKey: String(row.deck_id), chars: row.chars, score: Number(row.score), note: row.note,
       createdAt: Date.parse(row.created_at), unionLabel: `${row.page_id}페이지 · ${row.row_index + 1}행${row.element ? ` · ${row.element}` : ''}`,

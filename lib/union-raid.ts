@@ -1,4 +1,5 @@
 export type RaidMode = 'solo' | 'union';
+export const UNION_SEASON_OFF_KEY = '__season_off__';
 export const UNION_ELEMENTS = ['수냉', '작열', '풍압', '전격', '철갑'] as const;
 export type UnionElement = typeof UNION_ELEMENTS[number];
 export type UnionSchedule = {
@@ -8,6 +9,9 @@ export type UnionSchedule = {
 export type UnionDeckMeta = { pageId: number; rowIndex: number; deckId: number; element: string | null };
 export type UnionDeckPayload = { draft: string[]; scoreText: string; note?: string; editingId: string | null; union?: UnionDeckMeta };
 export function unionRaidKey(round: number) { return `union-${round}`; }
+export function unionDeckStorageTarget(activeRaidKey: string | null) {
+  return activeRaidKey ?? UNION_SEASON_OFF_KEY;
+}
 export function validateUnionSchedule(round: number, startsAt: string, endsAt: string): string | null {
   if (!Number.isSafeInteger(round) || round < 1) return '회차는 1 이상의 정수로 입력해주세요.';
   const start = Date.parse(startsAt), end = Date.parse(endsAt);

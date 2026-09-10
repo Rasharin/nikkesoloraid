@@ -39,6 +39,7 @@ type SavedTabProps = {
   visibleSavedDecks: Deck[];
   deckTabs: readonly SavedTabItem[];
   seasonOffTab?: SavedTabItem | null;
+  moveTargets: readonly SavedTabItem[];
   savedDeckTab: string;
   readOnly: boolean;
   onSavedDeckTabChange: (key: string) => void;
@@ -47,6 +48,7 @@ type SavedTabProps = {
   onDeleteDeck: (id: string) => void;
   onDeleteAllDecks: () => void;
   onCopyDeckToBuilder: (deck: Deck) => void;
+  onMoveDeck: (id: string, targetRaidKey: string) => Promise<boolean>;
   allNikkeNames: string[];
   nikkeMap: Map<string, NikkeRow>;
   getPublicUrl: (bucket: "nikke-images" | "boss-images", path: string) => string;
@@ -59,6 +61,7 @@ export default function SavedTab({
   visibleSavedDecks,
   deckTabs,
   seasonOffTab,
+  moveTargets,
   savedDeckTab,
   readOnly,
   onSavedDeckTabChange,
@@ -67,6 +70,7 @@ export default function SavedTab({
   onDeleteDeck,
   onDeleteAllDecks,
   onCopyDeckToBuilder,
+  onMoveDeck,
   allNikkeNames,
   nikkeMap,
   getPublicUrl,
@@ -75,6 +79,8 @@ export default function SavedTab({
   const [editingScoreId, setEditingScoreId] = useState<string | null>(null);
   const [editingScoreText, setEditingScoreText] = useState("");
   const [savingSlot, setSavingSlot] = useState(false);
+  const [movingDeck, setMovingDeck] = useState<Deck | null>(null);
+  const [moveTargetKey, setMoveTargetKey] = useState("");
 
   const sortedNikkeNames = useMemo(() => [...allNikkeNames].sort((a, b) => a.localeCompare(b)), [allNikkeNames]);
 
@@ -251,6 +257,16 @@ export default function SavedTab({
                     점수 수정
                   </button>
                   <button
+                    onClick={() => {
+                      setMovingDeck(deck);
+                      setMoveTargetKey(moveTargets.find((target) => target.key !== deck.raidKey)?.key ?? "");
+                    }}
+                    disabled={moveTargets.length < 2}
+                    className="rounded-2xl border border-amber-500/40 px-3 py-2 text-sm text-amber-100 transition hover:border-amber-300/70 hover:bg-amber-500/15 active:scale-[0.99] disabled:opacity-50"
+                  >
+                    이동
+                  </button>
+                  <button
                     onClick={() => onCopyDeckToBuilder(deck)}
                     className="rounded-2xl border border-cyan-500/40 px-3 py-2 text-sm text-cyan-100 transition hover:border-cyan-300/70 hover:bg-cyan-500/15 active:scale-[0.99]"
                   >
@@ -269,6 +285,22 @@ export default function SavedTab({
           })
         )}
       </div>
+      {movingDeck ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label="저장된 덱 이동">
+          <div className="w-full max-w-sm rounded-2xl border border-neutral-700 bg-neutral-950 p-4 shadow-2xl">
+            <h3 className="text-lg font-semibold">저장된 덱 이동</h3>
+            <p className="mt-1 text-sm text-neutral-400">이동할 레이드를 선택하세요.</p>
+            <select value={moveTargetKey} onChange={(event) => setMoveTargetKey(event.target.value)} className="mt-4 w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="" disabled>이동할 레이드</option>
+              {moveTargets.map((target) => <option key={target.key} value={target.key} disabled={target.key === movingDeck.raidKey}>{target.label}</option>)}
+            </select>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setMovingDeck(null)} className="rounded-xl border border-neutral-700 px-3 py-2 text-sm">취소</button>
+              <button type="button" disabled={!moveTargetKey || moveTargetKey === movingDeck.raidKey} onClick={() => void (async () => { const saved = await onMoveDeck(movingDeck.id, moveTargetKey); if (saved) setMovingDeck(null); })()} className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-black disabled:opacity-50">이동 저장</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

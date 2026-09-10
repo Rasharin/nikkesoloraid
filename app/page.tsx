@@ -3722,6 +3722,76 @@ export default function Page() {
     }
   }
 
+	  async function moveSavedDeck(id: string, targetRaidKey: string) {
+	    if (!targetRaidKey) return false;
+	    const targetDeck = [...decks, ...offSeasonDecks].find((deck) => deck.id === id);
+	    if (!targetDeck || targetDeck.raidKey === targetRaidKey) return false;
+	    const targetIsRemoteDeck = Boolean(userId && decks.some((deck) => deck.id === id));
+
+	    try {
+	      if (targetIsRemoteDeck && userId) {
+	        const { data, error } = await supabase
+	          .from("decks")
+	          .update({ raid_key: targetRaidKey })
+	          .eq("id", id)
+	          .eq("user_id", userId)
+	          .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
+	          .single();
+        if (error) throw error;
+        const updated = mapDeckRow(data as DeckRow);
+        if (!updated) throw new Error("Invalid deck row");
+        setDecks((prev) => prev.map((deck) => (deck.id === id ? updated : deck)));
+        writeCachedUserDecks(userId, decks.map((deck) => (deck.id === id ? updated : deck)));
+      } else {
+        const nextDeck = { ...targetDeck, raidKey: targetRaidKey };
+        const sourceWasOffSeason = offSeasonDecks.some((deck) => deck.id === id);
+        const withoutDeck = (prev: Deck[]) => prev.filter((deck) => deck.id !== id);
+        const nextOffSeasonWithoutDeck = offSeasonDecks.filter((deck) => deck.id !== id);
+        const nextPrimaryWithoutDeck = decks.filter((deck) => deck.id !== id);
+        if (sourceWasOffSeason) {
+          setOffSeasonDecks(nextOffSeasonWithoutDeck);
+          saveLocalOffSeasonDecks(nextOffSeasonWithoutDeck);
+        }
+        else setDecks(withoutDeck);
+        if (targetRaidKey === SEASON_OFF_RAID_KEY) {
+          const nextOffSeason = [nextDeck, ...nextOffSeasonWithoutDeck];
+          setOffSeasonDecks(nextOffSeason);
+          saveLocalOffSeasonDecks(nextOffSeason);
+        } else if (sourceWasOffSeason && userId) {
+          const { data, error } = await supabase
+            .from("decks")
+            .insert({
+              user_id: userId,
+              raid_key: targetRaidKey,
+              deck_key: nextDeck.deckKey,
+              chars: [...nextDeck.chars],
+              score: nextDeck.score,
+              note: nextDeck.note,
+            })
+            .select("id,user_id,raid_key,deck_key,chars,score,note,created_at")
+            .single();
+          if (error) throw error;
+          const inserted = mapDeckRow(data as DeckRow);
+          if (!inserted) throw new Error("Invalid deck row");
+          const nextPrimary = [inserted, ...nextPrimaryWithoutDeck];
+          setDecks(nextPrimary);
+          writeCachedUserDecks(userId, nextPrimary);
+        } else {
+          const nextPrimary = [nextDeck, ...nextPrimaryWithoutDeck];
+          setDecks(nextPrimary);
+          if (!userId) saveLocalDecks(nextPrimary);
+        }
+      }
+      removeCachedCommunityRaidDecks([targetDeck.raidKey, targetRaidKey]);
+      showToast("덱 이동 완료");
+      return true;
+    } catch (error) {
+      console.error(error);
+      showToast("덱 이동 실패");
+      return false;
+    }
+  }
+
 	  async function deleteDeck(id: string) {
 	    const targetIsRemoteDeck = Boolean(userId && decks.some((deck) => deck.id === id));
 	    const targetDeck = (soloRaidInProgress ? editableDecks : savedDeckSource).find((deck) => deck.id === id) ?? null;
@@ -5693,7 +5763,10 @@ export default function Page() {
               onRaidModeChange={setRaidMode}
               visibleSavedDecks={raidMode === "union" ? unionRaid.decks : visibleSavedDecks}
 	              deckTabs={raidMode === "union" ? unionRaid.schedules.filter(s => s.status !== "scheduled").map(s => ({ key: s.raid_key, label: `${s.round}차 유니온 레이드` })) : savedDeckTabs}
-	              seasonOffTab={raidMode === "solo" && !soloRaidInProgress ? { key: SEASON_OFF_RAID_KEY, label: SEASON_OFF_TAB_LABEL } : null}
+	              seasonOffTab={raidMode === "union" || !soloRaidInProgress ? { key: SEASON_OFF_RAID_KEY, label: SEASON_OFF_TAB_LABEL } : null}
+	              moveTargets={raidMode === "union"
+                ? [...unionRaid.schedules.filter(s => s.status !== "scheduled").map(s => ({ key: s.raid_key, label: `${s.round}차 유니온 레이드` })), { key: SEASON_OFF_RAID_KEY, label: SEASON_OFF_TAB_LABEL }]
+                : [...savedDeckTabs, { key: SEASON_OFF_RAID_KEY, label: SEASON_OFF_TAB_LABEL }]}
 	              savedDeckTab={raidMode === "union" ? unionRaid.selectedKey : currentDeckRaidKey ?? ""}
               readOnly={raidMode === "union" ? unionRaid.selectedKey !== unionRaid.activeUnionRaidKey : !soloRaidInProgress && currentDeckRaidKey !== SEASON_OFF_RAID_KEY}
 	              onSavedDeckTabChange={(key) => {
@@ -5709,6 +5782,7 @@ export default function Page() {
               onDeleteDeck={raidMode === "union" ? (id) => void unionRaid.remove(id) : deleteDeck}
               onDeleteAllDecks={raidMode === "union" ? () => void unionRaid.remove() : deleteAllVisibleSavedDecks}
               onCopyDeckToBuilder={raidMode === "union" ? copyUnionDeckToBuilder : copySavedDeckToBuilder}
+              onMoveDeck={raidMode === "union" ? unionRaid.move : moveSavedDeck}
               allNikkeNames={nikkes.map((nikke) => nikke.name)}
               nikkeMap={nikkeMap}
               getPublicUrl={getPublicUrl}

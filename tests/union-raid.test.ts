@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { crossRowDuplicates, validateUnionSchedule, unionRaidKey } from '../lib/union-raid.ts';
+import { crossRowDuplicates, unionDeckStorageTarget, validateUnionSchedule, unionRaidKey } from '../lib/union-raid.ts';
 
 test('only duplicates across logical three-deck rows are highlighted', () => {
   assert.deepEqual([...crossRowDuplicates([['A'], ['A'], [null], ['B']])], []);
@@ -14,4 +14,9 @@ test('schedule requires a positive integer round and valid ordered dates', () =>
   for (const round of [0, -1, 1.5, NaN]) assert.ok(validateUnionSchedule(round, '2026-09-10', '2026-09-11'));
   assert.ok(validateUnionSchedule(1, 'bad', '2026-09-11'));
   assert.ok(validateUnionSchedule(1, '2026-09-11', '2026-09-10'));
+});
+
+test('union deck storage falls back to season off when no raid is active', () => {
+  assert.equal(unionDeckStorageTarget(null), '__season_off__');
+  assert.equal(unionDeckStorageTarget('union-7'), 'union-7');
 });
