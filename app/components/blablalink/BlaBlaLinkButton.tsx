@@ -9,10 +9,11 @@ type Props = {
   integration: BlaBlaLinkIntegration | null;
   disabled?: boolean;
   deckToolbar?: boolean;
+  groupedDeckToolbar?: boolean;
   onSynced: (integration: BlaBlaLinkIntegration) => void;
 };
 
-export default function BlaBlaLinkButton({ integration, disabled = false, deckToolbar = false, onSynced }: Props) {
+export default function BlaBlaLinkButton({ integration, disabled = false, deckToolbar = false, groupedDeckToolbar = false, onSynced }: Props) {
   const [open, setOpen] = useState(false);
   const [server, setServer] = useState<BlaBlaLinkServerKey>(integration?.server ?? "korea");
   const [profileUrl, setProfileUrl] = useState("");
@@ -44,9 +45,11 @@ export default function BlaBlaLinkButton({ integration, disabled = false, deckTo
   return (
     <>
       {deckToolbar ? (
-        <button type="button" disabled={disabled} onClick={() => setOpen(true)} className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 transition hover:border-[var(--theme-border-strong)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50">
-          <Image src="/blablalink-icon.png" alt="blablalink" width={24} height={24} className="h-6 w-6 rounded-full object-contain" />
-          <span className="whitespace-nowrap text-xs font-bold text-[var(--theme-text-soft)] sm:text-sm">BlaBlalink 동기화</span>
+        <button type="button" disabled={disabled} onClick={() => setOpen(true)} className={groupedDeckToolbar
+          ? "flex h-full items-center gap-2 border-0 border-l border-[var(--border)] bg-transparent px-3 text-xs font-bold text-[var(--theme-text-soft)] transition hover:bg-[var(--theme-panel)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+          : "flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 transition hover:border-[var(--theme-border-strong)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"}>
+          {!groupedDeckToolbar ? <Image src="/blablalink-icon.png" alt="blablalink" width={24} height={24} className="h-6 w-6 rounded-full object-contain" /> : null}
+          <span className="whitespace-nowrap">BlaBlalink 동기화</span>
         </button>
       ) : (
         <button type="button" disabled={disabled} onClick={() => setOpen(true)} className="rounded-xl border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-sm font-semibold text-sky-200 transition hover:border-sky-300 disabled:cursor-not-allowed disabled:opacity-50">

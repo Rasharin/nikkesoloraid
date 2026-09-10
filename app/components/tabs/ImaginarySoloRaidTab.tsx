@@ -1962,16 +1962,18 @@ export default function ImaginarySoloRaidTab({
               </svg>
             </a>
           </div>
-          <a
-            href="https://www.blablalink.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 transition hover:border-[var(--theme-border-strong)] active:scale-[0.99]"
-          >
-            <Image src="/blablalink-icon.png" alt="blablalink" width={24} height={24} className="h-6 w-6 rounded-full object-contain" />
-            <span className="whitespace-nowrap text-xs font-bold text-[var(--theme-text-soft)] sm:text-sm">Blablalink</span>
-          </a>
-          <BlaBlaLinkButton integration={blaBlaLinkIntegration} deckToolbar onSynced={onBlaBlaLinkSynced} />
+          <div className="flex h-9 items-center overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--theme-text-soft)] shadow-sm">
+            <a
+              href="https://www.blablalink.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="BlaBlaLink 사이트 바로가기"
+              className="flex h-full items-center justify-center px-3 transition hover:bg-[var(--theme-panel)] active:scale-[0.99]"
+            >
+              <Image src="/blablalink-icon.png" alt="blablalink" width={24} height={24} className="h-5 w-5 rounded-full object-contain" />
+            </a>
+            <BlaBlaLinkButton integration={blaBlaLinkIntegration} deckToolbar groupedDeckToolbar onSynced={onBlaBlaLinkSynced} />
+          </div>
           <div className="flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 text-xs font-medium text-[var(--theme-text-soft)] sm:text-sm">
             <span className="whitespace-nowrap text-neutral-400">점수 표기</span>
             <span suppressHydrationWarning className={`whitespace-nowrap ${scoreDisplayMode === "eok" ? "text-neutral-100" : "text-neutral-500"}`}>
