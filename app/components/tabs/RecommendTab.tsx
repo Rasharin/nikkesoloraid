@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
+import { matchesNikkeSearch } from "../../../lib/nikke-search";
 import { formatRecommendationRankLabel } from "../../../lib/recommend";
 import GiseonDeckSection from "../recommend/GiseonDeckSection";
 import RecommendationRecordPanel from "../recommend/RecommendationRecordPanel";
@@ -172,9 +173,7 @@ export default function RecommendTab({
             queries.every((query) =>
               deck.chars.some((name) => {
                 const nikke = nikkeMap.get(name);
-                const matchesName = name.toLowerCase().includes(query);
-                const matchesAlias = nikke?.aliases?.some((alias) => alias.toLowerCase().includes(query)) ?? false;
-                return matchesName || matchesAlias;
+                return matchesNikkeSearch({ name, aliases: nikke?.aliases }, query);
               })
             )
           );

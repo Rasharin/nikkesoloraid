@@ -4,6 +4,7 @@ import Image from "next/image";
 import React, { useMemo, useState } from "react";
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { matchesSelectedElements } from "../../../lib/nikke-elements";
+import { matchesNikkeSearch } from "../../../lib/nikke-search";
 
 type NikkeRow = {
   id: string;
@@ -211,9 +212,7 @@ export default function SettingsTab({
 
     return nikkes.filter((nikke) => {
       if (query) {
-        const matchesName = nikke.name.toLowerCase().includes(query);
-        const matchesAlias = nikke.aliases.some((alias) => alias.toLowerCase().includes(query));
-        if (!matchesName && !matchesAlias) return false;
+        if (!matchesNikkeSearch(nikke, query)) return false;
       }
 
       if (selectedBursts.size > 0) {

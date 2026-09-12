@@ -25,6 +25,7 @@ import { buildCopiedRecommendedDeckDrafts, copyDeckDraftAfterIndex } from "../..
 import { formatNikkeDisplayName } from "../../../lib/nikke-display";
 import { encodeNikkeCalcShareCode, getNikkeCalcShareSelectionError } from "../../../lib/nikke-calc-share";
 import { matchesSelectedElements } from "../../../lib/nikke-elements";
+import { matchesNikkeSearch } from "../../../lib/nikke-search";
 import { formatPlainScoreText, formatScore, parseScoreInput, type ScoreDisplayMode } from "../../../lib/score-format";
 import { useHydrated } from "../../hooks/useHydrated";
 import BlaBlaLinkButton from "../blablalink/BlaBlaLinkButton";
@@ -951,9 +952,7 @@ export default function ImaginarySoloRaidTab({
     const query = nikkeSearch.trim().toLowerCase();
     return effectiveSelectedNikkes.filter((nikke) => {
       if (query) {
-        const matchesName = nikke.name.toLowerCase().includes(query);
-        const matchesAlias = nikke.aliases?.some((alias) => alias.toLowerCase().includes(query)) ?? false;
-        if (!matchesName && !matchesAlias) return false;
+        if (!matchesNikkeSearch(nikke, query)) return false;
       }
       if (!matchesSelectedElements(nikke, selectedElementFilter)) return false;
       if (selectedBurstFilter.size > 0) {
@@ -990,9 +989,7 @@ export default function ImaginarySoloRaidTab({
     return nikkes
       .filter((nikke) => {
         if (query) {
-          const matchesName = nikke.name.toLowerCase().includes(query);
-          const matchesAlias = nikke.aliases?.some((alias) => alias.toLowerCase().includes(query)) ?? false;
-          if (!matchesName && !matchesAlias) return false;
+          if (!matchesNikkeSearch(nikke, query)) return false;
         }
         if (!matchesSelectedElements(nikke, pickerElementFilter)) return false;
         if (pickerBurstFilter.size > 0) {

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { CSS } from "@dnd-kit/utilities";
 import { formatNikkeDisplayName } from "../../../../lib/nikke-display";
 import { matchesSelectedElements } from "../../../../lib/nikke-elements";
+import { matchesNikkeSearch } from "../../../../lib/nikke-search";
 import type { TierCatalogLayoutMode } from "../../../../lib/tier-catalog-layout";
 import {
   DEFAULT_TIER_CATALOG_SETTINGS,
@@ -147,8 +148,7 @@ export default function TierNikkeCatalog({
     return nikkes.filter((nikke) => {
       if (
         query &&
-        !nikke.name.toLowerCase().includes(query) &&
-        !nikke.aliases.some((alias) => alias.toLowerCase().includes(query))
+        !matchesNikkeSearch(nikke, query)
       ) {
         return false;
       }

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { BlaBlaLinkMappingStatus } from "@/lib/blablalink-mapping";
+import { matchesNikkeSearch } from "../../../lib/nikke-search";
 
 type Mapping = {
   id: string;
@@ -80,9 +81,8 @@ export default function BlaBlaLinkMappingManager({
   }, [load]);
 
   const filtered = useMemo(() => (data?.mappings ?? []).filter((row) => {
-    const query = search.trim().toLocaleLowerCase("ko-KR");
-    const matchesSearch = !query || row.name.toLocaleLowerCase("ko-KR").includes(query)
-      || String(row.resource_id ?? "").includes(query);
+    const matchesSearch = matchesNikkeSearch({ name: row.name }, search)
+      || String(row.resource_id ?? "").includes(search.trim());
     const matchesFilter = filter === "all"
       || (filter === "unverified" && !row.mapping_verified)
       || (filter === "unmatched" && row.status === "unmatched")
@@ -92,10 +92,9 @@ export default function BlaBlaLinkMappingManager({
   }), [data, filter, search]);
 
   const visibleCandidates = useMemo(() => {
-    const query = candidateSearch.trim().toLocaleLowerCase("ko-KR");
-    if (!query) return (data?.candidates ?? []).slice(0, 30);
-    return (data?.candidates ?? []).filter((candidate) => candidate.name.toLocaleLowerCase("ko-KR").includes(query)
-      || String(candidate.resourceId).includes(query)).slice(0, 50);
+    if (!candidateSearch.trim()) return (data?.candidates ?? []).slice(0, 30);
+    return (data?.candidates ?? []).filter((candidate) => matchesNikkeSearch({ name: candidate.name }, candidateSearch)
+      || String(candidate.resourceId).includes(candidateSearch.trim())).slice(0, 50);
   }, [candidateSearch, data]);
 
   return (

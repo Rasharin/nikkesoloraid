@@ -38,6 +38,7 @@ import {
   type RecommendationRankData,
 } from "../lib/recommend";
 import { formatScore, parseScoreInput, type ScoreDisplayMode } from "../lib/score-format";
+import { findBestNikkeMatch } from "../lib/nikke-search";
 import { createGlobalRefreshVersion, shouldApplyGlobalRefreshVersion } from "../lib/global-refresh";
 import {
   HEARTBEAT_INTERVAL_MS,
@@ -943,11 +944,22 @@ function removeCachedCommunityRaidDecks(raidKeys: readonly (string | null | unde
   } catch {}
 }
 
-function resolveDeckChars(chars: string[], nikkeNameLookup: Map<string, string>): string[] | null {
-  const resolved = chars.map((char) => nikkeNameLookup.get(normToken(char)) ?? char.trim());
-  if (resolved.some((char) => !char)) return null;
-  if (new Set(resolved).size !== MAX_DECK_CHARS) return null;
-  return resolved;
+function resolveDeckChars(chars: string[], nikkes: readonly NikkeRow[]): { chars: string[]; invalidNames: string[] } | null {
+  const invalidNames: string[] = [];
+  const resolved = chars.map((char) => {
+    const match = findBestNikkeMatch(char, nikkes);
+    if (!match.nikke) {
+      invalidNames.push(char.trim());
+      return null;
+    }
+    return match.nikke.name;
+  });
+
+  if (resolved.some((char) => char === null) || new Set(resolved).size !== MAX_DECK_CHARS) {
+    return { chars: [], invalidNames: invalidNames.length > 0 ? invalidNames : chars.map((char) => char.trim()) };
+  }
+
+  return { chars: resolved as string[], invalidNames: [] };
 }
 
 function compareNikkeNamePriority(a: NikkeRow, b: NikkeRow): number {
@@ -4096,15 +4108,22 @@ export default function Page() {
   }
 
 	  async function submitBulkFromHome(text: string) {
+    const invalidNames = new Set<string>();
     const parsed = parseBulk(text)
       .map((entry) => {
-        const chars = resolveDeckChars(entry.chars, nikkeNameLookup);
-        return chars ? { ...entry, chars } : null;
+        const resolved = resolveDeckChars(entry.chars, nikkes);
+        if (!resolved || resolved.invalidNames.length > 0) {
+          for (const name of resolved?.invalidNames ?? entry.chars) {
+            if (name) invalidNames.add(name);
+          }
+          return null;
+        }
+        return { ...entry, chars: resolved.chars };
       })
       .filter((entry): entry is { chars: string[]; score: number } => entry !== null);
 
     if (parsed.length === 0) {
-      showToast("맞는 덱이 없음.");
+      showToast(invalidNames.size > 0 ? `다음 니케를 확인해 주세요: ${Array.from(invalidNames).join(", ")}` : "맞는 덱이 없음.");
       return false;
     }
 	    const targetRaidKey = soloRaidInProgress ? currentDeckRaidKey : SEASON_OFF_RAID_KEY;
@@ -4181,6 +4200,9 @@ export default function Page() {
 	      }
 	      removeCachedCommunityRaidDecks([targetRaidKey]);
 	      showToast(`텍스트로 ${added.length}개 추가`);
+      if (invalidNames.size > 0) {
+        showToast(`다음 니케를 확인해 주세요: ${Array.from(invalidNames).join(", ")}`);
+      }
     } catch (e) {
       console.error(e);
       showToast("텍스트 덱 저장 실패");

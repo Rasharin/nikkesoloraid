@@ -17,6 +17,7 @@ import type { BlaBlaLinkIntegration } from "../../../lib/blablalink";
 import BlaBlaLinkButton from "../blablalink/BlaBlaLinkButton";
 import BlaBlaLinkMappingManager from "../blablalink/BlaBlaLinkMappingManager";
 import { matchesSelectedElements, normalizeSecondaryElement } from "../../../lib/nikke-elements";
+import { matchesNikkeSearch } from "../../../lib/nikke-search";
 import BlockedUsersSection from "../../components/mypage/BlockedUsersSection";
 
 type RecommendationDeck = {
@@ -331,9 +332,7 @@ export default function MyPageTab({
 
     return nikkes.filter((nikke) => {
       if (query) {
-        const matchesName = nikke.name.toLowerCase().includes(query);
-        const matchesAlias = nikke.aliases.some((alias) => alias.toLowerCase().includes(query));
-        if (!matchesName && !matchesAlias) return false;
+        if (!matchesNikkeSearch(nikke, query)) return false;
       }
       if (adminNikkeFilterBursts.size > 0) {
         const burst = nikke.burst ?? -1;
