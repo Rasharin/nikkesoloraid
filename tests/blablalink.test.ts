@@ -39,6 +39,27 @@ test("BlaBlaLink API exposes a health endpoint separate from authenticated state
   assert.doesNotMatch(healthRoute, /Cookie:\s*cookie/);
 });
 
+test("BlaBlaLink chart API scopes snapshots to the requested raid", () => {
+  const route = readFileSync(new URL("../app/api/blablalink/route.ts", import.meta.url), "utf8");
+  assert.match(route, /searchParams\.get\("raidKey"\)/);
+  assert.match(route, /\.eq\("raid_key", raidKey\)/);
+});
+
+test("recommendation persistence refreshes a linked user's current raid snapshot", () => {
+  const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /blablalink_best5_snapshots/);
+  assert.match(page, /const synchroLevel = blaBlaLinkIntegration\?\.synchroLevel/);
+  assert.match(page, /synchro_level: synchroLevel/);
+  assert.match(page, /raid_key: record\.raidKey/);
+});
+
+test("BlaBlaLink button reuses the last profile input for an existing integration", () => {
+  const button = readFileSync(new URL("../app/components/blablalink/BlaBlaLinkButton.tsx", import.meta.url), "utf8");
+  assert.match(button, /localStorage/);
+  assert.match(button, /블라블라링크 다시 동기화/);
+  assert.match(button, /profileUrl.*localStorage|localStorage.*profileUrl/s);
+});
+
 test("area resolver falls back sequentially and stops at the first account match", async () => {
   const attempted: number[] = [];
   const resolved = await resolveBlaBlaLinkArea("korea", async (areaId) => {

@@ -13,10 +13,31 @@ type Props = {
   onSynced: (integration: BlaBlaLinkIntegration) => void;
 };
 
+const BLABLALINK_PROFILE_STORAGE_KEY = "soloraid_blablalink_profile_v1";
+
+type StoredBlaBlaLinkProfile = {
+  server: BlaBlaLinkServerKey;
+  profileUrl: string;
+};
+
+function readStoredProfile(): StoredBlaBlaLinkProfile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(BLABLALINK_PROFILE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredBlaBlaLinkProfile>;
+    if (!parsed.profileUrl?.trim() || !parsed.server || !BLABLALINK_SERVERS.some((item) => item.key === parsed.server)) return null;
+    return { server: parsed.server, profileUrl: parsed.profileUrl.trim() };
+  } catch {
+    return null;
+  }
+}
+
 export default function BlaBlaLinkButton({ integration, disabled = false, deckToolbar = false, groupedDeckToolbar = false, onSynced }: Props) {
   const [open, setOpen] = useState(false);
-  const [server, setServer] = useState<BlaBlaLinkServerKey>(integration?.server ?? "korea");
-  const [profileUrl, setProfileUrl] = useState("");
+  const [storedProfile] = useState(readStoredProfile);
+  const [server, setServer] = useState<BlaBlaLinkServerKey>(storedProfile?.server ?? integration?.server ?? "korea");
+  const [profileUrl, setProfileUrl] = useState(storedProfile?.profileUrl ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const profileInputUrl = process.env.NEXT_PUBLIC_BLABLALINK_PROFILE_URL?.trim() || "https://www.blablalink.com/user";
@@ -33,10 +54,16 @@ export default function BlaBlaLinkButton({ integration, disabled = false, deckTo
       });
       const payload = await response.json().catch(() => ({})) as { integration?: BlaBlaLinkIntegration; error?: string; unmappedCount?: number };
       if (!response.ok || !payload.integration) throw new Error(payload.error ?? "연동에 실패했습니다.");
+      try {
+        window.localStorage.setItem(BLABLALINK_PROFILE_STORAGE_KEY, JSON.stringify({ server, profileUrl: profileUrl.trim() } satisfies StoredBlaBlaLinkProfile));
+      } catch {
+        // Local storage is optional; a successful server sync should remain successful.
+      }
       onSynced(payload.integration);
       setOpen(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "연동에 실패했습니다.");
+      setOpen(true);
     } finally {
       setSaving(false);
     }
@@ -45,14 +72,14 @@ export default function BlaBlaLinkButton({ integration, disabled = false, deckTo
   return (
     <>
       {deckToolbar ? (
-        <button type="button" disabled={disabled} onClick={() => setOpen(true)} className={groupedDeckToolbar
+        <button type="button" disabled={disabled} onClick={() => integration && profileUrl.trim() ? void sync() : setOpen(true)} className={groupedDeckToolbar
           ? "flex h-full items-center gap-2 border-0 border-l border-[var(--border)] bg-transparent px-3 text-xs font-bold text-[var(--theme-text-soft)] transition hover:bg-[var(--theme-panel)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
           : "flex h-10 items-center gap-2 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 transition hover:border-[var(--theme-border-strong)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"}>
           {!groupedDeckToolbar ? <Image src="/blablalink-icon.png" alt="blablalink" width={24} height={24} className="h-6 w-6 rounded-full object-contain" /> : null}
           <span className="whitespace-nowrap">BlaBlalink 동기화</span>
         </button>
       ) : (
-        <button type="button" disabled={disabled} onClick={() => setOpen(true)} className="rounded-xl border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-sm font-semibold text-sky-200 transition hover:border-sky-300 disabled:cursor-not-allowed disabled:opacity-50">
+        <button type="button" disabled={disabled} onClick={() => integration && profileUrl.trim() ? void sync() : setOpen(true)} className="rounded-xl border border-sky-500/50 bg-sky-500/10 px-3 py-2 text-sm font-semibold text-sky-200 transition hover:border-sky-300 disabled:cursor-not-allowed disabled:opacity-50">
           {integration ? "블라블라링크 다시 동기화" : "블라블라링크 연동"}
         </button>
       )}

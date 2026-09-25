@@ -1525,6 +1525,7 @@ export default function Page() {
   const [favoriteNames, setFavoriteNames] = useState<Set<string>>(new Set());
   const [blaBlaLinkIntegration, setBlaBlaLinkIntegration] = useState<BlaBlaLinkIntegration | null>(null);
   const [best5SynchroChartPoints, setBest5SynchroChartPoints] = useState<Best5ChartRangePoint[]>([]);
+  const [blaBlaLinkChartRefreshTick, setBlaBlaLinkChartRefreshTick] = useState(0);
 
   const [homeEditRequest, setHomeEditRequest] = useState<Deck | null>(null);
 
@@ -1633,27 +1634,6 @@ export default function Page() {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
-
-  useEffect(() => {
-    if (!userId) {
-      setBlaBlaLinkIntegration(null);
-      setBest5SynchroChartPoints([]);
-      return;
-    }
-    let cancelled = false;
-    fetch("/api/blablalink", { credentials: "same-origin" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`BlaBlaLink state failed: ${response.status}`);
-        return response.json() as Promise<{ integration: BlaBlaLinkIntegration | null; chartPoints: Best5ChartRangePoint[] }>;
-      })
-      .then((payload) => {
-        if (cancelled) return;
-        setBlaBlaLinkIntegration(payload.integration);
-        setBest5SynchroChartPoints(Array.isArray(payload.chartPoints) ? payload.chartPoints : []);
-      })
-      .catch((error) => console.warn("[blablalink] state loading skipped", error));
-    return () => { cancelled = true; };
-  }, [userId, blaBlaLinkIntegration?.syncedAt]);
 
   useEffect(() => {
     const cached = readCachedSupabaseData();
@@ -3004,6 +2984,29 @@ export default function Page() {
     if (recommendRaidKey && deckTabs.some((deckTab) => deckTab.key === recommendRaidKey)) return recommendRaidKey;
     return defaultSelectableRaidKey;
   }, [defaultSelectableRaidKey, deckTabs, recommendRaidKey]);
+
+  useEffect(() => {
+    if (!userId) {
+      setBlaBlaLinkIntegration(null);
+      setBest5SynchroChartPoints([]);
+      return;
+    }
+    let cancelled = false;
+    const query = selectedRecommendRaidKey ? `?raidKey=${encodeURIComponent(selectedRecommendRaidKey)}` : "";
+    fetch(`/api/blablalink${query}`, { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`BlaBlaLink state failed: ${response.status}`);
+        return response.json() as Promise<{ integration: BlaBlaLinkIntegration | null; chartPoints: Best5ChartRangePoint[] }>;
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setBlaBlaLinkIntegration(payload.integration);
+        setBest5SynchroChartPoints(Array.isArray(payload.chartPoints) ? payload.chartPoints : []);
+      })
+      .catch((error) => console.warn("[blablalink] state loading skipped", error));
+    return () => { cancelled = true; };
+  }, [userId, blaBlaLinkIntegration?.syncedAt, blaBlaLinkChartRefreshTick, selectedRecommendRaidKey]);
+
   const selectedTipRaidKey = useMemo(() => {
     if (tipRaidKey && deckTabs.some((deckTab) => deckTab.key === tipRaidKey)) return tipRaidKey;
     return defaultSelectableRaidKey;
@@ -3327,6 +3330,23 @@ export default function Page() {
       );
 
     if (error) throw error;
+
+    const synchroLevel = blaBlaLinkIntegration?.synchroLevel;
+    if (typeof synchroLevel === "number" && Number.isInteger(synchroLevel) && synchroLevel > 0 && record.total > 0) {
+      const { error: snapshotError } = await supabase.from("blablalink_best5_snapshots").upsert(
+        {
+          user_id: currentUserId,
+          raid_key: record.raidKey,
+          synchro_level: synchroLevel,
+          total: record.total,
+          decks: record.decks,
+          synced_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,raid_key,synchro_level" },
+      );
+      if (snapshotError) throw snapshotError;
+      setBlaBlaLinkChartRefreshTick((value) => value + 1);
+    }
   }
 
   async function persistRecommendedDeckSnapshot(currentUserId: string, raidKey: string, raidLabel: string, decksToPersist: readonly RecommendedDeck[]) {

@@ -25,18 +25,19 @@ async function getClients() {
   return { client, admin };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const clients = await getClients();
   if (!clients) return NextResponse.json({ error: "Supabase 환경변수가 설정되지 않았습니다." }, { status: 500 });
   const { data: authData } = await clients.client.auth.getUser();
   if (!authData.user) return NextResponse.json({ error: "로그인 세션이 만료되었습니다." }, { status: 401 });
+  const raidKey = new URL(request.url).searchParams.get("raidKey")?.trim() ?? "";
   const [{ data: integration }, { data: characters }] = await Promise.all([
     clients.client.from("blablalink_integrations").select("server_key,synchro_level,synced_at").maybeSingle(),
     clients.client.from("blablalink_user_characters").select("nikke_id"),
   ]);
   let chartPoints: Best5ChartRangePoint[] = [];
-  if (clients.admin) {
-    const { data: rows } = await clients.admin.from("blablalink_best5_snapshots").select("synchro_level,total");
+  if (clients.admin && raidKey) {
+    const { data: rows } = await clients.admin.from("blablalink_best5_snapshots").select("synchro_level,total").eq("raid_key", raidKey);
     chartPoints = buildBest5ChartPoints((rows ?? []).map((row) => ({ synchroLevel: Number(row.synchro_level), total: Number(row.total) })));
   }
   return NextResponse.json({
