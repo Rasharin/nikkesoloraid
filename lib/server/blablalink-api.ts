@@ -51,7 +51,10 @@ export async function getBlaBlaLinkProxyHealth() {
   try {
     const response = await fetch(`${proxyUrl}/health`, {
       method: "POST",
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        Origin: "https://www.nikkesolo.com",
+      },
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
     });
@@ -192,7 +195,11 @@ async function fetchBlaBlaLinkProxyProfileRequest(input: {
   try {
     response = await fetch(`${input.proxyUrl}/sync`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Origin: "https://www.nikkesolo.com",
+      },
       body: JSON.stringify({ profileUrl: input.profileUrl, area: input.areaId }),
       cache: "no-store",
       signal: AbortSignal.timeout(45_000),

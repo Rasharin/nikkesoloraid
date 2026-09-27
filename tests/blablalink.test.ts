@@ -137,6 +137,11 @@ test("BlaBlaLink sync prefers the configured proxy instead of the shared server 
   assert.match(route, /profileUrl/);
 });
 
+test("server-side proxy requests identify the allowed site origin", () => {
+  const server = readFileSync(new URL("../lib/server/blablalink-api.ts", import.meta.url), "utf8");
+  assert.equal((server.match(/Origin: "https:\/\/www\.nikkesolo\.com"/g) ?? []).length, 2);
+});
+
 test("deck building keeps the Nikke management selection and catalog independent from BlaBlaLink ownership", () => {
   const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   const selectedNikkesBlock = page.slice(page.indexOf("const selectednikkes"), page.indexOf("const soloRaidInProgress"));
