@@ -15,6 +15,7 @@ import { buildBlaBlaLinkMappingCandidates } from "../blablalink-mapping";
 
 const API_BASE = "https://api.blablalink.com/api/game/proxy/";
 const CDN_BASE = "https://sg-tools-cdn.blablalink.com";
+const BLABLALINK_PROXY_URL = "BLABLALINK_PROXY_URL";
 const SCRAPED_DATA_URL = "https://raw.githubusercontent.com/Jgaram/nikke-calc/master/scraper/nikke_scraped.json";
 const LARGE_PRIMES = [224737, 1000639, 2654435761, 2654435769, 1000621, 4294967291] as const;
 const COMMON_PARAMS = { game_id: "29080", area_id: "global", source: "pc_web", intl_game_id: "29080", language: "ko", env: "prod" };
@@ -37,6 +38,28 @@ export function getBlaBlaLinkServerSessionCookie() {
     throw new BlaBlaLinkError("CONFIG", "현재 블라블라링크 연결을 사용할 수 없습니다. 잠시 후 다시 시도해주세요.");
   }
   return cookie;
+}
+
+export function getBlaBlaLinkProxyUrl() {
+  const value = process.env[BLABLALINK_PROXY_URL]?.trim().replace(/\/+$/, "") ?? "";
+  return value || null;
+}
+
+export async function getBlaBlaLinkProxyHealth() {
+  const proxyUrl = getBlaBlaLinkProxyUrl();
+  if (!proxyUrl) return null;
+  try {
+    const response = await fetch(`${proxyUrl}/health`, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    const payload = await response.json().catch(() => null);
+    return payload && typeof payload === "object" ? payload as Record<string, unknown> : { upstream: { code: null, msg: "invalid json" } };
+  } catch (error) {
+    return { upstream: { code: null, msg: error instanceof Error ? error.message : "network error" } };
+  }
 }
 
 function djb2(value: string, seed: number) {
@@ -150,6 +173,72 @@ async function loadCharacterMaps(nikkes: readonly { id: string; name: string; re
   const nikkeIdByResourceId = new Map<number, string>();
   for (const nikke of nikkes) if (nikke.resource_id !== null) nikkeIdByResourceId.set(Number(nikke.resource_id), nikke.id);
   return { resourceIdByNameCode, nikkeIdByResourceId };
+}
+
+type ProxyArea = {
+  area: number;
+  characters?: BlaBlaLinkCharacterSource[];
+  details?: Array<Record<string, unknown>>;
+  outpost?: { synchro_level?: number } | null;
+};
+
+async function fetchBlaBlaLinkProxyProfileRequest(input: {
+  proxyUrl: string;
+  profileUrl: string;
+  areaId: number;
+  nikkes: readonly { id: string; name: string; resource_id: number | null }[];
+}) {
+  let response: Response;
+  try {
+    response = await fetch(`${input.proxyUrl}/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ profileUrl: input.profileUrl, area: input.areaId }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(45_000),
+    });
+  } catch {
+    throw new BlaBlaLinkError("NETWORK", "블라블라링크 프록시에 연결하지 못했습니다.");
+  }
+  const payload = await response.json().catch(() => null) as { error?: string; reason?: string; openid?: string; areas?: ProxyArea[] } | null;
+  if (!response.ok || !payload) {
+    if (payload?.reason === "session") throw new BlaBlaLinkError("AUTH", "블라블라링크 프록시 세션이 만료되었습니다. 관리자에게 쿠키 갱신을 요청해주세요.");
+    if (payload?.reason === "private") throw new BlaBlaLinkError("PRIVATE", payload.error ?? "프로필 정보를 확인할 수 없습니다.");
+    if (payload?.reason === "badurl" || payload?.reason === "badarea") throw new BlaBlaLinkError("ACCOUNT", payload.error ?? "프로필 링크를 확인해주세요.");
+    throw new BlaBlaLinkError("API", payload?.error ?? "블라블라링크 프록시 응답을 확인할 수 없습니다.");
+  }
+  const area = payload.areas?.find((candidate) => Number(candidate.area) === input.areaId);
+  if (!area || !Array.isArray(area.characters) || area.characters.length === 0) {
+    throw new BlaBlaLinkError("PRIVATE", "프로필 정보를 확인할 수 없습니다. 프로필 공개 상태와 링크를 확인해주세요.");
+  }
+  const synchroLevel = Number(area.outpost?.synchro_level);
+  if (!Number.isInteger(synchroLevel) || synchroLevel <= 0) {
+    throw new BlaBlaLinkError("PRIVATE", "프로필 정보를 확인할 수 없습니다. 전초기지 정보를 공개해주세요.");
+  }
+  const maps = await loadCharacterMaps(input.nikkes);
+  const mapped = mapBlaBlaLinkCharacters(area.characters, maps.resourceIdByNameCode, maps.nikkeIdByResourceId);
+  const detailsByNameCode = new Map((area.details ?? []).map((detail) => [Number(detail.name_code), detail]));
+  return {
+    ...mapped,
+    characters: mapped.characters.map((character) => ({
+      ...character,
+      details: detailsByNameCode.get(character.nameCode) ?? {},
+    })),
+    synchroLevel,
+    areaId: input.areaId,
+  };
+}
+
+export async function fetchBlaBlaLinkProxyProfile(input: {
+  server: BlaBlaLinkServerKey;
+  profileUrl: string;
+  nikkes: readonly { id: string; name: string; resource_id: number | null }[];
+}) {
+  const proxyUrl = getBlaBlaLinkProxyUrl();
+  if (!proxyUrl) throw new BlaBlaLinkError("CONFIG", "블라블라링크 프록시가 설정되지 않았습니다.");
+  const areaId = BLABLALINK_SERVERS.find((server) => server.key === input.server)?.areaId;
+  if (!areaId) throw new BlaBlaLinkError("CONFIG", "선택한 서버가 올바르지 않습니다.");
+  return fetchBlaBlaLinkProxyProfileRequest({ ...input, proxyUrl, areaId });
 }
 
 export async function fetchBlaBlaLinkMappingCandidates() {

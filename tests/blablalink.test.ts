@@ -128,6 +128,15 @@ test("BlaBlaLink modal and browser payload expose only server and profileUrl", (
   assert.match(deckBuilding, /deckToolbar/);
 });
 
+test("BlaBlaLink sync prefers the configured proxy instead of the shared server cookie", () => {
+  const route = readFileSync(new URL("../app/api/blablalink/route.ts", import.meta.url), "utf8");
+  const server = readFileSync(new URL("../lib/server/blablalink-api.ts", import.meta.url), "utf8");
+  assert.match(server, /BLABLALINK_PROXY_URL/);
+  assert.match(server, /fetchBlaBlaLinkProxyProfile/);
+  assert.match(route, /fetchBlaBlaLinkProxyProfile/);
+  assert.match(route, /profileUrl/);
+});
+
 test("deck building keeps the Nikke management selection and catalog independent from BlaBlaLink ownership", () => {
   const page = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
   const selectedNikkesBlock = page.slice(page.indexOf("const selectednikkes"), page.indexOf("const soloRaidInProgress"));

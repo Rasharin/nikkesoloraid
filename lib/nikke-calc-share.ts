@@ -35,7 +35,7 @@ export function encodeNikkeCalcShareCode(decks: readonly NikkeCalcDeck[]): strin
   while (normalized.length > 1 && normalized[normalized.length - 1]!.every((name) => !name?.trim())) {
     normalized.pop();
   }
-  const bytes: number[] = [1, normalized.length];
+  const bytes: number[] = [normalized.length > 1 ? 1 : 0, normalized.length];
 
   for (const deck of normalized) {
     let mask = 0;

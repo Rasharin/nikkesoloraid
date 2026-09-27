@@ -12,7 +12,16 @@ test("encodes selected decks using the NK2 calculator share format", () => {
     [""],
   ]);
 
-  assert.equal(code, "NK2-AQEA");
+  assert.equal(code, "NK2-AAEA");
+});
+
+test("marks multi-deck shares as five-deck mode", () => {
+  const code = encodeNikkeCalcShareCode([
+    [""],
+    ["리타"],
+  ]);
+
+  assert.equal(code, "NK2-AQIAAQLt0Q");
 });
 
 test("rejects more than five decks before producing a calculator code", () => {

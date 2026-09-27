@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { buildBest5ChartPoints, type Best5ChartRangePoint, type BlaBlaLinkServerKey } from "@/lib/blablalink";
 import { BlaBlaLinkProfileUrlError, parseBlaBlaLinkProfileUrl } from "@/lib/blablalink/profile-url";
 import { isBlaBlaLinkServerKey } from "@/lib/blablalink/constants";
-import { BlaBlaLinkError, fetchBlaBlaLinkProfile, getBlaBlaLinkServerSessionCookie, hashGameOpenId } from "@/lib/server/blablalink-api";
+import { BlaBlaLinkError, fetchBlaBlaLinkProfile, fetchBlaBlaLinkProxyProfile, getBlaBlaLinkProxyUrl, getBlaBlaLinkServerSessionCookie, hashGameOpenId } from "@/lib/server/blablalink-api";
 
 export const runtime = "nodejs";
 
@@ -64,15 +64,16 @@ export async function POST(request: Request) {
   }
   try {
     const { openId } = parseBlaBlaLinkProfileUrl(body.profileUrl);
-    const sessionCookie = getBlaBlaLinkServerSessionCookie();
     const { data: nikkes, error: nikkesError } = await clients.client.from("nikkes").select("id,name,resource_id");
     if (nikkesError) throw nikkesError;
-    const profile = await fetchBlaBlaLinkProfile({
-      server: body.server,
-      openId,
-      sessionCookie,
-      nikkes: nikkes ?? [],
-    });
+    const profile = getBlaBlaLinkProxyUrl()
+      ? await fetchBlaBlaLinkProxyProfile({ server: body.server, profileUrl: body.profileUrl, nikkes: nikkes ?? [] })
+      : await fetchBlaBlaLinkProfile({
+          server: body.server,
+          openId,
+          sessionCookie: getBlaBlaLinkServerSessionCookie(),
+          nikkes: nikkes ?? [],
+        });
     const syncedAt = new Date().toISOString();
     const { error: integrationError } = await clients.client.from("blablalink_integrations").upsert({
       user_id: userId,
