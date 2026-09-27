@@ -30,6 +30,15 @@ test("canonicalizes legacy spacing before hashing calculator names", () => {
   assert.equal(legacy, canonical);
 });
 
+test("uses the BlaBlaLink resource id to resolve decorated local names", () => {
+  const decorated = encodeNikkeCalcShareCode(
+    [["아니스:스타"]],
+    [{ name: "아니스:스타", resourceId: 17 }],
+  );
+  const canonical = encodeNikkeCalcShareCode([["아니스 : 스타"]], ["아니스 : 스타"]);
+  assert.equal(decorated, canonical);
+});
+
 test("rejects more than five decks before producing a calculator code", () => {
   assert.throws(
     () => encodeNikkeCalcShareCode(Array.from({ length: 6 }, () => ["리타"])),

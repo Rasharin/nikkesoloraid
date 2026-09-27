@@ -7,6 +7,7 @@ export const MAX_DECK_CHARS = 5;
 export type NikkeRow = {
   id: string;
   name: string;
+  resource_id?: number | null;
   image_path: string | null;
   burst?: number | null;
   element?: string | null;

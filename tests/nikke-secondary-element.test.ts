@@ -50,7 +50,7 @@ test("main Nikke data flow reads, normalizes, and writes the secondary element",
   assert.match(source, /element2:\s*nikke\.element2 \?\? null/);
   assert.match(
     source,
-    /\.select\("id,name,image_path,created_at,burst,element,element2,role,aliases"\)/
+    /\.select\("id,name,resource_id,image_path,created_at,burst,element,element2,role,aliases"\)/
   );
   assert.match(
     source,

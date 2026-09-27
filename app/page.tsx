@@ -261,6 +261,7 @@ type NikkeRole = "attacker" | "supporter" | "defender" | null
 type NikkeRow = {
   id: string;
   name: string;
+  resource_id?: number | null;
   image_path: string | null;
   created_at: string;
   burst: number | null;
@@ -2840,7 +2841,7 @@ export default function Page() {
       const [nikkeResult, bossResult] = await Promise.all([
         supabase
           .from("nikkes")
-          .select("id,name,image_path,created_at,burst,element,element2,role,aliases")
+          .select("id,name,resource_id,image_path,created_at,burst,element,element2,role,aliases")
           .order("name", { ascending: true }),
         supabase
           .from(bossSource)

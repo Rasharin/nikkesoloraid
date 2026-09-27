@@ -1,11 +1,24 @@
+import { NIKKE_CALCULATOR_NAMES_BY_RESOURCE_ID } from "./nikke-calc-catalog.ts";
+
 const PREFIX = "NK2-";
 const MAX_DECKS = 5;
 const MAX_SLOTS = 5;
 
 export type NikkeCalcDeck = readonly (string | null | undefined)[];
+export type NikkeCalcCatalogEntry = {
+  name: string;
+  resourceId?: number | null;
+};
 
 function normalizeCatalogName(name: string): string {
   return name.normalize("NFKC").replace(/\s+/g, "").toLocaleLowerCase("ko-KR");
+}
+
+function calculatorNameFallback(name: string): string {
+  return name
+    .replace(/\[[^\]]*\].*$/, "")
+    .trim()
+    .replace(/\s*:\s*/g, " : ");
 }
 
 export function getNikkeCalcShareSelectionError(deckCount: number): string | null {
@@ -31,22 +44,26 @@ function toBase64Url(bytes: Uint8Array): string {
 
 export function encodeNikkeCalcShareCode(
   decks: readonly NikkeCalcDeck[],
-  catalogNames: readonly string[] = [],
+  catalog: readonly (string | NikkeCalcCatalogEntry)[] = [],
 ): string {
   const selectionError = getNikkeCalcShareSelectionError(decks.length);
   if (selectionError && decks.length > 0) throw new Error(selectionError);
 
   const canonicalNames = new Map<string, string>();
-  for (const catalogName of catalogNames) {
+  for (const entry of catalog) {
+    const catalogName = typeof entry === "string" ? entry : entry.name;
+    const canonicalName = typeof entry === "string"
+      ? calculatorNameFallback(catalogName)
+      : NIKKE_CALCULATOR_NAMES_BY_RESOURCE_ID[String(entry.resourceId ?? "")] ?? calculatorNameFallback(catalogName);
     const key = normalizeCatalogName(catalogName);
-    if (key && !canonicalNames.has(key)) canonicalNames.set(key, catalogName);
+    if (key && !canonicalNames.has(key)) canonicalNames.set(key, canonicalName);
   }
 
   const normalized = (decks.length > 0 ? decks : [[]]).map((deck) =>
     Array.from({ length: MAX_SLOTS }, (_, index) => {
       const name = deck[index] ?? null;
       if (typeof name !== "string") return name;
-      return canonicalNames.get(normalizeCatalogName(name)) ?? name;
+      return canonicalNames.get(normalizeCatalogName(name)) ?? calculatorNameFallback(name);
     })
   );
   while (normalized.length > 1 && normalized[normalized.length - 1]!.every((name) => !name?.trim())) {
