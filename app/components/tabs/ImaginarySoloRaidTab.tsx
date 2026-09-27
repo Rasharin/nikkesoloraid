@@ -1141,7 +1141,7 @@ export default function ImaginarySoloRaidTab({
     const selectedDecks = deckDrafts
       .filter((deck) => effectiveSelectedDeckDraftIds.has(deck.id))
       .map((deck) => deck.draft);
-    const code = encodeNikkeCalcShareCode(selectedDecks);
+    const code = encodeNikkeCalcShareCode(selectedDecks, nikkes.map((nikke) => nikke.name));
 
     try {
       await navigator.clipboard.writeText(code);

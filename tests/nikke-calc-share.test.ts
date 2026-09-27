@@ -24,6 +24,12 @@ test("marks multi-deck shares as five-deck mode", () => {
   assert.equal(code, "NK2-AQIAAQLt0Q");
 });
 
+test("canonicalizes legacy spacing before hashing calculator names", () => {
+  const legacy = encodeNikkeCalcShareCode([["아니스:스타"]], ["아니스 : 스타"]);
+  const canonical = encodeNikkeCalcShareCode([["아니스 : 스타"]], ["아니스 : 스타"]);
+  assert.equal(legacy, canonical);
+});
+
 test("rejects more than five decks before producing a calculator code", () => {
   assert.throws(
     () => encodeNikkeCalcShareCode(Array.from({ length: 6 }, () => ["리타"])),

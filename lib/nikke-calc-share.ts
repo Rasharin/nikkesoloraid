@@ -4,6 +4,10 @@ const MAX_SLOTS = 5;
 
 export type NikkeCalcDeck = readonly (string | null | undefined)[];
 
+function normalizeCatalogName(name: string): string {
+  return name.normalize("NFKC").replace(/\s+/g, "").toLocaleLowerCase("ko-KR");
+}
+
 export function getNikkeCalcShareSelectionError(deckCount: number): string | null {
   if (deckCount === 0) return "덱을 선택해야 합니다.(최대 5개)";
   if (deckCount > MAX_DECKS) return "계산기로 공유는 최대 5개 덱까지 가능합니다.";
@@ -25,12 +29,25 @@ function toBase64Url(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-export function encodeNikkeCalcShareCode(decks: readonly NikkeCalcDeck[]): string {
+export function encodeNikkeCalcShareCode(
+  decks: readonly NikkeCalcDeck[],
+  catalogNames: readonly string[] = [],
+): string {
   const selectionError = getNikkeCalcShareSelectionError(decks.length);
   if (selectionError && decks.length > 0) throw new Error(selectionError);
 
+  const canonicalNames = new Map<string, string>();
+  for (const catalogName of catalogNames) {
+    const key = normalizeCatalogName(catalogName);
+    if (key && !canonicalNames.has(key)) canonicalNames.set(key, catalogName);
+  }
+
   const normalized = (decks.length > 0 ? decks : [[]]).map((deck) =>
-    Array.from({ length: MAX_SLOTS }, (_, index) => deck[index] ?? null)
+    Array.from({ length: MAX_SLOTS }, (_, index) => {
+      const name = deck[index] ?? null;
+      if (typeof name !== "string") return name;
+      return canonicalNames.get(normalizeCatalogName(name)) ?? name;
+    })
   );
   while (normalized.length > 1 && normalized[normalized.length - 1]!.every((name) => !name?.trim())) {
     normalized.pop();
