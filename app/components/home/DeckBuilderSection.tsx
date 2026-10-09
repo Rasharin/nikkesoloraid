@@ -12,6 +12,9 @@ import { getDeckSlotId, parseDeckSlotTarget, type DraftSlot, type DragItemData, 
 type DeckBuilderSectionProps = {
   compact?: boolean;
   duplicateNames?: ReadonlySet<string>;
+  elementOptions?: readonly string[];
+  element?: string | null;
+  onElementChange?: (element: string | null) => void;
   deckIndex?: number;
   title?: string;
   draft: DraftSlot[];
@@ -41,6 +44,9 @@ type DeckBuilderSectionProps = {
 function DeckBuilderSectionComponent({
   compact = false,
   duplicateNames,
+  elementOptions,
+  element,
+  onElementChange,
   deckIndex = 0,
   title,
   draft,
@@ -71,6 +77,21 @@ function DeckBuilderSectionComponent({
   return (
     <section ref={sectionRef} className={`rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 ${className ?? ""}`}>
       <div>
+        {elementOptions && onElementChange ? (
+          <div className="mb-2 flex flex-wrap items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--theme-panel)] px-2 py-1.5 pr-10">
+            {elementOptions.map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={element === option}
+                onClick={() => onElementChange(element === option ? null : option)}
+                className={`rounded-lg border px-2 py-0.5 text-xs ${element === option ? "border-cyan-400 bg-cyan-400/15" : "border-[var(--border)]"}`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <SortableContext items={slotIds} strategy={rectSortingStrategy}>
           <div className="grid grid-cols-5 gap-0.5">
             {draft.map((name, index) => {

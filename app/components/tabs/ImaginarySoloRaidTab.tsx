@@ -54,6 +54,7 @@ type DeckDraftState = {
   score: string;
   note: string;
   editingId: string | null;
+  element?: string | null;
 };
 
 type DeckBuilderPageState = {
@@ -263,6 +264,7 @@ function createEmptyDeckDrafts(unionMode = false): DeckDraftState[] {
     score: "",
     note: "",
     editingId: null,
+    element: null,
   }));
 }
 
@@ -292,7 +294,7 @@ function normalizeDraftSlots(value: unknown, length: number): DraftSlot[] {
 function normalizeSavedDeckDrafts(value: unknown): DeckDraftState[] {
   if (!Array.isArray(value)) return createEmptyDeckDrafts();
 
-  const normalized = value
+  const normalized: DeckDraftState[] = value
     .map((candidate, index) => {
       if (!candidate || typeof candidate !== "object") {
         return {
@@ -301,6 +303,7 @@ function normalizeSavedDeckDrafts(value: unknown): DeckDraftState[] {
           score: "",
           note: "",
           editingId: null,
+          element: null,
         } satisfies DeckDraftState;
       }
 
@@ -311,9 +314,9 @@ function normalizeSavedDeckDrafts(value: unknown): DeckDraftState[] {
         score: typeof saved.score === "string" ? formatPlainScoreText(saved.score) : "",
         note: typeof saved.note === "string" ? saved.note : "",
         editingId: typeof saved.editingId === "string" ? saved.editingId : null,
+        element: saved.element === null || UNION_ELEMENTS.some((element) => element === saved.element) ? saved.element : null,
       } satisfies DeckDraftState;
-    })
-    .filter((deck): deck is DeckDraftState => Boolean(deck));
+    });
 
   const maxId = normalized.reduce((max, deck) => Math.max(max, deck.id), 0);
   const filled: DeckDraftState[] =
@@ -348,9 +351,16 @@ function normalizeSavedDeckBuilderPage(value: unknown, fallbackId: number): Deck
   if (!value || typeof value !== "object") return createEmptyDeckBuilderPage(fallbackId);
 
   const saved = value as Partial<DeckBuilderPageState>;
+  const columnElements = saved.columnElements && typeof saved.columnElements === "object"
+    ? Object.fromEntries(Object.entries(saved.columnElements).filter(([, value]) => value === null || UNION_ELEMENTS.some(element => element === value)))
+    : {};
+  const deckDrafts = normalizeSavedDeckDrafts(saved.deckDrafts).map((deck, index) => ({
+    ...deck,
+    element: deck.element ?? columnElements[String(index % 3)] ?? null,
+  }));
   return {
     id: typeof saved.id === "number" && Number.isFinite(saved.id) ? saved.id : fallbackId,
-    deckDrafts: normalizeSavedDeckDrafts(saved.deckDrafts),
+    deckDrafts,
     rowElements: saved.rowElements && typeof saved.rowElements === "object" ? Object.fromEntries(Object.entries(saved.rowElements).filter(([, value]) => value === null || UNION_ELEMENTS.some(element => element === value))) : {},
     columnElements: saved.columnElements && typeof saved.columnElements === "object" ? Object.fromEntries(Object.entries(saved.columnElements).filter(([, value]) => value === null || UNION_ELEMENTS.some(element => element === value))) : {},
     spareSlots: normalizeDraftSlots(saved.spareSlots, SPARE_SLOT_COUNT),
@@ -754,7 +764,7 @@ export default function ImaginarySoloRaidTab({
       })),
     [deckDrafts],
   );
-  const unionMeta = (index: number) => unionMode ? { pageId: activeDeckPageId, rowIndex: Math.floor(index / 3), deckId: deckDrafts[index].id, element: activeDeckPage.columnElements?.[index % 3] ?? null } : undefined;
+  const unionMeta = (index: number) => unionMode ? { pageId: activeDeckPageId, rowIndex: Math.floor(index / 3), deckId: deckDrafts[index].id, element: deckDrafts[index].element ?? null } : undefined;
   const effectiveSelectedDeckDraftIds = useMemo(() => {
     const activeDeckIds = new Set(deckDrafts.map((deck) => deck.id));
     return new Set([...selectedDeckDraftIds].filter((id) => activeDeckIds.has(id)));
@@ -1112,6 +1122,7 @@ export default function ImaginarySoloRaidTab({
           score: "",
           note: "",
           editingId: null,
+          element: null,
         },
       ];
     });
@@ -2283,11 +2294,6 @@ export default function ImaginarySoloRaidTab({
                 <div className="mt-3 grid gap-2 lg:grid-cols-3">
                   {unionColumnGroups.map((group) => (
                     <section key={group.columnIndex} className="union-raid-column-section min-w-0 rounded-2xl border border-[var(--border)] bg-black/35 p-1 shadow-inner shadow-black/20">
-                      <div className="mb-2 flex flex-wrap items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--theme-panel)] px-2 py-1.5">
-                        {UNION_ELEMENTS.map(element => <button key={element} type="button" aria-pressed={activeDeckPage.columnElements?.[group.columnIndex] === element}
-                          onClick={() => setDeckPages(pages => pages.map(page => page.id !== activeDeckPageId ? page : { ...page, columnElements: { ...page.columnElements, [group.columnIndex]: page.columnElements?.[group.columnIndex] === element ? null : element } }))}
-                          className={`rounded-lg border px-2 py-0.5 text-xs ${activeDeckPage.columnElements?.[group.columnIndex] === element ? "border-cyan-400 bg-cyan-400/15" : "border-[var(--border)]"}`}>{element}</button>)}
-                      </div>
                       <div className="space-y-2">
                         {group.decks.map(({ deck, deckIndex }) => (
                           <Fragment key={deck.id}>
@@ -2295,6 +2301,9 @@ export default function ImaginarySoloRaidTab({
                               <DeckBuilderSection
                                 duplicateNames={duplicateNames}
                                 compact={unionMode}
+                                elementOptions={UNION_ELEMENTS}
+                                element={deck.element ?? null}
+                                onElementChange={(element) => setActiveDeckDrafts((decks) => decks.map((candidate) => candidate.id === deck.id ? { ...candidate, element } : candidate))}
                                 deckIndex={deckIndex}
                                 draft={deck.draft}
                                 nikkeMap={effectiveNikkeMap}
