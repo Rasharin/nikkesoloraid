@@ -196,7 +196,7 @@ export default function ArchiveApp() {
             <div className="text-sm font-semibold tracking-[0.18em] text-cyan-300">NiDeck ARCHIVE</div>
             <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">읽기 전용 덱 보관소</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-300 sm:text-base">
-              기존 이용자가 저장한 덱을 확인하고 내려받을 수 있도록 운영하는 보존 사이트입니다. 새로운 덱 저장과 수정은 지원하지 않습니다.
+              Nikkesolo웹을 이용해주셔 감사합니다. 본 사이트의 기존 형식대로 내년까지 유지하려 하였으나 부득이하게 조회 전용 사이트로 변경함을 알립니다. 기존에 로그인하신 분들의 경우 로그인하여 덱 정보를 열람하실 수 있습니다.
             </p>
           </div>
           {ownerId ? (
