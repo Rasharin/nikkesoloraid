@@ -1,16 +1,15 @@
 -- Freeze NiDeck as an owner-only read-only archive.
 -- Back up the project before applying this migration. It intentionally removes
--- every browser-facing public-schema privilege except the three grants below.
+-- browser-facing privileges for the archive tables except the three grants below.
 
 begin;
 
-revoke all privileges on all tables in schema public from public, anon, authenticated;
-revoke all privileges on all sequences in schema public from public, anon, authenticated;
-revoke execute on all functions in schema public from public, anon, authenticated;
+revoke all privileges on table public.decks, public.union_raid_decks, public.union_raid_schedules
+from public, anon, authenticated;
 
-alter default privileges in schema public revoke all privileges on tables from public, anon, authenticated;
-alter default privileges in schema public revoke all privileges on sequences from public, anon, authenticated;
-alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
+revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+alter function public.is_master() set search_path = '';
+alter function public.set_updated_at() set search_path = '';
 
 grant select on table public.decks to authenticated;
 grant select on table public.union_raid_decks to authenticated;

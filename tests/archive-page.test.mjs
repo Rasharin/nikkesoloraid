@@ -11,7 +11,7 @@ async function waitForPage() {
     try {
       const response = await fetch(origin);
       const html = await response.text();
-      if (response.ok) return html;
+      if (response.ok) return { headers: response.headers, html };
       lastError = new Error(`HTTP ${response.status}: ${html.slice(0, 200)}`);
     } catch (error) {
       lastError = error;
@@ -28,7 +28,7 @@ async function fetchPage(path) {
 }
 
 test("serves the signed-out read-only archive without mutation controls", { timeout: 30_000 }, async () => {
-  const server = spawn("./node_modules/.bin/next", ["dev", "--hostname", "127.0.0.1", "--port", String(port)], {
+  const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -40,11 +40,16 @@ test("serves the signed-out read-only archive without mutation controls", { time
   });
 
   try {
-    const html = await waitForPage();
+    const { headers, html } = await waitForPage();
     assert.match(html, /읽기 전용 덱 보관소/);
-    assert.match(html, /2027년 11월 11일/);
+    assert.match(html, /2027년 8월경/);
     assert.match(html, /Google 로그인/);
     assert.doesNotMatch(html, />전체 삭제<|>니케 관리<|>문의하기<|>저장<\/button>/);
+    assert.equal(headers.get("x-content-type-options"), "nosniff");
+    assert.equal(headers.get("x-frame-options"), "DENY");
+    assert.equal(headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+    assert.match(headers.get("permissions-policy") ?? "", /camera=\(\)/);
+    assert.match(headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
 
     const privacy = await fetchPage("/privacy");
     const terms = await fetchPage("/terms");

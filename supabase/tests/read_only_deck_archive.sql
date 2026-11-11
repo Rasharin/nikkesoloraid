@@ -87,6 +87,9 @@ end $$;
 set local role anon;
 do $$
 begin
+  if has_function_privilege('anon', 'public.rls_auto_enable()', 'execute') then
+    raise exception 'Anonymous SECURITY DEFINER RPC execution was allowed';
+  end if;
   begin
     perform 1 from public.decks;
     raise exception 'Anonymous solo read was allowed' using errcode='XX000';
@@ -107,6 +110,14 @@ begin
     raise exception 'Anonymous RPC execution was allowed' using errcode='XX000';
   exception when insufficient_privilege then null;
   end;
+end $$;
+
+reset role;
+do $$
+begin
+  if has_function_privilege('authenticated', 'public.rls_auto_enable()', 'execute') then
+    raise exception 'Authenticated SECURITY DEFINER RPC execution was allowed';
+  end if;
 end $$;
 
 reset role;
