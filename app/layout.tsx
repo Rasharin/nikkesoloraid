@@ -1,66 +1,28 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+
 import { canonicalUrl, siteUrl } from "@/lib/site";
-import ServiceWorkerRegistration from "@/app/components/ServiceWorkerRegistration";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const siteName = "NiDeck";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  alternates: {
-    canonical: canonicalUrl("/"),
-  },
-  title: {
-    default: siteName,
-    template: "%s | NiDeck",
-  },
-  description: "니케(NIKKE) 솔로레이드(솔레) 덱 조합, 추천, 기록, 솔로레이드 시즌별 기록, 솔레 팁.",
-  keywords: [
-    "니케 솔레",
-    "니케 덱",
-    "니케 솔로레이드",
-    "니케 덱 추천",
-    "니케 조합",
-  ],
+  alternates: { canonical: canonicalUrl("/") },
+  title: "NiDeck 읽기 전용 덱 보관소",
+  description: "기존 NiDeck 이용자가 본인의 저장 덱을 확인하고 내려받는 읽기 전용 보관소입니다.",
+  robots: { index: true, follow: true },
   openGraph: {
-    title: siteName,
-    description: "니케 덱 추천 최적화 사이트",
+    title: "NiDeck 읽기 전용 덱 보관소",
+    description: "저장된 솔로·유니온 레이드 덱 조회 및 내보내기",
     url: canonicalUrl("/"),
-    siteName,
+    siteName: "NiDeck Archive",
     locale: "ko_KR",
     type: "website",
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ko" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "try{var t=localStorage.getItem('soloraid_theme_mode_v1')||localStorage.getItem('theme');if(t!=='light'&&t!=='dark')t='dark';var e=document.documentElement;e.dataset.theme=t;e.classList.toggle('dark',t==='dark');e.classList.toggle('theme-light',t==='light');e.classList.toggle('theme-dark',t==='dark');}catch(e){}",
-          }}
-        />
-      </head>
-      <body suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ServiceWorkerRegistration />
-        {children}
-      </body>
+    <html lang="ko">
+      <body>{children}</body>
     </html>
   );
 }

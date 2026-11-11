@@ -9,13 +9,7 @@ export function canonicalUrl(path = "") {
 
 export const publicRoutes = [
   "",
-  "/deck-recommend",
-  "/deck-setting",
-  "/tier",
-  "/usage",
   "/saved-deck",
-  "/faq",
-  "/notice",
   "/terms",
   "/privacy",
   "/license",
