@@ -206,7 +206,7 @@ export default function ArchiveApp() {
           )}
         </div>
         <div className="mt-6 rounded-2xl border border-amber-700/50 bg-amber-950/30 p-4 text-sm leading-6 text-amber-100">
-          운영 종료 예정일은 <strong>2027년 11월 11일</strong>입니다. 종료 전에 아래 내보내기 기능으로 자신의 기록을 보관해 주세요.
+          운영 종료 예정일은 <strong>2027년 8월경</strong>입니다. 종료 전에 아래 내보내기 기능으로 자신의 기록을 보관해 주세요.
         </div>
         {contactEmail ? <p className="mt-3 text-xs text-neutral-400">조기 개인정보 삭제 요청: <a className="text-cyan-300 underline" href={`mailto:${contactEmail}`}>{contactEmail}</a></p> : null}
       </header>
